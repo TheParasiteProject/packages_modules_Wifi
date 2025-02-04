@@ -113,6 +113,7 @@ import com.android.server.wifi.ActiveModeWarden.ExternalClientModeManagerRequest
 import com.android.server.wifi.util.GeneralUtil.Mutable;
 import com.android.server.wifi.util.LastCallerInfoManager;
 import com.android.server.wifi.util.WifiPermissionsUtil;
+import com.android.wifi.flags.FeatureFlags;
 import com.android.wifi.resources.R;
 
 import org.junit.After;
@@ -204,6 +205,8 @@ public class ActiveModeWardenTest extends WifiBaseTest {
     @Mock WifiConnectivityManager mWifiConnectivityManager;
     @Mock WifiConfigManager mWifiConfigManager;
     @Mock WakeupController mWakeupController;
+    @Mock DeviceConfigFacade mDeviceConfigFacade;
+    @Mock FeatureFlags mFeatureFlags;
 
     Listener<ConcreteClientModeManager> mClientListener;
     Listener<SoftApManager> mSoftApListener;
@@ -248,6 +251,8 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         when(mClientModeManager.getInterfaceName()).thenReturn(WIFI_IFACE_NAME);
         when(mContext.getResourceCache()).thenReturn(mWifiResourceCache);
         when(mSoftApManager.getRole()).thenReturn(ROLE_SOFTAP_TETHERED);
+        when(mWifiInjector.getDeviceConfigFacade()).thenReturn(mDeviceConfigFacade);
+        when(mDeviceConfigFacade.getFeatureFlags()).thenReturn(mFeatureFlags);
 
         when(mWifiResourceCache.getString(R.string.wifi_localhotspot_configure_ssid_default))
                 .thenReturn("AndroidShare");
@@ -1599,6 +1604,21 @@ public class ActiveModeWardenTest extends WifiBaseTest {
      */
     @Test
     public void testWifiStateUnaffectedByAirplaneMode() throws Exception {
+        when(mFeatureFlags.monitorIntentForAllUsers()).thenReturn(false);
+        verifyWifiStateUnaffectedByAirplaneMode(false);
+    }
+
+    /**
+     * Same as #testWifiStateUnaffectedByAirplaneMode but monitoring intent by RegisterForAllUsers.
+     */
+    @Test
+    public void testWifiStateUnaffectedByAirplaneModeWithRegisterForAllUsers() throws Exception {
+        when(mFeatureFlags.monitorIntentForAllUsers()).thenReturn(true);
+        verifyWifiStateUnaffectedByAirplaneMode(true);
+    }
+
+    private void verifyWifiStateUnaffectedByAirplaneMode(boolean isMonitorIntentForAllUsersEnabled)
+            throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
         when(mUserManager.hasUserRestrictionForUser(eq(UserManager.DISALLOW_CHANGE_WIFI_STATE),
                 any())).thenReturn(true);
@@ -1612,9 +1632,16 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
         ArgumentCaptor<BroadcastReceiver> bcastRxCaptor =
                 ArgumentCaptor.forClass(BroadcastReceiver.class);
-        verify(mContext).registerReceiver(
-                bcastRxCaptor.capture(),
-                argThat(filter -> filter.hasAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)));
+        if (isMonitorIntentForAllUsersEnabled) {
+            verify(mContext).registerReceiverForAllUsers(
+                    bcastRxCaptor.capture(),
+                    argThat(filter -> filter.hasAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)),
+                    eq(null), any(Handler.class));
+        } else {
+            verify(mContext).registerReceiver(
+                    bcastRxCaptor.capture(),
+                    argThat(filter -> filter.hasAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)));
+        }
         BroadcastReceiver broadcastReceiver = bcastRxCaptor.getValue();
 
         Intent intent = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED);
@@ -1746,6 +1773,37 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         mLooper.dispatchAll();
 
         assertInDisabledState();
+    }
+
+    /**
+     * When in Client mode, make sure ECM triggers wifi shutdown.
+     */
+    @Test
+    public void testEcmReceiverFromClientModeWithRegisterForAllUsers()
+            throws Exception {
+        when(mFeatureFlags.monitorIntentForAllUsers()).thenReturn(true);
+        ArgumentCaptor<BroadcastReceiver> bcastRxCaptor =
+                ArgumentCaptor.forClass(BroadcastReceiver.class);
+        mActiveModeWarden = createActiveModeWarden();
+        mActiveModeWarden.start();
+        mLooper.dispatchAll();
+        verify(mContext).registerReceiverForAllUsers(
+                bcastRxCaptor.capture(),
+                argThat(filter ->
+                        filter.hasAction(TelephonyManager.ACTION_EMERGENCY_CALLBACK_MODE_CHANGED)),
+                        eq(null), any(Handler.class));
+        mEmergencyCallbackModeChangedBr = bcastRxCaptor.getValue();
+        when(mSettingsStore.isScanAlwaysAvailable()).thenReturn(false);
+        enableWifi();
+
+        // Test with WifiDisableInECBM turned on:
+        when(mFacade.getConfigWiFiDisableInECBM(mContext)).thenReturn(true);
+
+        assertWifiShutDown(() -> {
+            // test ecm changed
+            emergencyCallbackModeChanged(true);
+            mLooper.dispatchAll();
+        });
     }
 
     /**
@@ -1977,6 +2035,45 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         });
     }
 
+    /**
+     * Updates about call state change also trigger entry of ECM mode.
+     */
+    @Test
+    public void testEnterEcmOnEmergencyCallStateChangeWithRegisterForAllUsers()
+            throws Exception {
+        when(mFeatureFlags.monitorIntentForAllUsers()).thenReturn(true);
+        ArgumentCaptor<BroadcastReceiver> bcastRxCaptor =
+                ArgumentCaptor.forClass(BroadcastReceiver.class);
+        mActiveModeWarden = createActiveModeWarden();
+        mActiveModeWarden.start();
+        mLooper.dispatchAll();
+        verify(mContext).registerReceiverForAllUsers(
+                bcastRxCaptor.capture(),
+                argThat(filter ->
+                        filter.hasAction(TelephonyManager.ACTION_EMERGENCY_CALL_STATE_CHANGED)),
+                        eq(null), any(Handler.class));
+        mEmergencyCallStateChangedBr = bcastRxCaptor.getValue();
+        assertInDisabledState();
+
+        enableWifi();
+        assertInEnabledState();
+
+        // Test with WifiDisableInECBM turned on:
+        when(mFacade.getConfigWiFiDisableInECBM(mContext)).thenReturn(true);
+
+        assertEnteredEcmMode(() -> {
+            // test call state changed
+            emergencyCallStateChanged(true);
+            mLooper.dispatchAll();
+            mClientListener.onStopped(mClientModeManager);
+            mLooper.dispatchAll();
+        });
+
+        emergencyCallStateChanged(false);
+        mLooper.dispatchAll();
+
+        assertInEnabledState();
+    }
 
     /**
      * Updates about call state change also trigger entry of ECM mode.
