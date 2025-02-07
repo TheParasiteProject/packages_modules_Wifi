@@ -932,6 +932,7 @@ public class ActiveModeWarden {
         @NonNull public final String ssid;
         @Nullable public final String bssid;
         public final boolean didUserApprove;
+        public boolean preferSecondarySta = false;
 
         AdditionalClientModeManagerRequestInfo(
                 @NonNull ExternalClientModeManagerRequestListener listener,
@@ -947,7 +948,6 @@ public class ActiveModeWarden {
             this.ssid = ssid;
             this.bssid = bssid;
             this.didUserApprove = didUserApprove;
-
         }
     }
 
@@ -960,11 +960,12 @@ public class ActiveModeWarden {
      *                 3. The new ClientModeManager - if it was created successfully.
      * @param requestorWs the WorkSource for this request
      * @param didUserApprove if user explicitly approve on this request
+     * @param preferSecondarySta prefer to use secondary CMM for this request if possible
      */
     public void requestLocalOnlyClientModeManager(
             @NonNull ExternalClientModeManagerRequestListener listener,
             @NonNull WorkSource requestorWs, @NonNull String ssid, @NonNull String bssid,
-            boolean didUserApprove) {
+            boolean didUserApprove, boolean preferSecondarySta) {
         if (listener == null) {
             Log.wtf(TAG, "Cannot provide a null ExternalClientModeManagerRequestListener");
             return;
@@ -974,10 +975,14 @@ public class ActiveModeWarden {
             return;
         }
 
+        AdditionalClientModeManagerRequestInfo additionalClientModeManagerRequestInfo =
+                new AdditionalClientModeManagerRequestInfo(listener, requestorWs,
+                        ROLE_CLIENT_LOCAL_ONLY, ssid, bssid, didUserApprove);
+        additionalClientModeManagerRequestInfo.preferSecondarySta = preferSecondarySta;
+
         mWifiController.sendMessage(
                 WifiController.CMD_REQUEST_ADDITIONAL_CLIENT_MODE_MANAGER,
-                new AdditionalClientModeManagerRequestInfo(listener, requestorWs,
-                        ROLE_CLIENT_LOCAL_ONLY, ssid, bssid, didUserApprove));
+                additionalClientModeManagerRequestInfo);
     }
 
     /**
@@ -2487,7 +2492,8 @@ public class ActiveModeWarden {
                 // Special case for holders with ENTER_CAR_MODE_PRIORITIZED. Only give them the
                 // primary STA to avoid the device getting into STA+STA state.
                 // In STA+STA wifi scans will result in high latency in the secondary STA.
-                if (requestInfo.clientRole == ROLE_CLIENT_LOCAL_ONLY
+                if (!requestInfo.preferSecondarySta
+                        && requestInfo.clientRole == ROLE_CLIENT_LOCAL_ONLY
                         && requestInfo.requestorWs != null) {
                     WorkSource workSource = requestInfo.requestorWs;
                     for (int i = 0; i < workSource.size(); i++) {
