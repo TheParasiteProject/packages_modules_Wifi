@@ -3289,7 +3289,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         // request for ssid2/bssid2
         if (additionaClientModeManagerRole == ROLE_CLIENT_LOCAL_ONLY) {
             mActiveModeWarden.requestLocalOnlyClientModeManager(
-                    externalRequestListener, TEST_WORKSOURCE, ssid, bssid, false);
+                    externalRequestListener, TEST_WORKSOURCE, ssid, bssid, false, false);
         } else if (additionaClientModeManagerRole == ROLE_CLIENT_SECONDARY_LONG_LIVED) {
             mActiveModeWarden.requestSecondaryLongLivedClientModeManager(
                     externalRequestListener, TEST_WORKSOURCE, ssid, bssid);
@@ -3404,7 +3404,8 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         // request for ssid2/bssid2
         if (role == ROLE_CLIENT_LOCAL_ONLY) {
             mActiveModeWarden.requestLocalOnlyClientModeManager(
-                    externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, false);
+                    externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, false,
+                    false);
         } else if (role == ROLE_CLIENT_SECONDARY_LONG_LIVED) {
             mActiveModeWarden.requestSecondaryLongLivedClientModeManager(
                     externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2);
@@ -3435,7 +3436,8 @@ public class ActiveModeWardenTest extends WifiBaseTest {
                 ExternalClientModeManagerRequestListener.class);
         if (role == ROLE_CLIENT_LOCAL_ONLY) {
             mActiveModeWarden.requestLocalOnlyClientModeManager(
-                    externalRequestListener, TEST_WORKSOURCE, TEST_SSID_1, TEST_BSSID_1, false);
+                    externalRequestListener, TEST_WORKSOURCE, TEST_SSID_1, TEST_BSSID_1, false,
+                    false);
         } else if (role == ROLE_CLIENT_SECONDARY_LONG_LIVED) {
             mActiveModeWarden.requestSecondaryLongLivedClientModeManager(
                     externalRequestListener, TEST_WORKSOURCE, TEST_SSID_1, TEST_BSSID_1);
@@ -3467,7 +3469,8 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         // request for one more CMM (returns the existing one).
         if (role == ROLE_CLIENT_LOCAL_ONLY) {
             mActiveModeWarden.requestLocalOnlyClientModeManager(
-                    externalRequestListener, TEST_WORKSOURCE, TEST_SSID_3, TEST_BSSID_3, false);
+                    externalRequestListener, TEST_WORKSOURCE, TEST_SSID_3, TEST_BSSID_3, false,
+                    false);
         } else if (role == ROLE_CLIENT_SECONDARY_LONG_LIVED) {
             mActiveModeWarden.requestSecondaryLongLivedClientModeManager(
                     externalRequestListener, TEST_WORKSOURCE, TEST_SSID_3, TEST_BSSID_3);
@@ -3510,7 +3513,8 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         // request for the same SSID/BSSID and expect the existing CMM to get returned twice.
         if (role == ROLE_CLIENT_LOCAL_ONLY) {
             mActiveModeWarden.requestLocalOnlyClientModeManager(
-                    externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, false);
+                    externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, false,
+                    false);
         } else if (role == ROLE_CLIENT_SECONDARY_LONG_LIVED) {
             mActiveModeWarden.requestSecondaryLongLivedClientModeManager(
                     externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2);
@@ -3557,7 +3561,8 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         // request for same ssid1/bssid1
         if (role == ROLE_CLIENT_LOCAL_ONLY) {
             mActiveModeWarden.requestLocalOnlyClientModeManager(
-                    externalRequestListener, TEST_WORKSOURCE, TEST_SSID_1, TEST_BSSID_1, false);
+                    externalRequestListener, TEST_WORKSOURCE, TEST_SSID_1, TEST_BSSID_1, false,
+                    false);
         } else if (role == ROLE_CLIENT_SECONDARY_LONG_LIVED) {
             mActiveModeWarden.requestSecondaryLongLivedClientModeManager(
                     externalRequestListener, TEST_WORKSOURCE, TEST_SSID_1, TEST_BSSID_1);
@@ -3623,7 +3628,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         ExternalClientModeManagerRequestListener externalRequestListener = mock(
                 ExternalClientModeManagerRequestListener.class);
         mActiveModeWarden.requestLocalOnlyClientModeManager(
-                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_1, TEST_BSSID_1, false);
+                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_1, TEST_BSSID_1, false, false);
         mLooper.dispatchAll();
 
         verify(externalRequestListener).onAnswer(null);
@@ -3998,7 +4003,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
                 ExternalClientModeManagerRequestListener.class);
         // request for ssid2/bssid2
         mActiveModeWarden.requestLocalOnlyClientModeManager(
-                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, false);
+                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, false, false);
         mLooper.dispatchAll();
         verify(mWifiInjector).makeClientModeManager(
                 any(), eq(TEST_WORKSOURCE), eq(ROLE_CLIENT_LOCAL_ONLY), anyBoolean());
@@ -4083,7 +4088,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
                 ExternalClientModeManagerRequestListener.class);
         // request for ssid2/bssid2
         mActiveModeWarden.requestLocalOnlyClientModeManager(
-                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, false);
+                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, false, false);
         mLooper.dispatchAll();
         verify(mWifiInjector).makeClientModeManager(
                 any(), eq(TEST_WORKSOURCE), eq(ROLE_CLIENT_LOCAL_ONLY), anyBoolean());
@@ -4221,7 +4226,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
         // mock requesting local only secondary
         mActiveModeWarden.requestLocalOnlyClientModeManager(
-                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, false);
+                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, false, false);
         mLooper.dispatchAll();
         // Verify the primary is given to the externalRequestListener
         verify(externalRequestListener).onAnswer(requestedClientModeManager.capture());
@@ -4229,20 +4234,18 @@ public class ActiveModeWardenTest extends WifiBaseTest {
                 any(), any(), eq(ROLE_CLIENT_LOCAL_ONLY), anyBoolean());
         assertEquals(ROLE_CLIENT_PRIMARY, requestedClientModeManager.getValue().getRole());
 
-        // Request for non local-only STA and verify the secondary STA is provided instead.
-        when(additionalClientModeManager.getRole()).thenReturn(ROLE_CLIENT_SECONDARY_LONG_LIVED);
-        mActiveModeWarden.requestSecondaryLongLivedClientModeManager(
-                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2);
+        // mock requesting local only secondary, but with preference for secondary STA.
+        // This should bypass the enterCarMode permission check and still give secondary STA.
+        mActiveModeWarden.requestLocalOnlyClientModeManager(
+                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, false, true);
         mLooper.dispatchAll();
-        verify(mWifiInjector).makeClientModeManager(any(), any(),
-                eq(ROLE_CLIENT_SECONDARY_LONG_LIVED), anyBoolean());
-
         additionalClientListener.value.onStarted(additionalClientModeManager);
         mLooper.dispatchAll();
-        verify(externalRequestListener, times(2)).onAnswer(
-                requestedClientModeManager.capture());
-        assertEquals(ROLE_CLIENT_SECONDARY_LONG_LIVED,
-                requestedClientModeManager.getValue().getRole());
+        // Verify secondary is given to the externalRequestListener
+        verify(externalRequestListener, times(2)).onAnswer(requestedClientModeManager.capture());
+        verify(mWifiInjector).makeClientModeManager(
+                any(), any(), eq(ROLE_CLIENT_LOCAL_ONLY), anyBoolean());
+        assertEquals(ROLE_CLIENT_LOCAL_ONLY, requestedClientModeManager.getValue().getRole());
     }
 
     @Test
@@ -4279,10 +4282,10 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         when(additionalClientModeManager.getInterfaceName()).thenReturn(WIFI_IFACE_NAME_1);
         when(additionalClientModeManager.getRole()).thenReturn(ROLE_CLIENT_LOCAL_ONLY);
 
-        // Request will shell uid for local-only STA and verify the secondary is provided instead.
+        // Request with shell uid for local-only STA and verify the secondary is provided instead.
         WorkSource shellWs = new WorkSource(0, "shell");
         mActiveModeWarden.requestLocalOnlyClientModeManager(
-                externalRequestListener, shellWs, TEST_SSID_2, TEST_BSSID_2, false);
+                externalRequestListener, shellWs, TEST_SSID_2, TEST_BSSID_2, false, false);
         mLooper.dispatchAll();
         verify(mWifiInjector).makeClientModeManager(any(), any(),
                 eq(ROLE_CLIENT_LOCAL_ONLY), anyBoolean());
@@ -4664,7 +4667,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
         mActiveModeWarden.requestLocalOnlyClientModeManager(
                 mock(ExternalClientModeManagerRequestListener.class),
-                TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, false);
+                TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, false, false);
         mLooper.dispatchAll();
 
         // No role set, should be ignored.
@@ -4995,7 +4998,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
         // mock requesting local only secondary
         mActiveModeWarden.requestLocalOnlyClientModeManager(
-                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, true);
+                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, true, false);
         mLooper.dispatchAll();
         // Verify the primary is given to the externalRequestListener
         verify(externalRequestListener).onAnswer(requestedClientModeManager.capture());
@@ -5053,7 +5056,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
         // mock requesting local only secondary
         mActiveModeWarden.requestLocalOnlyClientModeManager(
-                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, true);
+                externalRequestListener, TEST_WORKSOURCE, TEST_SSID_2, TEST_BSSID_2, true, false);
         mLooper.dispatchAll();
         WorkSource ws = new WorkSource(TEST_WORKSOURCE);
         ws.add(SETTINGS_WORKSOURCE);
