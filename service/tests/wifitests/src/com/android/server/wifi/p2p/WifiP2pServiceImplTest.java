@@ -22,6 +22,10 @@ import static android.net.NetworkInfo.DetailedState.FAILED;
 import static android.net.NetworkInfo.DetailedState.IDLE;
 import static android.net.wifi.WifiManager.EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE;
 import static android.net.wifi.p2p.WifiP2pConfig.GROUP_CLIENT_IP_PROVISIONING_MODE_IPV6_LINK_LOCAL;
+import static android.net.wifi.p2p.WifiP2pManager.EXTRA_PARAM_KEY_USD_BASED_LOCAL_SERVICE_ADVERTISEMENT_CONFIG;
+import static android.net.wifi.p2p.WifiP2pManager.EXTRA_PARAM_KEY_USD_BASED_SERVICE_DISCOVERY_CONFIG;
+import static android.net.wifi.p2p.WifiP2pManager.WIFI_P2P_USD_BASED_ADD_LOCAL_SERVICE;
+import static android.net.wifi.p2p.WifiP2pManager.WIFI_P2P_USD_BASED_SERVICE_DISCOVERY;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.net.module.util.Inet4AddressUtils.inet4AddressToIntHTL;
@@ -107,9 +111,12 @@ import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.WifiP2pPairingBootstrappingConfig;
 import android.net.wifi.p2p.WifiP2pProvDiscEvent;
+import android.net.wifi.p2p.WifiP2pUsdBasedLocalServiceAdvertisementConfig;
+import android.net.wifi.p2p.WifiP2pUsdBasedServiceDiscoveryConfig;
 import android.net.wifi.p2p.WifiP2pWfdInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceRequest;
+import android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceConfig;
 import android.net.wifi.util.Environment;
 import android.os.Binder;
 import android.os.Build;
@@ -225,6 +232,12 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
     private static final String TEST_DEVICE_MAC_ADDRESS_STRING = "00:11:22:33:44:55";
     private static final byte[] TEST_NONCE = {10, 20, 30, 40, 50, 60, 70, 80};
     private static final byte[] TEST_DIR_TAG = {11, 22, 33, 44, 55, 66, 77, 88};
+    private static final String TEST_USD_SERVICE_NAME = "test_service_name";
+    private static final int TEST_USD_PROTOCOL_TYPE = 4;
+    private static final byte[] TEST_USD_SERVICE_SPECIFIC_INFO = {10, 20, 30, 40, 50, 60};
+    private static final int TEST_USD_DISCOVERY_CHANNEL_FREQUENCY_MHZ = 2437;
+    private static final int[] TEST_USD_DISCOVERY_CHANNEL_FREQUENCIES_MHZ = {2412, 2437, 2462};
+    private static final int TEST_USD_SESSION_ID = 2;
 
     private ArgumentCaptor<BroadcastReceiver> mBcastRxCaptor = ArgumentCaptor.forClass(
             BroadcastReceiver.class);
@@ -264,6 +277,11 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
     private ArgumentCaptor<WifiSettingsConfigStore.OnSettingsChangedListener>
             mD2DAllowedSettingsCallbackCaptor =
             ArgumentCaptor.forClass(WifiSettingsConfigStore.OnSettingsChangedListener.class);
+    private WifiP2pServiceInfo mTestUsdServiceInfo;
+    private WifiP2pUsdBasedServiceConfig mTestUsdConfig;
+    private WifiP2pUsdBasedLocalServiceAdvertisementConfig mTestUsdServiceAdvertisementConfig;
+    private WifiP2pServiceRequest mTestUsdServiceRequest;
+    private WifiP2pUsdBasedServiceDiscoveryConfig mTestUsdServiceDiscoveryConfig;
 
     @Mock Bundle mBundle;
     @Mock Context mContext;
@@ -379,6 +397,19 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         mTestThisDevice.deviceName = thisDeviceName;
         mTestThisDevice.deviceAddress = thisDeviceMac;
         mTestThisDevice.primaryDeviceType = "10-0050F204-5";
+
+        if (Environment.isSdkAtLeastB()) {
+            mTestUsdConfig = new WifiP2pUsdBasedServiceConfig.Builder(
+                    TEST_USD_SERVICE_NAME)
+                    .setServiceProtocolType(TEST_USD_PROTOCOL_TYPE)
+                    .setServiceSpecificInfo(TEST_USD_SERVICE_SPECIFIC_INFO).build();
+            mTestUsdServiceInfo = new WifiP2pServiceInfo(mTestUsdConfig);
+            mTestUsdServiceAdvertisementConfig = new WifiP2pUsdBasedLocalServiceAdvertisementConfig
+                    .Builder().setFrequencyMhz(TEST_USD_DISCOVERY_CHANNEL_FREQUENCY_MHZ).build();
+            mTestUsdServiceRequest = new WifiP2pServiceRequest(mTestUsdConfig);
+            mTestUsdServiceDiscoveryConfig = new WifiP2pUsdBasedServiceDiscoveryConfig.Builder()
+                    .setFrequenciesMhz(TEST_USD_DISCOVERY_CHANNEL_FREQUENCIES_MHZ).build();
+        }
     }
 
     /**
@@ -9004,5 +9035,182 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         assertEquals(passphrase,
                 config.getPairingBootstrappingConfig().getPairingBootstrappingPassword());
         assertTrue(config.isAuthorizeConnectionFromPeerEnabled());
+    }
+
+    /**
+     * Mock send WifiP2pManager.ADD_SERVICE_REQUEST with USD based service configuration.
+     *
+     * @param replyMessenger for checking replied message.
+     */
+    private void sendAddUsdServiceRequestMsg(Messenger replyMessenger) throws Exception {
+        Message msg = Message.obtain();
+        msg.what = WifiP2pManager.ADD_SERVICE_REQUEST;
+        msg.replyTo = replyMessenger;
+        msg.obj = mTestUsdServiceRequest;
+        mP2pStateMachineMessenger.send(Message.obtain(msg));
+        mLooper.dispatchAll();
+    }
+
+    /**
+     * Mock send WifiP2pManager.DISCOVER_SERVICES to discover USD based services.
+     *
+     * @param replyMessenger for checking replied message.
+     */
+    private void sendDiscoverUsdServiceMsg(Messenger replyMessenger) throws Exception {
+        Message msg = Message.obtain();
+        Bundle extras = new Bundle();
+        extras.putParcelable(EXTRA_PARAM_KEY_USD_BASED_SERVICE_DISCOVERY_CONFIG,
+                mTestUsdServiceDiscoveryConfig);
+        msg.what = WifiP2pManager.DISCOVER_SERVICES;
+        msg.arg1 = WIFI_P2P_USD_BASED_SERVICE_DISCOVERY;
+        msg.obj = new AttributionSource(1000, TEST_PACKAGE_NAME, null);
+        msg.getData().putBundle(WifiP2pManager.EXTRA_PARAM_KEY_BUNDLE, extras);
+        msg.replyTo = replyMessenger;
+        mP2pStateMachineMessenger.send(Message.obtain(msg));
+        mLooper.dispatchAll();
+    }
+
+    /**
+     * Mock send WifiP2pManager.ADD_LOCAL_SERVICE with USD service configuration.
+     *
+     * @param replyMessenger for checking replied message.
+     */
+    private void sendStartUsdBasedLocalServiceAdvertisementMsg(Messenger replyMessenger)
+            throws Exception {
+        Message msg = Message.obtain();
+        Bundle extras = new Bundle();
+        extras.putParcelable(WifiP2pManager.EXTRA_PARAM_KEY_SERVICE_INFO, mTestUsdServiceInfo);
+        extras.putParcelable(EXTRA_PARAM_KEY_USD_BASED_LOCAL_SERVICE_ADVERTISEMENT_CONFIG,
+                mTestUsdServiceAdvertisementConfig);
+        msg.what = WifiP2pManager.ADD_LOCAL_SERVICE;
+        msg.arg1 = WIFI_P2P_USD_BASED_ADD_LOCAL_SERVICE;
+        msg.obj = new AttributionSource(1000, TEST_PACKAGE_NAME, null);
+        msg.getData().putBundle(WifiP2pManager.EXTRA_PARAM_KEY_BUNDLE, extras);
+        msg.replyTo = replyMessenger;
+        mP2pStateMachineMessenger.send(Message.obtain(msg));
+        mLooper.dispatchAll();
+    }
+
+    private void verifyUsdBasedServiceDiscoveryRequest() throws Exception {
+        when(mWifiNative.startUsdBasedServiceDiscovery(any(), any(), anyInt()))
+                .thenReturn(TEST_USD_SESSION_ID);
+        ArgumentCaptor<WifiP2pUsdBasedServiceConfig> usdConfigCaptor = ArgumentCaptor.forClass(
+                WifiP2pUsdBasedServiceConfig.class);
+        ArgumentCaptor<WifiP2pUsdBasedServiceDiscoveryConfig> discoveryConfigCaptor =
+                ArgumentCaptor.forClass(WifiP2pUsdBasedServiceDiscoveryConfig.class);
+        sendAddUsdServiceRequestMsg(mClientMessenger);
+        sendDiscoverUsdServiceMsg(mClientMessenger);
+        assertTrue(mClientHandler.hasMessages(WifiP2pManager.DISCOVER_SERVICES_SUCCEEDED));
+        verify(mWifiNative).startUsdBasedServiceDiscovery(usdConfigCaptor.capture(),
+                discoveryConfigCaptor.capture(), eq(WifiP2pServiceImpl
+                        .USD_BASED_SERVICE_ADVERTISEMENT_DISCOVERY_TIMEOUT_S));
+        assertEquals(mTestUsdServiceRequest.getWifiP2pUsdBasedServiceConfig(),
+                usdConfigCaptor.getValue());
+        assertEquals(mTestUsdServiceDiscoveryConfig, discoveryConfigCaptor.getValue());
+    }
+
+
+    /**
+     * Verify the message WifiP2pManager.DISCOVER_SERVICES to discover USD based services.
+     */
+    @Test
+    public void testUsdBasedServiceDiscoveryRequestMessage() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        forceP2pEnabled(mClient1);
+
+        verifyUsdBasedServiceDiscoveryRequest();
+    }
+
+    /**
+     * Verify the message WifiP2pManager.REMOVE_SERVICE_REQUEST to stop USD based service discovery
+     */
+    @Test
+    public void testRemoveUsdBasedServiceDiscoveryRequest() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        forceP2pEnabled(mClient1);
+
+        verifyUsdBasedServiceDiscoveryRequest();
+
+        sendRemoveServiceRequestMsg(mClientMessenger, mTestUsdServiceRequest);
+        verify(mWifiNative).stopUsdBasedServiceDiscovery(anyInt());
+        assertTrue(mClientHandler.hasMessages(WifiP2pManager.REMOVE_SERVICE_REQUEST_SUCCEEDED));
+    }
+
+    /**
+     * Verify the message WifiP2pManager.CLEAR_SERVICE_REQUESTS to stop USD based service discovery
+     */
+    @Test
+    public void testClearUsdBasedServiceDiscoveryRequests() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        forceP2pEnabled(mClient1);
+
+        verifyUsdBasedServiceDiscoveryRequest();
+
+        sendSimpleMsg(mClientMessenger, WifiP2pManager.CLEAR_SERVICE_REQUESTS);
+        verify(mWifiNative).stopUsdBasedServiceDiscovery(anyInt());
+        assertTrue(mClientHandler.hasMessages(WifiP2pManager.CLEAR_SERVICE_REQUESTS_SUCCEEDED));
+    }
+
+    private void verifyUsdBasedServiceAdvertisementRequest() throws Exception {
+        when(mWifiNative.startUsdBasedServiceAdvertisement(any(), any(), anyInt()))
+                .thenReturn(TEST_USD_SESSION_ID);
+        ArgumentCaptor<WifiP2pUsdBasedServiceConfig> usdConfigCaptor = ArgumentCaptor.forClass(
+                WifiP2pUsdBasedServiceConfig.class);
+        ArgumentCaptor<WifiP2pUsdBasedLocalServiceAdvertisementConfig>
+                serviceAdvertisementConfigCaptor = ArgumentCaptor.forClass(
+                WifiP2pUsdBasedLocalServiceAdvertisementConfig.class);
+        sendStartUsdBasedLocalServiceAdvertisementMsg(mClientMessenger);
+        assertTrue(mClientHandler.hasMessages(WifiP2pManager.ADD_LOCAL_SERVICE_SUCCEEDED));
+
+        verify(mWifiNative).startUsdBasedServiceAdvertisement(usdConfigCaptor.capture(),
+                serviceAdvertisementConfigCaptor.capture(), eq(WifiP2pServiceImpl
+                        .USD_BASED_SERVICE_ADVERTISEMENT_DISCOVERY_TIMEOUT_S));
+        assertEquals(mTestUsdServiceInfo.getWifiP2pUsdBasedServiceConfig(),
+                usdConfigCaptor.getValue());
+        assertEquals(mTestUsdServiceAdvertisementConfig,
+                serviceAdvertisementConfigCaptor.getValue());
+    }
+
+    /**
+     * Verify the message WifiP2pManager.ADD_LOCAL_SERVICE to advertise USD based services.
+     */
+    @Test
+    public void testUsdBasedServiceAdvertisementRequestMessage() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        forceP2pEnabled(mClient1);
+
+        verifyUsdBasedServiceAdvertisementRequest();
+    }
+
+    /**
+     * Verify the message WifiP2pManager.REMOVE_LOCAL_SERVICE to stop advertising
+     * USD based services.
+     */
+    @Test
+    public void testRemoveUsdBasedServiceAdvertisement() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        forceP2pEnabled(mClient1);
+
+        verifyUsdBasedServiceAdvertisementRequest();
+
+        sendRemoveLocalServiceMsg(mClientMessenger, mTestUsdServiceInfo);
+        verify(mWifiNative).stopUsdBasedServiceAdvertisement(anyInt());
+        assertTrue(mClientHandler.hasMessages(WifiP2pManager.REMOVE_LOCAL_SERVICE_SUCCEEDED));
+    }
+
+    /**
+     * Verify the message WifiP2pManager.CLEAR_LOCAL_SERVICES to stop advertising
+     * USD based services.
+     */
+    @Test
+    public void testClearUsdBasedServiceAdvertisements() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        forceP2pEnabled(mClient1);
+
+        verifyUsdBasedServiceAdvertisementRequest();
+
+        sendSimpleMsg(mClientMessenger, WifiP2pManager.CLEAR_LOCAL_SERVICES);
+        verify(mWifiNative).stopUsdBasedServiceAdvertisement(anyInt());
+        assertTrue(mClientHandler.hasMessages(WifiP2pManager.CLEAR_LOCAL_SERVICES_SUCCEEDED));
     }
 }
