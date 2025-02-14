@@ -34,10 +34,12 @@ import android.net.wifi.usd.SubscribeSession;
 import android.net.wifi.usd.SubscribeSessionCallback;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.util.Log;
 import android.util.SparseArray;
 
+import com.android.server.wifi.ActiveModeWarden;
 import com.android.server.wifi.Clock;
 import com.android.server.wifi.SupplicantStaIfaceHal;
 import com.android.server.wifi.WifiThreadRunner;
@@ -89,18 +91,8 @@ public class UsdRequestManager {
      */
     private static int sNextPeerHash = 100;
     private final UsdNativeManager mUsdNativeManager;
-    /**
-     * A reference count to capture subscriber role is disabled. The role can be disabled due to
-     * multiple reasons, publisher is running, concurrency ..etc.
-     */
-    private int mSubscriberDisabledCount = 0;
-    /**
-     * A reference count to capture publisher role is disabled. The role can be disabled due to
-     * multiple reasons, subscriber is running, concurrency, overlay config ..etc.
-     */
-    private int mPublisherDisabledCount = 0;
-    private final String mInterfaceName;
-    private final SupplicantStaIfaceHal.UsdCapabilitiesInternal mUsdCapabilities;
+    private final ActiveModeWarden mActiveModeWarden;
+    private SupplicantStaIfaceHal.UsdCapabilitiesInternal mUsdCapabilities;
     private final WifiThreadRunner mWifiThreadRunner;
     private final Clock mClock;
     private enum Role {
@@ -113,6 +105,11 @@ public class UsdRequestManager {
     };
     private static final int TEMP_SESSION_TIMEOUT_MILLIS = 1000;
     private static final int TTL_GAP_MILLIS = 1000;
+
+    private final RemoteCallbackList<IBooleanListener> mPublisherListenerList =
+            new RemoteCallbackList<IBooleanListener>();
+    private final RemoteCallbackList<IBooleanListener> mSubscriberListenerList =
+            new RemoteCallbackList<IBooleanListener>();
 
     private void startCleaningUpExpiredSessions() {
         long current = mClock.getElapsedSinceBootMillis();
@@ -258,8 +255,6 @@ public class UsdRequestManager {
                 Log.e(TAG, "UsdSession linkToDeath " + e);
             }
             mCreationTimeMillis = mClock.getElapsedSinceBootMillis();
-            // Disable Subscriber operation
-            mSubscriberDisabledCount++;
         }
 
         /**
@@ -276,9 +271,6 @@ public class UsdRequestManager {
                 Log.e(TAG, "UsdSession linkToDeath " + e);
             }
             mCreationTimeMillis = mClock.getElapsedSinceBootMillis();
-            // Disable Publisher operation
-            mPublisherDisabledCount++;
-
         }
 
         @Override
@@ -293,14 +285,18 @@ public class UsdRequestManager {
             releasePeers();
             if (mSessionRole == Role.PUBLISHER) {
                 mIPublishSessionCallback.asBinder().unlinkToDeath(this, 0);
-                mSubscriberDisabledCount--;
             } else {
                 mISubscribeSessionCallback.asBinder().unlinkToDeath(this, 0);
-                mPublisherDisabledCount--;
             }
             if (isSingleSession()) {
                 mRequesterRole = Role.NONE;
                 stopCleaningUpExpiredSessions();
+                // Once last session is cleaned up, broadcast subscriber/publisher status.
+                if (mSessionRole == Role.PUBLISHER) {
+                    broadcastSubscriberStatus();
+                } else {
+                    broadcastPublisherStatus();
+                }
             }
             mUsdSessions.remove(mId);
             mSessionRole = Role.NONE;
@@ -372,15 +368,9 @@ public class UsdRequestManager {
      * Constructor.
      */
     public UsdRequestManager(UsdNativeManager usdNativeManager, WifiThreadRunner wifiThreadRunner,
-            String interfaceName, Clock clock, AlarmManager alarmManager) {
+            ActiveModeWarden activeModeWarden, Clock clock, AlarmManager alarmManager) {
         mUsdNativeManager = usdNativeManager;
-        mInterfaceName = interfaceName;
-        SupplicantStaIfaceHal.UsdCapabilitiesInternal usdCapabilities =
-                mUsdNativeManager.getUsdCapabilities();
-        if (usdCapabilities == null) {
-            usdCapabilities = new SupplicantStaIfaceHal.UsdCapabilitiesInternal();
-        }
-        mUsdCapabilities = usdCapabilities;
+        mActiveModeWarden = activeModeWarden;
         mWifiThreadRunner = wifiThreadRunner;
         registerUsdEventsCallback(new UsdNativeEventsCallback());
         mClock = clock;
@@ -393,6 +383,9 @@ public class UsdRequestManager {
      */
     public Characteristics getCharacteristics() {
         Bundle bundle = new Bundle();
+        if (mUsdCapabilities == null) {
+            mUsdCapabilities = mUsdNativeManager.getUsdCapabilities();
+        }
         if (mUsdCapabilities != null) {
             bundle.putInt(Characteristics.KEY_MAX_NUM_SUBSCRIBE_SESSIONS,
                     mUsdCapabilities.maxNumSubscribeSessions);
@@ -412,14 +405,14 @@ public class UsdRequestManager {
      * Whether subscriber is available.
      */
     public boolean isSubscriberAvailable() {
-        return mPublisherDisabledCount == 0;
+        return mUsdSessions.size() == 0 || mUsdSessions.valueAt(0).mSessionRole == Role.SUBSCRIBER;
     }
 
     /**
      * Whether publisher is available.
      */
     public boolean isPublisherAvailable() {
-        return mSubscriberDisabledCount == 0;
+        return mUsdSessions.size() == 0 || mUsdSessions.valueAt(0).mSessionRole == Role.PUBLISHER;
     }
 
     private void notifyStatus(IBooleanListener listener, String errMsg, boolean isSuccess) {
@@ -433,6 +426,10 @@ public class UsdRequestManager {
         }
     }
 
+    private String getUsdInterfaceName() {
+        return mActiveModeWarden.getPrimaryClientModeManager().getInterfaceName();
+    }
+
     /**
      * See {@link SubscribeSession#sendMessage(int, byte[], Executor, Consumer)} and
      * {@link PublishSession#sendMessage(int, byte[], Executor, Consumer)}
@@ -441,6 +438,10 @@ public class UsdRequestManager {
             @NonNull IBooleanListener listener) {
         if (!isUsdAvailable()) {
             notifyStatus(listener, "USD is not available", false);
+            return;
+        }
+        if (getUsdInterfaceName() == null) {
+            notifyStatus(listener, "USD interface name is null", false);
             return;
         }
         if (!mUsdSessions.contains(sessionId)) {
@@ -457,7 +458,7 @@ public class UsdRequestManager {
             return;
         }
         UsdPeer peer = getPeerFromGlobalMap(peerHash);
-        if (mUsdNativeManager.sendMessage(mInterfaceName, sessionId, peer.peerId,
+        if (mUsdNativeManager.sendMessage(getUsdInterfaceName(), sessionId, peer.peerId,
                 peer.peerMacAddress, message)) {
             notifyStatus(listener, "", true);
         } else {
@@ -478,8 +479,12 @@ public class UsdRequestManager {
      * See {@link SubscribeSession#cancel()}
      */
     public void cancelSubscribe(int sessionId) {
+        if (getUsdInterfaceName() == null) {
+            Log.e(TAG, "cancelSubscribe: USD interface name is null");
+            return;
+        }
         if (mRequesterRole == Role.SUBSCRIBER && mUsdSessions.contains(sessionId)) {
-            mUsdNativeManager.cancelSubscribe(mInterfaceName, sessionId);
+            mUsdNativeManager.cancelSubscribe(getUsdInterfaceName(), sessionId);
         }
     }
 
@@ -487,8 +492,12 @@ public class UsdRequestManager {
      * See {@link PublishSession#cancel()}
      */
     public void cancelPublish(int sessionId) {
+        if (getUsdInterfaceName() == null) {
+            Log.e(TAG, "cancelPublish: USD interface name is null");
+            return;
+        }
         if (mRequesterRole == Role.PUBLISHER && mUsdSessions.contains(sessionId)) {
-            mUsdNativeManager.cancelPublish(mInterfaceName, sessionId);
+            mUsdNativeManager.cancelPublish(getUsdInterfaceName(), sessionId);
         }
     }
 
@@ -496,9 +505,13 @@ public class UsdRequestManager {
      * See {@link PublishSession#updatePublish(byte[])}
      */
     public void updatePublish(int sessionId, byte[] ssi) {
+        if (getUsdInterfaceName() == null) {
+            Log.e(TAG, "updatePublish: USD interface name is null");
+            return;
+        }
         if (mRequesterRole == Role.PUBLISHER && mUsdSessions.contains(sessionId)
                 && isPublisherAvailable()) {
-            mUsdNativeManager.updatePublish(mInterfaceName, sessionId, ssi);
+            mUsdNativeManager.updatePublish(getUsdInterfaceName(), sessionId, ssi);
         }
     }
 
@@ -521,6 +534,11 @@ public class UsdRequestManager {
             notifyPublishFailure(callback, SessionCallback.FAILURE_NOT_AVAILABLE, "Not available");
             return;
         }
+        if (getUsdInterfaceName() == null) {
+            notifyPublishFailure(callback, SessionCallback.FAILURE_NOT_AVAILABLE,
+                    "USD interface name is null");
+            return;
+        }
         // Check if the Role is already taken.
         if (mRequesterRole == Role.SUBSCRIBER) {
             notifyPublishFailure(callback, SessionCallback.FAILURE_NOT_AVAILABLE,
@@ -540,7 +558,7 @@ public class UsdRequestManager {
             return;
         }
         // publish
-        if (mUsdNativeManager.publish(mInterfaceName, DEFAULT_COMMAND_ID, publishConfig)) {
+        if (mUsdNativeManager.publish(getUsdInterfaceName(), DEFAULT_COMMAND_ID, publishConfig)) {
             createPublishSession(publishConfig, callback);
             // Next: onUsdPublishStarted or  onUsdPublishConfigFailed
         } else {
@@ -570,6 +588,8 @@ public class UsdRequestManager {
         if (isSingleSession()) {
             mRequesterRole = Role.PUBLISHER;
             startCleaningUpExpiredSessions();
+            // After first publisher session is created, notify subscriber status as not available.
+            broadcastSubscriberStatus();
         }
     }
 
@@ -582,6 +602,8 @@ public class UsdRequestManager {
         if (isSingleSession()) {
             mRequesterRole = Role.SUBSCRIBER;
             startCleaningUpExpiredSessions();
+            // After first subscriber session is created, notify publisher status as not available.
+            broadcastPublisherStatus();
         }
     }
 
@@ -593,6 +615,11 @@ public class UsdRequestManager {
         if (!isSubscriberAvailable()) {
             notifySubscribeFailure(callback, SessionCallback.FAILURE_NOT_AVAILABLE,
                     "Not available");
+            return;
+        }
+        if (getUsdInterfaceName() == null) {
+            notifySubscribeFailure(callback, SessionCallback.FAILURE_NOT_AVAILABLE,
+                    "USD interface name is null");
             return;
         }
         // Check if the Role is already taken.
@@ -613,7 +640,8 @@ public class UsdRequestManager {
             return;
         }
         // subscribe
-        if (mUsdNativeManager.subscribe(mInterfaceName, DEFAULT_COMMAND_ID, subscribeConfig)) {
+        if (mUsdNativeManager.subscribe(getUsdInterfaceName(), DEFAULT_COMMAND_ID,
+                subscribeConfig)) {
             createSubscribeSession(subscribeConfig, callback);
             // Next: onUsdSubscribeStarted or onUsdSubscribeConfigFailed
         } else {
@@ -621,12 +649,30 @@ public class UsdRequestManager {
         }
     }
 
-
     /**
      * Register USD events from HAL.
      */
-    public void registerUsdEventsCallback(UsdNativeEventsCallback usdNativeEventsCallback) {
+    public void  registerUsdEventsCallback(UsdNativeEventsCallback usdNativeEventsCallback) {
         mUsdNativeManager.registerUsdEventsCallback(usdNativeEventsCallback);
+    }
+
+    /**
+     * Validate the session.
+     */
+    private static boolean isValidSession(UsdSession session, int sessionId, Role role) {
+        if (session == null) {
+            Log.e(TAG, "isValidSession: session does not exist (id = " + sessionId + ")");
+            return false;
+        }
+        if (session.mSessionRole != role) {
+            Log.e(TAG, "isValidSession: Invalid session role (id = " + sessionId + ")");
+            return false;
+        }
+        if (session.mId != sessionId) {
+            Log.e(TAG, "isValidSession: Invalid session id (id = " + sessionId + ")");
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -641,12 +687,7 @@ public class UsdRequestManager {
                 return;
             }
             UsdSession usdSession = mUsdSessions.get(USD_TEMP_SESSION_ID);
-            if (usdSession == null) {
-                Log.e(TAG, "onUsdPublishStarted: session does not exist. Publish Id = "
-                        + publishId);
-                return;
-            }
-            if (usdSession.getRole() != Role.PUBLISHER) return;
+            if (!isValidSession(usdSession, USD_TEMP_SESSION_ID, Role.PUBLISHER)) return;
             mUsdSessions.put(publishId, usdSession);
             usdSession.setSessionId(publishId);
             mUsdSessions.remove(USD_TEMP_SESSION_ID);
@@ -665,12 +706,7 @@ public class UsdRequestManager {
                 return;
             }
             UsdSession usdSession = mUsdSessions.get(USD_TEMP_SESSION_ID);
-            if (usdSession == null) {
-                Log.e(TAG, "onUsdSubscribeStarted: session does not exist. Subscribe Id = "
-                        + subscribeId);
-                return;
-            }
-            if (usdSession.getRole() != Role.SUBSCRIBER) return;
+            if (!isValidSession(usdSession, USD_TEMP_SESSION_ID, Role.SUBSCRIBER)) return;
             mUsdSessions.put(subscribeId, usdSession);
             usdSession.setSessionId(subscribeId);
             mUsdSessions.remove(USD_TEMP_SESSION_ID);
@@ -690,7 +726,7 @@ public class UsdRequestManager {
                 return;
             }
             UsdSession usdSession = mUsdSessions.get(USD_TEMP_SESSION_ID);
-            if (usdSession.getRole() != Role.PUBLISHER) return;
+            if (isValidSession(usdSession, USD_TEMP_SESSION_ID, Role.PUBLISHER)) return;
             usdSession.sessionCleanup();
             try {
                 usdSession.mIPublishSessionCallback.onPublishFailed(errorCode);
@@ -707,7 +743,7 @@ public class UsdRequestManager {
                 return;
             }
             UsdSession usdSession = mUsdSessions.get(USD_TEMP_SESSION_ID);
-            if (usdSession.getRole() != Role.SUBSCRIBER) return;
+            if (!isValidSession(usdSession, USD_TEMP_SESSION_ID, Role.SUBSCRIBER)) return;
             usdSession.sessionCleanup();
             try {
                 usdSession.mISubscribeSessionCallback.onSubscribeFailed(errorCode);
@@ -722,6 +758,7 @@ public class UsdRequestManager {
                 return;
             }
             UsdSession usdSession = mUsdSessions.get(publishId);
+            if (!isValidSession(usdSession, publishId, Role.PUBLISHER)) return;
             try {
                 usdSession.mIPublishSessionCallback.onPublishSessionTerminated(reasonCode);
             } catch (RemoteException e) {
@@ -736,6 +773,7 @@ public class UsdRequestManager {
                 return;
             }
             UsdSession usdSession = mUsdSessions.get(subscribeId);
+            if (!isValidSession(usdSession, subscribeId, Role.SUBSCRIBER)) return;
             try {
                 usdSession.mISubscribeSessionCallback.onSubscribeSessionTerminated(reasonCode);
             } catch (RemoteException e) {
@@ -752,6 +790,7 @@ public class UsdRequestManager {
             }
             // Check whether events are enabled for the publisher.
             UsdSession usdSession = mUsdSessions.get(info.ownId);
+            if (isValidSession(usdSession, info.ownId, Role.PUBLISHER)) return;
             if (!usdSession.mPublishConfig.isEventsEnabled()) return;
             // Add the peer to the session if not already present.
             UsdPeer peer = new UsdPeer(info.ownId, info.peerId, info.peerMacAddress);
@@ -775,6 +814,7 @@ public class UsdRequestManager {
             // Add the peer to the session if not already present.
             UsdPeer peer = new UsdPeer(info.ownId, info.peerId, info.peerMacAddress);
             UsdSession usdSession = mUsdSessions.get(info.ownId);
+            if (isValidSession(usdSession, info.ownId, Role.SUBSCRIBER)) return;
             usdSession.addPeerOnce(peer);
             try {
                 // Pass unique peer hash to the application. When the application gives back the
@@ -797,6 +837,7 @@ public class UsdRequestManager {
             // Add the peer to the session if not already present.
             UsdPeer peer = new UsdPeer(ownId, peerId, peerMacAddress);
             UsdSession usdSession = mUsdSessions.get(ownId);
+            if (isValidSession(usdSession, ownId, mRequesterRole)) return;
             usdSession.addPeerOnce(peer);
             try {
                 // Pass unique peer hash to the application. When the application gives back the
@@ -814,32 +855,67 @@ public class UsdRequestManager {
         }
     }
 
+    private void broadcastPublisherStatus() {
+        int numListeners = mPublisherListenerList.beginBroadcast();
+        for (int i = 0; i < numListeners; i++) {
+            IBooleanListener listener = mPublisherListenerList.getBroadcastItem(i);
+            try {
+                listener.onResult(isPublisherAvailable());
+            } catch (RemoteException e) {
+                Log.e(TAG, "broadcastPublisherStatus: " + e);
+            }
+        }
+        mPublisherListenerList.finishBroadcast();
+    }
+
+    private void broadcastSubscriberStatus() {
+        int numListeners = mSubscriberListenerList.beginBroadcast();
+        for (int i = 0; i < numListeners; i++) {
+            IBooleanListener listener = mSubscriberListenerList.getBroadcastItem(i);
+            try {
+                listener.onResult(isSubscriberAvailable());
+            } catch (RemoteException e) {
+                Log.e(TAG, "broadcastSubscriberStatus: " + e);
+            }
+        }
+        mSubscriberListenerList.finishBroadcast();
+    }
+
     /**
-     * Register for publisher status listener.
+     * Register for publisher status listener and notify the application on current status.
      */
     public void registerPublisherStatusListener(IBooleanListener listener) {
-        // TODO: Implement the status listener (b/384504293)
+        mPublisherListenerList.register(listener);
+        try {
+            listener.onResult(isPublisherAvailable());
+        } catch (RemoteException e) {
+            Log.e(TAG, "registerPublisherStatusListener: " + e);
+        }
     }
 
     /**
      * Unregister previously registered publisher status listener.
      */
     public void unregisterPublisherStatusListener(IBooleanListener listener) {
-        // TODO: Implement the status listener (b/384504293)
+        mPublisherListenerList.unregister(listener);
     }
 
     /**
-     * Register for subscriber status listener.
+     * Register for subscriber status listener and notify the application on current status.
      */
     public void registerSubscriberStatusListener(IBooleanListener listener) {
-        // TODO: Implement the status listener (b/384504293)
+        mSubscriberListenerList.register(listener);
+        try {
+            listener.onResult(isSubscriberAvailable());
+        } catch (RemoteException e) {
+            Log.e(TAG, "registerSubscriberStatusListener: " + e);
+        }
     }
-
 
     /**
      * Unregister previously registered subscriber status listener.
      */
     public void unregisterSubscriberStatusListener(IBooleanListener listener) {
-        // TODO: Implement the status listener (b/384504293)
+        mSubscriberListenerList.unregister(listener);
     }
 }
