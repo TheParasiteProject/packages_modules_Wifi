@@ -927,13 +927,14 @@ public class WifiP2pNativeTest extends WifiBaseTest {
     }
 
     /**
-     * Verifies reinvoking a device from a persiste group..
+     * Verifies reinvoking a device from a persistent group.
      */
     @Test
     public void testP2pReinvoke() {
-        when(mSupplicantP2pIfaceHalMock.reinvoke(anyInt(), anyString())).thenReturn(true);
-        assertTrue(mWifiP2pNative.p2pReinvoke(5, TEST_BSSID));
-        verify(mSupplicantP2pIfaceHalMock).reinvoke(eq(5), eq(TEST_BSSID));
+        when(mSupplicantP2pIfaceHalMock.reinvoke(anyInt(), anyString(), anyInt()))
+                .thenReturn(true);
+        assertTrue(mWifiP2pNative.p2pReinvoke(5, TEST_BSSID, -1));
+        verify(mSupplicantP2pIfaceHalMock).reinvoke(eq(5), eq(TEST_BSSID), eq(-1));
     }
 
     /**

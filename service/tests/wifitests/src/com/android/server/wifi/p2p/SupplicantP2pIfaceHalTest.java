@@ -431,9 +431,9 @@ public class SupplicantP2pIfaceHalTest extends WifiBaseTest {
     @Test
     public void testReinvoke() {
         initializeWithAidlImpl(true);
-        when(mP2pIfaceHalAidlMock.reinvoke(anyInt(), anyString())).thenReturn(true);
-        assertTrue(mDut.reinvoke(NETWORK_ID, BSSID));
-        verify(mP2pIfaceHalAidlMock).reinvoke(eq(NETWORK_ID), eq(BSSID));
+        when(mP2pIfaceHalAidlMock.reinvoke(anyInt(), anyString(), anyInt())).thenReturn(true);
+        assertTrue(mDut.reinvoke(NETWORK_ID, BSSID, -1));
+        verify(mP2pIfaceHalAidlMock).reinvoke(eq(NETWORK_ID), eq(BSSID), eq(-1));
     }
 
     /**

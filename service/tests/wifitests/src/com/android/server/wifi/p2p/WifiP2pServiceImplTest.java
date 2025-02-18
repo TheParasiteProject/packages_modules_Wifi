@@ -238,6 +238,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
     private static final int TEST_USD_DISCOVERY_CHANNEL_FREQUENCY_MHZ = 2437;
     private static final int[] TEST_USD_DISCOVERY_CHANNEL_FREQUENCIES_MHZ = {2412, 2437, 2462};
     private static final int TEST_USD_SESSION_ID = 2;
+    private static final int TEST_DIK_ID = 3;
 
     private ArgumentCaptor<BroadcastReceiver> mBcastRxCaptor = ArgumentCaptor.forClass(
             BroadcastReceiver.class);
@@ -342,7 +343,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         if (Environment.isSdkAtLeastB()) {
             mTestWifiP2pV2Device = spy(new WifiP2pDevice());
             mTestWifiP2pV2Device.deviceName = "TestV2DeviceName";
-            mTestWifiP2pV2Device.deviceAddress = "aa:bb:cc:dd:ee:22";
+            mTestWifiP2pV2Device.deviceAddress = TEST_DEVICE_MAC_ADDRESS_STRING;
         }
 
         mTestWifiP2pPeerAddress = MacAddress.fromString(mTestWifiP2pDevice.deviceAddress);
@@ -7711,7 +7712,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
     public void testPbcReconnectForUnknownGroupInvitation() throws Exception {
         forceP2pEnabled(mClient1);
         when(mWifiNative.getGroupCapability(any())).thenReturn(0);
-        when(mWifiNative.p2pReinvoke(anyInt(), any())).thenReturn(true);
+        when(mWifiNative.p2pReinvoke(anyInt(), any(), anyInt())).thenReturn(true);
         when(mWifiNative.p2pGetSsid(any())).thenReturn(null);
         when(mTestWifiP2pDevice.isGroupOwner()).thenReturn(false);
         when(mTestWifiP2pDevice.isInvitationCapable()).thenReturn(true);
@@ -7732,7 +7733,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
     public void testPinReconnectForUnknownGroupInvitation() throws Exception {
         forceP2pEnabled(mClient1);
         when(mWifiNative.getGroupCapability(any())).thenReturn(0);
-        when(mWifiNative.p2pReinvoke(anyInt(), any())).thenReturn(true);
+        when(mWifiNative.p2pReinvoke(anyInt(), any(), anyInt())).thenReturn(true);
         when(mWifiNative.p2pGetSsid(any())).thenReturn(null);
         when(mTestWifiP2pDevice.isGroupOwner()).thenReturn(false);
         when(mTestWifiP2pDevice.isInvitationCapable()).thenReturn(true);
@@ -7911,7 +7912,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
     public void testFallbackToNegotiationOnInviteStatusCodeInfoUnavailable() throws Exception {
         forceP2pEnabled(mClient1);
         when(mWifiNative.getGroupCapability(any())).thenReturn(0);
-        when(mWifiNative.p2pReinvoke(anyInt(), any())).thenReturn(true);
+        when(mWifiNative.p2pReinvoke(anyInt(), any(), anyInt())).thenReturn(true);
         when(mWifiNative.p2pGetSsid(any())).thenReturn(null);
         when(mTestWifiP2pDevice.isGroupOwner()).thenReturn(false);
         when(mTestWifiP2pDevice.isInvitationCapable()).thenReturn(true);
@@ -7955,7 +7956,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         forceP2pEnabled(mClient1);
         when(mWifiNative.p2pExtListen(anyBoolean(), anyInt(), anyInt(), any())).thenReturn(true);
         when(mWifiNative.getGroupCapability(any())).thenReturn(0);
-        when(mWifiNative.p2pReinvoke(anyInt(), any())).thenReturn(true);
+        when(mWifiNative.p2pReinvoke(anyInt(), any(), anyInt())).thenReturn(true);
         when(mWifiNative.p2pGetSsid(any())).thenReturn(null);
         when(mTestWifiP2pDevice.isGroupOwner()).thenReturn(false);
         when(mTestWifiP2pDevice.isInvitationCapable()).thenReturn(true);
@@ -9212,5 +9213,58 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         sendSimpleMsg(mClientMessenger, WifiP2pManager.CLEAR_LOCAL_SERVICES);
         verify(mWifiNative).stopUsdBasedServiceAdvertisement(anyInt());
         assertTrue(mClientHandler.hasMessages(WifiP2pManager.CLEAR_LOCAL_SERVICES_SUCCEEDED));
+    }
+
+    /**
+     * Verify the handling of WifiP2pManager.CONNECT triggering re-invoke of P2P connection for
+     * V2 connection when the device identity key is available.
+     */
+    @Test
+    public void testReinvokeForV2Connection() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        forceP2pEnabled(mClient1);
+
+        mTestWifiP2pV2Device.dirInfo = new WifiP2pDirInfo(
+                MacAddress.fromString(TEST_DEVICE_MAC_ADDRESS_STRING), TEST_NONCE, TEST_DIR_TAG);
+        when(mWifiNative.validateDirInfo(any())).thenReturn(TEST_DIK_ID);
+        when(mWifiNative.p2pReinvoke(anyInt(), any(), anyInt())).thenReturn(true);
+        when(mTestWifiP2pV2Device.isGroupOwner()).thenReturn(false);
+        when(mTestWifiP2pV2Device.isInvitationCapable()).thenReturn(true);
+
+        mockPeersList();
+
+        createTestP2pV2PeerConfig(WifiP2pPairingBootstrappingConfig
+                .PAIRING_BOOTSTRAPPING_METHOD_OPPORTUNISTIC, "", false);
+        sendConnectMsg(mClientMessenger, mTestWifiP2pV2PeerConfig);
+
+        verify(mWifiNative, never()).p2pProvisionDiscovery(any());
+        verify(mWifiNative).p2pReinvoke(eq(-1), eq(TEST_DEVICE_MAC_ADDRESS_STRING),
+                eq(TEST_DIK_ID));
+    }
+
+    /**
+     * Verify the handling of WifiP2pManager.CONNECT triggering provision discovery
+     * when the device identity key is not available.
+     */
+    @Test
+    public void testTriggerProvisionDiscoveryWhenDikInfoIsNotAvailable() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        forceP2pEnabled(mClient1);
+
+        mTestWifiP2pV2Device.dirInfo = new WifiP2pDirInfo(
+                MacAddress.fromString(TEST_DEVICE_MAC_ADDRESS_STRING), TEST_NONCE, TEST_DIR_TAG);
+        when(mWifiNative.validateDirInfo(any())).thenReturn(-1);
+        when(mWifiNative.p2pReinvoke(anyInt(), any(), anyInt())).thenReturn(true);
+        when(mTestWifiP2pV2Device.isGroupOwner()).thenReturn(false);
+        when(mTestWifiP2pV2Device.isInvitationCapable()).thenReturn(true);
+
+        mockPeersList();
+
+        createTestP2pV2PeerConfig(WifiP2pPairingBootstrappingConfig
+                .PAIRING_BOOTSTRAPPING_METHOD_OPPORTUNISTIC, "", false);
+        sendConnectMsg(mClientMessenger, mTestWifiP2pV2PeerConfig);
+
+        verify(mWifiNative).p2pProvisionDiscovery(any());
+        verify(mWifiNative, never()).p2pReinvoke(anyInt(), any(), anyInt());
     }
 }
