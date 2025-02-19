@@ -114,6 +114,7 @@ public class RttTestUtils {
         // SAE with no password configured
         pasnConfig = new PasnConfig
                 .Builder(PasnConfig.AKM_SAE, PasnConfig.CIPHER_GCMP_256)
+                .setWifiSsid(WifiSsid.fromString("\"TEST_SSID\""))
                 .build();
         secureRangingConfig = new SecureRangingConfig
                 .Builder(pasnConfig)
