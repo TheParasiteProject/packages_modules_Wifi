@@ -54,6 +54,7 @@ import android.util.Log;
 import androidx.annotation.Keep;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.telephony.flags.Flags;
 import com.android.modules.utils.BackgroundThread;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.aware.WifiAwareMetrics;
@@ -631,7 +632,9 @@ public class WifiInjector {
         mTwtManager = new TwtManager(this, mCmiMonitor, mWifiNative, mWifiHandler, mClock,
                 WifiTwtSession.MAX_TWT_SESSIONS, 1);
         mBackupRestoreController = new BackupRestoreController(mWifiSettingsBackupRestore, mClock);
-        if (mFeatureFlags.voipDetectionBugfix() && SdkLevel.isAtLeastV()) {
+        if (mFeatureFlags.voipDetectionBugfix() && SdkLevel.isAtLeastV()
+                && Flags.passCopiedCallStateList() && mContext.getResources().getBoolean(
+                R.bool.config_wifiVoipDetectionEnabled)) {
             mWifiVoipDetector = new WifiVoipDetector(mContext, mWifiHandler, this,
                     mWifiCarrierInfoManager);
         } else {
