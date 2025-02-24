@@ -378,6 +378,14 @@ public class UsdRequestManager {
         mRequesterRole = Role.NONE;
     }
 
+    private boolean isUsdPublisherSupported() {
+        return mUsdCapabilities != null && mUsdCapabilities.isUsdPublisherSupported;
+    }
+
+    private boolean isUsdSubscriberSupported() {
+        return mUsdCapabilities != null && mUsdCapabilities.isUsdSubscriberSupported;
+    }
+
     /**
      * Get USD characteristics.
      */
@@ -530,7 +538,7 @@ public class UsdRequestManager {
      * PublishSessionCallback)}
      */
     public void publish(PublishConfig publishConfig, IPublishSessionCallback callback) {
-        if (!isPublisherAvailable()) {
+        if (!isUsdPublisherSupported() || !isPublisherAvailable()) {
             notifyPublishFailure(callback, SessionCallback.FAILURE_NOT_AVAILABLE, "Not available");
             return;
         }
@@ -612,7 +620,7 @@ public class UsdRequestManager {
      * SubscribeSessionCallback)}
      */
     public void subscribe(SubscribeConfig subscribeConfig, ISubscribeSessionCallback callback) {
-        if (!isSubscriberAvailable()) {
+        if (!isUsdSubscriberSupported() || !isSubscriberAvailable()) {
             notifySubscribeFailure(callback, SessionCallback.FAILURE_NOT_AVAILABLE,
                     "Not available");
             return;
