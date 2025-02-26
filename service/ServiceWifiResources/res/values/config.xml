@@ -1412,10 +1412,6 @@
     <!-- Boolean indicating whether to trigger bugreport for WiFi subsystem restart issue -->
     <bool translatable="false" name ="config_wifi_subsystem_restart_bugreport_enabled">true</bool>
 
-    <!-- Boolean indicating whether to use the common nl80211 implementation of the WiFi Hal. This
-         will be used instead of the AIDL or HIDL implementation if enabled. -->
-    <bool translatable="false" name="config_wifiNl80211HalEnabled">false</bool>
-
     <!-- Boolean indicating whether to use wifi VoIP detection module to detect VoIP over Wi-FI to
          ehance Wi-Fi VoIP quality -->
     <bool translatable="false" name="config_wifiVoipDetectionEnabled">false</bool>
