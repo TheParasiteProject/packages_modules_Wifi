@@ -1268,8 +1268,8 @@
     <string translatable="false" name="config_wifiP2pGoEapolIpAddressRangeStart"/>
     <string translatable="false" name="config_wifiP2pGoEapolIpAddressRangeEnd"/>
     <!-- Boolean indicating whether to disable firmware roaming when the device goes into idle mode.
-         true: firmware roaming will be disabled when the device goes into idle mode, and then
-               re-activated when the device exits idle mode.
+         true: firmware roaming will be disabled when the device goes into idle mode and screen
+               is off, and then re-activated when the device exits idle mode or screen is on.
          false: firmware roaming will not be affected. -->
     <bool translatable="false" name ="config_wifiDisableFirmwareRoamingInIdleMode">false</bool>
     <!-- Boolean indicating whether the framework updates country from scan results when there is
