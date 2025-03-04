@@ -199,8 +199,12 @@ public class PasnConfigTest {
         assertEquals(PasnConfig.CIPHER_NONE, PasnConfig.getCiphersFromCapabilities(""));
         assertEquals(PasnConfig.CIPHER_CCMP_128,
                 PasnConfig.getCiphersFromCapabilities("[RSN-SAE+SAE_EXT_KEY-CCMP]"));
+        assertEquals(PasnConfig.CIPHER_CCMP_256,
+                PasnConfig.getCiphersFromCapabilities("[RSN-SAE+SAE_EXT_KEY-CCMP-256]"));
         assertEquals(PasnConfig.CIPHER_GCMP_128,
-                PasnConfig.getCiphersFromCapabilities("[RSN-SAE+SAE_EXT_KEY-GCMP-128]"));
+                PasnConfig.getCiphersFromCapabilities("[RSN-SAE+SAE_EXT_KEY-GCMP]"));
+        assertEquals(PasnConfig.CIPHER_GCMP_256,
+                PasnConfig.getCiphersFromCapabilities("[RSN-SAE+SAE_EXT_KEY-GCMP-256]"));
     }
 
     /**
