@@ -421,11 +421,15 @@ public class RttServiceImplTest extends WifiBaseTest {
         assertEquals("Password is not set", "TEST_PASSWORD", halRequest.mRttPeers.get(
                 1).getSecureRangingConfig().getPasnConfig().getPassword());
 
+        // Verify ranging results are processed correctly
+        Pair<List<RangingResult>, List<RangingResult>> resultsPair = getDummyRangingResults(
+                halRequest);
         mRangingResultsCbCaptor.getValue().onRangingResults(mIntCaptor.getValue(),
-                getDummyRangingResults(request).second);
+                resultsPair.first);
         mMockLooper.dispatchAll();
-
         verify(mockCallback).onRangingResults(mListCaptor.capture());
+        assertTrue(compareListContentsNoOrdering(resultsPair.second, mListCaptor.getValue()));
+
         verifyWakeupCancelled();
         verifyNoMoreInteractions(mockRttControllerHal, mockCallback,
                 mAlarmManager.getAlarmManager());

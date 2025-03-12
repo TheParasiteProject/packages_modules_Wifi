@@ -1452,6 +1452,17 @@ public class RttServiceImpl extends IWifiRttManager.Stub {
                             && !resultForRequest.getVendorData().isEmpty()) {
                         builder.setVendorData(resultForRequest.getVendorData());
                     }
+                    // set secure ranging fields
+                    builder.setRangingFrameProtected(resultForRequest.isRangingFrameProtected())
+                            .setRangingAuthenticated(resultForRequest.isRangingAuthenticated())
+                            .setSecureHeLtfEnabled(resultForRequest.isSecureHeLtfEnabled())
+                            .setSecureHeLtfProtocolVersion(
+                                    resultForRequest.getSecureHeLtfProtocolVersion());
+                    if (resultForRequest.getPasnComebackCookie() != null) {
+                        builder.setPasnComebackCookie(resultForRequest.getPasnComebackCookie());
+                        builder.setPasnComebackAfterMillis(
+                                resultForRequest.getPasnComebackAfterMillis());
+                    }
                     finalResults.add(builder.build());
                 }
             }
