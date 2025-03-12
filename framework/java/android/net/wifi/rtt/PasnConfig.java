@@ -426,8 +426,9 @@ public final class PasnConfig implements Parcelable {
 
     @Override
     public String toString() {
+        String password = (mPassword != null ? "*" : "null");
         return "PasnConfig{" + "mBaseAkms=" + mBaseAkms + ", mCiphers=" + mCiphers + ", mPassword='"
-                + mPassword + '\'' + ", mWifiSsid=" + mWifiSsid + ", mPasnComebackCookie="
+                + password + '\'' + ", mWifiSsid=" + mWifiSsid + ", mPasnComebackCookie="
                 + Arrays.toString(mPasnComebackCookie) + '}';
     }
 }
