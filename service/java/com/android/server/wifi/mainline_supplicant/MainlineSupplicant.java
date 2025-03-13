@@ -18,6 +18,7 @@ package com.android.server.wifi.mainline_supplicant;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.net.MacAddress;
 import android.net.wifi.usd.Config;
 import android.net.wifi.usd.PublishConfig;
 import android.net.wifi.usd.SubscribeConfig;
@@ -28,10 +29,12 @@ import android.os.ServiceSpecificException;
 import android.system.wifi.mainline_supplicant.IMainlineSupplicant;
 import android.system.wifi.mainline_supplicant.IStaInterface;
 import android.system.wifi.mainline_supplicant.IStaInterfaceCallback;
+import android.system.wifi.mainline_supplicant.UsdMessageInfo;
 import android.system.wifi.mainline_supplicant.UsdServiceProtoType;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.server.wifi.SupplicantStaIfaceHal;
 import com.android.server.wifi.WifiNative;
 import com.android.server.wifi.WifiThreadRunner;
 import com.android.server.wifi.usd.UsdNativeManager;
@@ -510,6 +513,170 @@ public class MainlineSupplicant {
             }
             try {
                 iface.startUsdSubscribe(cmdId, frameworkToHalUsdSubscribeConfig(subscribeConfig));
+                return true;
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodName);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodName);
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Get the USD capabilities for the interface.
+     *
+     * @param ifaceName Name of the interface
+     * @return UsdCapabilities if available, otherwise null
+     */
+    public @Nullable SupplicantStaIfaceHal.UsdCapabilitiesInternal getUsdCapabilities(
+            @NonNull String ifaceName) {
+        synchronized (mLock) {
+            final String methodName = "getUsdCapabilities";
+            if (ifaceName == null) {
+                return null;
+            }
+            IStaInterface iface = getStaIfaceOrLogError(ifaceName, methodName);
+            if (iface == null) {
+                return null;
+            }
+            try {
+                IStaInterface.UsdCapabilities aidlCaps = iface.getUsdCapabilities();
+                if (aidlCaps == null) {
+                    Log.e(TAG, "Received null USD capabilities from the HAL");
+                    return null;
+                }
+                return new SupplicantStaIfaceHal.UsdCapabilitiesInternal(
+                        aidlCaps.isUsdPublisherSupported,
+                        aidlCaps.isUsdSubscriberSupported,
+                        aidlCaps.maxLocalSsiLengthBytes,
+                        aidlCaps.maxServiceNameLengthBytes,
+                        aidlCaps.maxMatchFilterLengthBytes,
+                        aidlCaps.maxNumPublishSessions,
+                        aidlCaps.maxNumSubscribeSessions);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodName);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodName);
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Update an ongoing USD publish operation.
+     *
+     * @param ifaceName Name of the interface
+     * @param publishId Publish id for this session
+     * @param ssi Service specific info
+     */
+    public void updateUsdPublish(@NonNull String ifaceName, int publishId,
+            @NonNull byte[] ssi) {
+        synchronized (mLock) {
+            final String methodName = "updateUsdPublish";
+            if (ifaceName == null || ssi == null) {
+                return;
+            }
+            IStaInterface iface = getStaIfaceOrLogError(ifaceName, methodName);
+            if (iface == null) {
+                return;
+            }
+            try {
+                iface.updateUsdPublish(publishId, ssi);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodName);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodName);
+            }
+        }
+    }
+
+    /**
+     * Cancel an ongoing USD publish session.
+     *
+     * @param ifaceName Name of the interface
+     * @param publishId Publish id for the session
+     */
+    public void cancelUsdPublish(@NonNull String ifaceName, int publishId) {
+        synchronized (mLock) {
+            final String methodName = "cancelUsdPublish";
+            if (ifaceName == null) {
+                return;
+            }
+            IStaInterface iface = getStaIfaceOrLogError(ifaceName, methodName);
+            if (iface == null) {
+                return;
+            }
+            try {
+                iface.cancelUsdPublish(publishId);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodName);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodName);
+            }
+        }
+    }
+
+    /**
+     * Cancel an ongoing USD subscribe session.
+     *
+     * @param ifaceName Name of the interface
+     * @param subscribeId Subscribe id for the session
+     */
+    public void cancelUsdSubscribe(@NonNull String ifaceName, int subscribeId) {
+        synchronized (mLock) {
+            final String methodName = "cancelUsdSubscribe";
+            if (ifaceName == null) {
+                return;
+            }
+            IStaInterface iface = getStaIfaceOrLogError(ifaceName, methodName);
+            if (iface == null) {
+                return;
+            }
+            try {
+                iface.cancelUsdSubscribe(subscribeId);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodName);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodName);
+            }
+        }
+    }
+
+    private static UsdMessageInfo createUsdMessageInfo(int ownId, int peerId,
+            MacAddress peerMacAddress, byte[] message) {
+        UsdMessageInfo messageInfo = new UsdMessageInfo();
+        messageInfo.ownId = ownId;
+        messageInfo.peerId = peerId;
+        messageInfo.message = message;
+        messageInfo.peerMacAddress = peerMacAddress.toByteArray();
+        return messageInfo;
+    }
+
+    /**
+     * Send a message to an ongoing USD publish or subscribe session.
+     *
+     * @param ifaceName Name of the interface
+     * @param ownId Id for the session
+     * @param peerId Id for the peer session
+     * @param peerMacAddress Mac address of the peer session
+     * @param message Data to send
+     * @return true if successful, false otherwise
+     */
+    public boolean sendUsdMessage(@NonNull String ifaceName, int ownId, int peerId,
+            @NonNull MacAddress peerMacAddress, @NonNull byte[] message) {
+        synchronized (mLock) {
+            final String methodName = "sendUsdMessage";
+            if (ifaceName == null || peerMacAddress == null || message == null) {
+                return false;
+            }
+            IStaInterface iface = getStaIfaceOrLogError(ifaceName, methodName);
+            if (iface == null) {
+                return false;
+            }
+            try {
+                iface.sendUsdMessage(
+                        createUsdMessageInfo(ownId, peerId, peerMacAddress, message));
                 return true;
             } catch (ServiceSpecificException e) {
                 handleServiceSpecificException(e, methodName);
