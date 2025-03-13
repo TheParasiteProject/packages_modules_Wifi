@@ -18,6 +18,9 @@ package com.android.server.wifi.mainline_supplicant;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.net.wifi.usd.Config;
+import android.net.wifi.usd.PublishConfig;
+import android.net.wifi.usd.SubscribeConfig;
 import android.net.wifi.util.Environment;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -25,6 +28,7 @@ import android.os.ServiceSpecificException;
 import android.system.wifi.mainline_supplicant.IMainlineSupplicant;
 import android.system.wifi.mainline_supplicant.IStaInterface;
 import android.system.wifi.mainline_supplicant.IStaInterfaceCallback;
+import android.system.wifi.mainline_supplicant.UsdServiceProtoType;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
@@ -33,6 +37,7 @@ import com.android.server.wifi.WifiThreadRunner;
 import com.android.server.wifi.usd.UsdNativeManager;
 import com.android.wifi.flags.Flags;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -48,6 +53,7 @@ public class MainlineSupplicant {
     private static final String TAG = "MainlineSupplicant";
     private static final String MAINLINE_SUPPLICANT_SERVICE_NAME = "wifi_mainline_supplicant";
     private static final long WAIT_FOR_DEATH_TIMEOUT_MS = 50L;
+    protected static final int DEFAULT_USD_FREQ_MHZ = 2437;
 
     private IMainlineSupplicant mIMainlineSupplicant;
     private final Object mLock = new Object();
@@ -360,6 +366,160 @@ public class MainlineSupplicant {
         }
     }
 
+    private static byte frameworkToHalUsdTransmissionType(
+            @Config.TransmissionType int transmissionType) {
+        switch (transmissionType) {
+            case Config.TRANSMISSION_TYPE_MULTICAST:
+                return IStaInterface.UsdPublishTransmissionType.MULTICAST;
+            case Config.TRANSMISSION_TYPE_UNICAST:
+            default:
+                return IStaInterface.UsdPublishTransmissionType.UNICAST;
+        }
+    }
+
+    private static byte frameworkToHalUsdProtoType(
+            @Config.ServiceProtoType int protoType) {
+        switch (protoType) {
+            case Config.SERVICE_PROTO_TYPE_GENERIC:
+                return UsdServiceProtoType.GENERIC;
+            case Config.SERVICE_PROTO_TYPE_CSA_MATTER:
+                return UsdServiceProtoType.CSA_MATTER;
+            default:
+                return UsdServiceProtoType.UNKNOWN;
+        }
+    }
+
+    @VisibleForTesting
+    protected static IStaInterface.UsdPublishConfig frameworkToHalUsdPublishConfig(
+            PublishConfig frameworkConfig) {
+        IStaInterface.UsdPublishConfig aidlConfig = new IStaInterface.UsdPublishConfig();
+        // USD publisher is always solicited and unsolicited
+        aidlConfig.publishType = IStaInterface.UsdPublishType.SOLICITED_AND_UNSOLICITED;
+        // FSD is always enabled for USD
+        aidlConfig.isFsd = true;
+        aidlConfig.transmissionType = frameworkToHalUsdTransmissionType(
+                frameworkConfig.getSolicitedTransmissionType());
+        aidlConfig.announcementPeriodMillis = frameworkConfig.getAnnouncementPeriodMillis();
+        aidlConfig.baseConfig = new IStaInterface.UsdBaseConfig();
+        aidlConfig.baseConfig.ttlSec = frameworkConfig.getTtlSeconds();
+        int[] freqs = frameworkConfig.getOperatingFrequenciesMhz();
+        aidlConfig.baseConfig.defaultFreqMhz = (freqs == null || freqs.length == 0)
+                ? DEFAULT_USD_FREQ_MHZ : freqs[0];
+        aidlConfig.baseConfig.freqsMhz = (freqs == null || freqs.length <= 1)
+                ? new int[0] : Arrays.copyOfRange(freqs, 1, freqs.length);
+        aidlConfig.baseConfig.serviceName = Arrays.toString(frameworkConfig.getServiceName());
+        aidlConfig.baseConfig.serviceSpecificInfo =
+                frameworkConfig.getServiceSpecificInfo() != null
+                        ? frameworkConfig.getServiceSpecificInfo() : new byte[0];
+        aidlConfig.baseConfig.rxMatchFilter = frameworkConfig.getRxMatchFilterTlv() != null
+                ? frameworkConfig.getRxMatchFilterTlv() : new byte[0];
+        aidlConfig.baseConfig.txMatchFilter = frameworkConfig.getTxMatchFilterTlv() != null
+                ? frameworkConfig.getTxMatchFilterTlv() : new byte[0];
+        aidlConfig.baseConfig.serviceProtoType = frameworkToHalUsdProtoType(
+                frameworkConfig.getServiceProtoType());
+        return aidlConfig;
+    }
+
+    /**
+     * Start a USD publish operation.
+     *
+     * @param ifaceName Name of the interface
+     * @param cmdId An id for this command
+     * @param publishConfig Publish configuration
+     * @return true if successful, false otherwise
+     */
+    public boolean startUsdPublish(@NonNull String ifaceName, int cmdId,
+            @NonNull PublishConfig publishConfig) {
+        synchronized (mLock) {
+            final String methodName = "startUsdPublish";
+            if (ifaceName == null || publishConfig == null) {
+                return false;
+            }
+            IStaInterface iface = getStaIfaceOrLogError(ifaceName, methodName);
+            if (iface == null) {
+                return false;
+            }
+            try {
+                iface.startUsdPublish(cmdId, frameworkToHalUsdPublishConfig(publishConfig));
+                return true;
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodName);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodName);
+            }
+            return false;
+        }
+    }
+
+    private static byte frameworkToHalUsdSubscribeType(
+            @Config.SubscribeType int subscribeType) {
+        switch (subscribeType) {
+            case Config.SUBSCRIBE_TYPE_ACTIVE:
+                return IStaInterface.UsdSubscribeType.ACTIVE_MODE;
+            case Config.SUBSCRIBE_TYPE_PASSIVE:
+            default:
+                return IStaInterface.UsdSubscribeType.PASSIVE_MODE;
+        }
+    }
+
+    @VisibleForTesting
+    protected static IStaInterface.UsdSubscribeConfig frameworkToHalUsdSubscribeConfig(
+            SubscribeConfig frameworkConfig) {
+        IStaInterface.UsdSubscribeConfig aidlConfig = new IStaInterface.UsdSubscribeConfig();
+        aidlConfig.subscribeType =
+                frameworkToHalUsdSubscribeType(frameworkConfig.getSubscribeType());
+        aidlConfig.queryPeriodMillis = frameworkConfig.getQueryPeriodMillis();
+        aidlConfig.baseConfig = new IStaInterface.UsdBaseConfig();
+        aidlConfig.baseConfig.ttlSec = frameworkConfig.getTtlSeconds();
+        int[] freqs = frameworkConfig.getOperatingFrequenciesMhz();
+        aidlConfig.baseConfig.defaultFreqMhz = (freqs == null || freqs.length == 0)
+                ? DEFAULT_USD_FREQ_MHZ : freqs[0];
+        aidlConfig.baseConfig.freqsMhz = (freqs == null || freqs.length <= 1)
+                ? new int[0] : Arrays.copyOfRange(freqs, 1, freqs.length);
+        aidlConfig.baseConfig.serviceName = Arrays.toString(frameworkConfig.getServiceName());
+        aidlConfig.baseConfig.serviceSpecificInfo =
+                frameworkConfig.getServiceSpecificInfo() != null
+                        ? frameworkConfig.getServiceSpecificInfo() : new byte[0];
+        aidlConfig.baseConfig.rxMatchFilter = frameworkConfig.getRxMatchFilterTlv() != null
+                ? frameworkConfig.getRxMatchFilterTlv() : new byte[0];
+        aidlConfig.baseConfig.txMatchFilter = frameworkConfig.getTxMatchFilterTlv() != null
+                ? frameworkConfig.getTxMatchFilterTlv() : new byte[0];
+        aidlConfig.baseConfig.serviceProtoType = frameworkToHalUsdProtoType(
+                frameworkConfig.getServiceProtoType());
+        return aidlConfig;
+    }
+
+    /**
+     * Start a USD subscribe operation.
+     *
+     * @param ifaceName Name of the interface
+     * @param cmdId An id for this command
+     * @param subscribeConfig Subscribe configuration
+     * @return true if successful, false otherwise
+     */
+    public boolean startUsdSubscribe(@NonNull String ifaceName, int cmdId,
+            @NonNull SubscribeConfig subscribeConfig) {
+        synchronized (mLock) {
+            final String methodName = "startUsdSubscribe";
+            if (ifaceName == null || subscribeConfig == null) {
+                return false;
+            }
+            IStaInterface iface = getStaIfaceOrLogError(ifaceName, methodName);
+            if (iface == null) {
+                return false;
+            }
+            try {
+                iface.startUsdSubscribe(cmdId, frameworkToHalUsdSubscribeConfig(subscribeConfig));
+                return true;
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodName);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodName);
+            }
+            return false;
+        }
+    }
+
     private void handleServiceSpecificException(ServiceSpecificException e, String methodName) {
         Log.e(TAG, methodName + " encountered ServiceSpecificException " + e);
     }
@@ -370,6 +530,17 @@ public class MainlineSupplicant {
             return false;
         }
         return true;
+    }
+
+    private @Nullable IStaInterface getStaIfaceOrLogError(String ifaceName, String methodName) {
+        synchronized (mLock) {
+            if (!mActiveStaIfaces.containsKey(ifaceName)) {
+                Log.e(TAG, "Unable to call " + methodName + " since iface "
+                        + ifaceName + " does not exist");
+                return null;
+            }
+            return mActiveStaIfaces.get(ifaceName);
+        }
     }
 
     private void handleRemoteException(RemoteException e, String methodName) {
