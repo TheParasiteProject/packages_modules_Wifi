@@ -29,6 +29,7 @@ import android.os.WorkSource;
 import android.util.Log;
 
 import com.android.server.wifi.proto.WifiStatsLog;
+import com.android.server.wifi.util.WifiPermissionsUtil;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -54,6 +55,9 @@ public class WifiMulticastLockManager {
     private boolean mVerboseLoggingEnabled = false;
     private final BatteryStatsManager mBatteryStats;
     private final ActiveModeWarden mActiveModeWarden;
+    private final Clock mClock;
+    private final WifiMetrics mWifiMetrics;
+    private final WifiPermissionsUtil mWifiPermissionsUtil;
 
     /** Delegate for handling state change events for multicast filtering. */
     public interface FilterController {
@@ -68,10 +72,16 @@ public class WifiMulticastLockManager {
             ActiveModeWarden activeModeWarden,
             BatteryStatsManager batteryStats,
             Looper looper,
-            Context context) {
+            Context context,
+            Clock clock,
+            WifiMetrics wifiMetrics,
+            WifiPermissionsUtil wifiPermissionsUtil) {
         mBatteryStats = batteryStats;
         mActiveModeWarden = activeModeWarden;
         mHandler = new Handler(looper);
+        mClock = clock;
+        mWifiMetrics = wifiMetrics;
+        mWifiPermissionsUtil = wifiPermissionsUtil;
 
         mActiveModeWarden.registerPrimaryClientModeManagerChangedCallback(
                 new PrimaryClientModeManagerChangedCallback());
@@ -91,6 +101,7 @@ public class WifiMulticastLockManager {
         IBinder mBinder;
         String mAttributionTag;
         String mPackageName;
+        long mAcquireTime;
 
         Multicaster(int uid, IBinder binder, String tag, String attributionTag,
                 String packageName) {
@@ -99,6 +110,7 @@ public class WifiMulticastLockManager {
             mBinder = binder;
             mAttributionTag = attributionTag;
             mPackageName = packageName;
+            mAcquireTime = mClock.getElapsedSinceBootMillis();
             try {
                 mBinder.linkToDeath(this, 0);
             } catch (RemoteException e) {
@@ -141,6 +153,10 @@ public class WifiMulticastLockManager {
 
         public String getPackageName() {
             return mPackageName;
+        }
+
+        public long getAcquireTime() {
+            return mAcquireTime;
         }
 
         public String toString() {
@@ -299,6 +315,10 @@ public class WifiMulticastLockManager {
         Multicaster removed = mMulticasters.remove(i);
         if (removed != null) {
             removed.unlinkDeathRecipient();
+            mWifiMetrics.addMulticastLockManagerAcqSession(
+                    uid, removed.getAttributionTag(),
+                    mWifiPermissionsUtil.getWifiCallerType(uid, removed.getPackageName()),
+                    mClock.getElapsedSinceBootMillis() - removed.getAcquireTime());
         }
 
         if (mNumLocksPerActiveOwner.containsKey(uid)) {

@@ -34,6 +34,7 @@ import androidx.test.filters.SmallTest;
 
 import com.android.server.wifi.ActiveModeWarden.PrimaryClientModeManagerChangedCallback;
 import com.android.server.wifi.WifiMulticastLockManager.FilterController;
+import com.android.server.wifi.util.WifiPermissionsUtil;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -54,6 +55,7 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
     private static final int TEST_UID = 123;
     private static final String TEST_ATTRIBUTION_TAG = "attribution-tag";
     private static final String TEST_PACKAGE_NAME = "package-name";
+    private static final long START_TIME = 0;
 
     private TestLooper mLooper;
     @Mock ConcreteClientModeManager mClientModeManager;
@@ -64,6 +66,9 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
     @Mock ActiveModeWarden mActiveModeWarden;
     @Mock Context mContext;
     @Mock ActivityManager mActivityManager;
+    @Mock Clock mClock;
+    @Mock WifiMetrics mWifiMetrics;
+    @Mock WifiPermissionsUtil mWifiPermissionsUtil;
     @Captor ArgumentCaptor<PrimaryClientModeManagerChangedCallback> mPrimaryChangedCallbackCaptor;
     @Captor ArgumentCaptor<ActivityManager.OnUidImportanceListener> mUidImportanceListenerCaptor =
             ArgumentCaptor.forClass(ActivityManager.OnUidImportanceListener.class);
@@ -88,7 +93,7 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
         when(mActiveModeWarden.getPrimaryClientModeManager()).thenReturn(mClientModeManager);
         when(mContext.getSystemService(ActivityManager.class)).thenReturn(mActivityManager);
         mManager = new WifiMulticastLockManager(mActiveModeWarden, mBatteryStats,
-                mLooper.getLooper(), mContext);
+                mLooper.getLooper(), mContext, mClock, mWifiMetrics, mWifiPermissionsUtil);
 
         verify(mActiveModeWarden).registerPrimaryClientModeManagerChangedCallback(
                 mPrimaryChangedCallbackCaptor.capture());
@@ -384,5 +389,21 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
         mManager.releaseLock(uid2, binder2, WL_2_TAG);
         assertFalse(mManager.isMulticastEnabled());
         verify(mFilterController, times(2)).startFilteringMulticastPackets();
+    }
+
+    /**
+     * Verify that an acquire session is logged in the metrics when a lock is released.
+     */
+    @Test
+    public void testAcquireSessionMetrics() {
+        IBinder binder = mock(IBinder.class);
+        when(mClock.getElapsedSinceBootMillis()).thenReturn(START_TIME);
+        mManager.acquireLock(TEST_UID, binder, WL_1_TAG, TEST_ATTRIBUTION_TAG, TEST_PACKAGE_NAME);
+
+        // Advance clock by 10 ms and release the lock
+        when(mClock.getElapsedSinceBootMillis()).thenReturn(START_TIME + 10);
+        mManager.releaseLock(TEST_UID, binder, WL_1_TAG);
+        verify(mWifiMetrics).addMulticastLockManagerAcqSession(
+                eq(TEST_UID), eq(TEST_ATTRIBUTION_TAG), anyInt(), eq(10L) /* duration */);
     }
 }
