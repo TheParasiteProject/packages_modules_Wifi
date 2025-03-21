@@ -30,6 +30,7 @@ import android.util.Log;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.wifi.WifiNative;
 import com.android.server.wifi.WifiThreadRunner;
+import com.android.server.wifi.usd.UsdNativeManager;
 import com.android.wifi.flags.Flags;
 
 import java.util.HashMap;
@@ -57,6 +58,7 @@ public class MainlineSupplicant {
     private final boolean mIsServiceAvailable;
     private Map<String, IStaInterface> mActiveStaIfaces = new HashMap<>();
     private Map<String, IStaInterfaceCallback> mStaIfaceCallbacks = new HashMap<>();
+    private UsdNativeManager.UsdEventsCallback mUsdEventsCallback = null;
 
     public MainlineSupplicant(@NonNull WifiThreadRunner wifiThreadRunner) {
         mWifiThreadRunner = wifiThreadRunner;
@@ -278,6 +280,22 @@ public class MainlineSupplicant {
             }
             return false;
         }
+    }
+
+    /**
+     * Register a framework callback to receive USD events.
+     */
+    public void registerUsdEventsCallback(
+            @NonNull UsdNativeManager.UsdEventsCallback usdEventsCallback) {
+        mUsdEventsCallback = usdEventsCallback;
+    }
+
+    /**
+     * Get the registered USD events callback. Method should only be used
+     * by {@link MainlineSupplicantStaIfaceCallback}.
+     */
+    protected @Nullable UsdNativeManager.UsdEventsCallback getUsdEventsCallback() {
+        return mUsdEventsCallback;
     }
 
     /**
