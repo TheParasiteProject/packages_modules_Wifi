@@ -50,6 +50,8 @@ public class WifiMulticastLockManager {
     private final Map<Integer, Integer> mNumLocksPerInactiveOwner = new HashMap<>();
     private int mMulticastEnabled = 0;
     private int mMulticastDisabled = 0;
+    private boolean mIsFilterDisableSessionActive = false;
+    private long mFilterDisableSessionStartTime;
     private final Handler mHandler;
     private final Object mLock = new Object();
     private boolean mVerboseLoggingEnabled = false;
@@ -235,17 +237,32 @@ public class WifiMulticastLockManager {
     public void startFilteringMulticastPackets() {
         synchronized (mLock) {
             if (!isMulticastEnabled()) {
+                if (mIsFilterDisableSessionActive) {
+                    // Log the end of the filtering disabled session,
+                    // since we're about to re-enable multicast packet filtering
+                    mWifiMetrics.addMulticastLockManagerActiveSession(
+                            mClock.getElapsedSinceBootMillis() - mFilterDisableSessionStartTime);
+                }
                 mActiveModeWarden.getPrimaryClientModeManager()
                         .getMcastLockManagerFilterController()
                         .startFilteringMulticastPackets();
+                mIsFilterDisableSessionActive = false;
             }
         }
     }
 
     private void stopFilteringMulticastPackets() {
-        mActiveModeWarden.getPrimaryClientModeManager()
-                .getMcastLockManagerFilterController()
-                .stopFilteringMulticastPackets();
+        synchronized (mLock) {
+            if (!mIsFilterDisableSessionActive) {
+                // Mark the beginning of a filtering disabled session,
+                // since we're about to disable multicast packet filtering
+                mFilterDisableSessionStartTime = mClock.getElapsedSinceBootMillis();
+            }
+            mActiveModeWarden.getPrimaryClientModeManager()
+                    .getMcastLockManagerFilterController()
+                    .stopFilteringMulticastPackets();
+            mIsFilterDisableSessionActive = true;
+        }
     }
 
     /**
@@ -273,9 +290,7 @@ public class WifiMulticastLockManager {
             // our new size == 1 (first call), but this function won't
             // be called often and by making the stopPacket call each
             // time we're less fragile and self-healing.
-            mActiveModeWarden.getPrimaryClientModeManager()
-                    .getMcastLockManagerFilterController()
-                    .stopFilteringMulticastPackets();
+            stopFilteringMulticastPackets();
         }
 
         final long ident = Binder.clearCallingIdentity();
@@ -328,9 +343,7 @@ public class WifiMulticastLockManager {
         }
 
         if (!isMulticastEnabled()) {
-            mActiveModeWarden.getPrimaryClientModeManager()
-                    .getMcastLockManagerFilterController()
-                    .startFilteringMulticastPackets();
+            startFilteringMulticastPackets();
         }
 
         final long ident = Binder.clearCallingIdentity();
