@@ -193,8 +193,10 @@ package android.net.wifi {
     method @NonNull public String getKey();
     method public int getMacRandomizationSetting();
     method @NonNull public android.net.MacAddress getRandomizedMacAddress();
+    method @FlaggedApi("com.android.wifi.flags.multi_user_wifi_enhancement") public boolean isAllowedToUpdateByOtherUsers();
     method public boolean isDppConfigurator();
     method public boolean isPasspoint();
+    method @FlaggedApi("com.android.wifi.flags.multi_user_wifi_enhancement") public void setAllowedToUpdateByOtherUsers(boolean);
     method public void setHttpProxy(android.net.ProxyInfo);
     method public void setIpConfiguration(@Nullable android.net.IpConfiguration);
     method public void setMacRandomizationSetting(int);
