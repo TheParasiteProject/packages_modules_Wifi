@@ -496,6 +496,12 @@ public class WifiLockManager {
                 <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE)) {
             return true;
         }
+        // Exemption for applications that can project to a nearby device.
+        if (mWifiPermissionsUtil.checkRequestCompanionProfileNearbyDeviceStreamingPermission(uid)
+                && (importance
+                <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_SERVICE)) {
+            return true;
+        }
         // Add any exemption cases for applications regarding restricting Low latency locks to
         // running in the foreground.
         return false;
@@ -522,6 +528,10 @@ public class WifiLockManager {
     private boolean isAppExemptedFromScreenOn(int uid) {
         // Exemption for applications running with CAR Mode permissions.
         if (mWifiPermissionsUtil.checkRequestCompanionProfileAutomotiveProjectionPermission(uid)) {
+            return true;
+        }
+        // Exemption for applications that can project to a nearby device.
+        if (mWifiPermissionsUtil.checkRequestCompanionProfileNearbyDeviceStreamingPermission(uid)) {
             return true;
         }
         // Add more exemptions here
