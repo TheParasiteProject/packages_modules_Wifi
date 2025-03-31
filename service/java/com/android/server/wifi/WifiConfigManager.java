@@ -603,7 +603,11 @@ public class WifiConfigManager {
                 mRandomizedMacAddressMapping.remove(config.getNetworkKey());
             }
         }
-        MacAddress result = mMacAddressUtil.calculatePersistentMacForSta(config.getNetworkKey(),
+        String key = config.getNetworkKey();
+        if (config.persistentMacRandomizationSeed != 0) {
+            key += "-" + Integer.toString(config.persistentMacRandomizationSeed);
+        }
+        MacAddress result = mMacAddressUtil.calculatePersistentMacForSta(key,
                 Process.WIFI_UID);
         if (result == null) {
             Log.wtf(TAG, "Failed to generate MAC address from KeyStore even after retrying. "
@@ -4669,5 +4673,22 @@ public class WifiConfigManager {
             return;
         }
         writeBufferedData();
+    }
+
+    /**
+     * Refreshes random MAC address on next connection to the Wi-Fi network.
+     * This does not change phone MAC.
+     *
+     * @param networkId networkId of the requested network.
+     */
+    public void refreshMacRandomization(int networkId) {
+        WifiConfiguration config = getInternalConfiguredNetwork(networkId);
+        if (config == null) {
+            Log.e(TAG, "refreshMacRandomization networkId " + networkId + " not found");
+            return;
+        }
+        config.randomizedMacExpirationTimeMs = 0;
+        config.randomizedMacLastModifiedTimeMs = 0;
+        config.persistentMacRandomizationSeed++;
     }
 }

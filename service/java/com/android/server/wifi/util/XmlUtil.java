@@ -377,6 +377,8 @@ public class XmlUtil {
         public static final String XML_TAG_ROAMING_CONSORTIUM_OIS = "RoamingConsortiumOIs";
         public static final String XML_TAG_RANDOMIZED_MAC_ADDRESS = "RandomizedMacAddress";
         public static final String XML_TAG_MAC_RANDOMIZATION_SETTING = "MacRandomizationSetting";
+        public static final String XML_TAG_PERSISTENT_MAC_RANDOMIZATION_SEED =
+                "PersistentMacRandomizationSeed";
         public static final String XML_TAG_SEND_DHCP_HOSTNAME = "SendDhcpHostname";
         public static final String XML_TAG_CARRIER_ID = "CarrierId";
         public static final String XML_TAG_SUBSCRIPTION_ID = "SubscriptionId";
@@ -713,6 +715,8 @@ public class XmlUtil {
             if (SdkLevel.isAtLeastV()) {
                 writeVendorDataListToXml(out, configuration.getVendorData());
             }
+            XmlUtil.writeNextValue(out, XML_TAG_PERSISTENT_MAC_RANDOMIZATION_SEED,
+                    configuration.persistentMacRandomizationSeed);
         }
 
         private static List<String> covertMacAddressListToStringList(List<MacAddress> macList) {
@@ -1025,6 +1029,9 @@ public class XmlUtil {
                         case XML_TAG_MAC_RANDOMIZATION_SETTING:
                             configuration.macRandomizationSetting = (int) value;
                             macRandomizationSettingExists = true;
+                            break;
+                        case XML_TAG_PERSISTENT_MAC_RANDOMIZATION_SEED:
+                            configuration.persistentMacRandomizationSeed = (int) value;
                             break;
                         case XML_TAG_SEND_DHCP_HOSTNAME:
                             configuration.setSendDhcpHostnameEnabled((boolean) value);

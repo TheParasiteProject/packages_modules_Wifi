@@ -564,4 +564,6 @@ interface IWifiManager {
 
     void queryPrivilegedConfiguredNetworks(
             in IPrivilegedConfiguredNetworksListener listener, in Bundle extras);
+
+    void refreshMacRandomization(int netId);
 }
