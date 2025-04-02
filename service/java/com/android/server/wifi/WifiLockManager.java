@@ -38,6 +38,7 @@ import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.proto.WifiStatsLog;
 import com.android.server.wifi.util.WifiPermissionsUtil;
 import com.android.server.wifi.util.WorkSourceUtil;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import java.io.PrintWriter;
@@ -82,8 +83,7 @@ public class WifiLockManager {
     /** the current op mode of the primary ClientModeManager */
     private int mCurrentOpMode = WifiManager.WIFI_MODE_NO_LOCKS_HELD;
     private boolean mScreenOn = false;
-    /** whether Wifi is connected on the primary ClientModeManager */
-    private boolean mWifiConnected = false;
+    private boolean mStaConnected = false;
     private boolean mP2pConnected = false;
     private boolean mAwareConnected = false;
 
@@ -155,7 +155,7 @@ public class WifiLockManager {
 
         // Only condition is when Wifi is connected
         if ((ignoreMask & IGNORE_WIFI_STATE_MASK) == 0) {
-            check = check && mWifiConnected;
+            check = check && mStaConnected;
         }
 
         return check;
@@ -170,7 +170,7 @@ public class WifiLockManager {
         boolean check = true;
 
         if ((ignoreMask & IGNORE_WIFI_STATE_MASK) == 0) {
-            check = check && mWifiConnected;
+            check = check && isWifiConnectionActive();
         }
         if ((ignoreMask & IGNORE_SCREEN_STATE_MASK) == 0) {
             check = check && mScreenOn;
@@ -270,6 +270,34 @@ public class WifiLockManager {
         return releaseLock(binder);
     }
 
+    private int getNumActiveConnectionTypes(boolean countD2dConnections) {
+        int numConnectionTypes = 0;
+        if (mStaConnected) numConnectionTypes++;
+        if (countD2dConnections) {
+            if (mP2pConnected) numConnectionTypes++;
+            if (mAwareConnected) numConnectionTypes++;
+        }
+        return numConnectionTypes;
+    }
+
+    private boolean isWifiConnectionActive() {
+        if (doesD2dSatisfyConnectionRequirementForAnyApp()) {
+            return mStaConnected || mP2pConnected || mAwareConnected;
+        }
+        return mStaConnected;
+    }
+
+    private boolean isConnectionRequirementSatisfiedForApp(UidRec uidRec) {
+        if (uidRec.mD2dSatisfiesConnectionRequirement) {
+            return mStaConnected || mP2pConnected || mAwareConnected;
+        }
+        return mStaConnected;
+    }
+
+    private boolean isScreenStateValidForApp(UidRec uidRec) {
+        return uidRec.mIsScreenOnExempted ? true : mScreenOn;
+    }
+
     /**
      * Method used to get the strongest lock type currently held by the WifiLockManager.
      *
@@ -279,8 +307,8 @@ public class WifiLockManager {
      */
     @VisibleForTesting
     synchronized int getStrongestLockMode() {
-        // If Wifi Client is not connected, then all locks are not effective
-        if (!mWifiConnected) {
+        // If the connection requirement is not met, then WifiLocks are not effective
+        if (!isWifiConnectionActive()) {
             return WifiManager.WIFI_MODE_NO_LOCKS_HELD;
         }
 
@@ -422,6 +450,38 @@ public class WifiLockManager {
     }
 
     /**
+     * Handler for any connection state change.
+     *
+     * @param isStaConnection true if a STA connection was changed, or false otherwise.
+     * @param connectionWasStarted true if the connection was started,
+     *                             or false if it was stopped.
+     */
+    private void handleConnectionChanged(boolean isStaConnection, boolean connectionWasStarted) {
+        boolean shouldConsiderD2dConnections = doesD2dSatisfyConnectionRequirementForAnyApp();
+        if (!isStaConnection && !shouldConsiderD2dConnections) return;
+
+        boolean shouldBlameD2dAllowedApps = false;
+        if (shouldConsiderD2dConnections) {
+            // When multiple connection types are valid, only update blaming if the last valid
+            // connection was ended, or the first valid connection was just started.
+            int numConnectionTypes = getNumActiveConnectionTypes(true);
+            shouldBlameD2dAllowedApps = numConnectionTypes == 0
+                    || (connectionWasStarted && numConnectionTypes == 1);
+        }
+        if (!isStaConnection && !shouldBlameD2dAllowedApps) {
+            // No apps are affected by this connection state change.
+            return;
+        }
+
+        // If the screen condition is met, then the connection state change may affect blaming.
+        boolean screenExemptedAppExists = countFgLowLatencyUids(/* isScreenOnExempted */ true) > 0;
+        if (screenExemptedAppExists || mScreenOn) {
+            updateBlameForConnectionStateChange(shouldBlameD2dAllowedApps, isStaConnection);
+        }
+        updateOpMode();
+    }
+
+    /**
      * Handler for Wifi Client mode state changes
      */
     public void updateWifiClientConnected(
@@ -433,27 +493,19 @@ public class WifiLockManager {
             Log.d(TAG, "updateWifiClientConnected hasAtLeastOneConnection="
                     + hasAtLeastOneConnection);
         }
-        if (mWifiConnected == hasAtLeastOneConnection) {
+        if (mStaConnected == hasAtLeastOneConnection) {
             // No need to take action
             return;
         }
-        mWifiConnected = hasAtLeastOneConnection;
-
-        // Adjust blaming for UIDs in foreground carrying low latency locks
-        if (canActivateLowLatencyLock(countFgLowLatencyUids(/*isScreenOnExempted*/ true) > 0
-                ? IGNORE_SCREEN_STATE_MASK | IGNORE_WIFI_STATE_MASK
-                : IGNORE_WIFI_STATE_MASK)) {
-            setBlameLowLatencyWatchList(BlameReason.WIFI_CONNECTION_STATE_CHANGED, mWifiConnected);
-        }
+        mStaConnected = hasAtLeastOneConnection;
 
         // Adjust blaming for UIDs carrying high perf locks
         // Note that blaming is adjusted only if needed,
         // since calling this API is reference counted
         if (canActivateHighPerfLock(IGNORE_WIFI_STATE_MASK)) {
-            setBlameHiPerfLocks(mWifiConnected);
+            setBlameHiPerfLocks(mStaConnected);
         }
-
-        updateOpMode();
+        handleConnectionChanged(true, mStaConnected);
     }
 
     /**
@@ -467,6 +519,7 @@ public class WifiLockManager {
             Log.i(TAG, "Updating P2P connected state to " + isConnected);
         }
         mP2pConnected = isConnected;
+        handleConnectionChanged(false, mP2pConnected);
     }
 
     /**
@@ -480,6 +533,7 @@ public class WifiLockManager {
             Log.i(TAG, "Updating Aware connected state to " + isConnected);
         }
         mAwareConnected = isConnected;
+        handleConnectionChanged(false, mAwareConnected);
     }
 
     private synchronized void setBlameHiPerfLocks(boolean shouldBlame) {
@@ -566,6 +620,27 @@ public class WifiLockManager {
         return false;
     }
 
+    private boolean doesD2dSatisfyConnectionRequirementForApp(int uid) {
+        if (!Flags.wifiLockActivatedByP2pOrAware()) {
+            return false;
+        }
+        if (mWifiPermissionsUtil.checkRequestCompanionProfileNearbyDeviceStreamingPermission(uid)) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean doesD2dSatisfyConnectionRequirementForAnyApp() {
+        if (!Flags.wifiLockActivatedByP2pOrAware()) return false;
+        for (int i = 0; i < mLowLatencyUidWatchList.size(); i++) {
+            UidRec uidRec = mLowLatencyUidWatchList.valueAt(i);
+            if (uidRec.mD2dSatisfiesConnectionRequirement) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void addUidToLlWatchList(int uid) {
         UidRec uidRec = mLowLatencyUidWatchList.get(uid);
         if (uidRec != null) {
@@ -582,6 +657,8 @@ public class WifiLockManager {
             uidRec.mIsFgExempted = isAppExemptedFromImportance(uid,
                     ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND);
             uidRec.mIsScreenOnExempted = isAppExemptedFromScreenOn(uid);
+            uidRec.mD2dSatisfiesConnectionRequirement =
+                    doesD2dSatisfyConnectionRequirementForApp(uid);
 
             if (canActivateLowLatencyLock(
                     uidRec.mIsScreenOnExempted ? IGNORE_SCREEN_STATE_MASK : 0,
@@ -1134,6 +1211,29 @@ public class WifiLockManager {
         if (notify) notifyLowLatencyActiveUsersChanged();
     }
 
+    private void updateBlameForConnectionStateChange(boolean shouldBlameD2dAllowedApps,
+            boolean shouldBlameNonD2dAllowedApps) {
+        boolean activeUsersChanged = false;
+        for (int i = 0; i < mLowLatencyUidWatchList.size(); i++) {
+            UidRec uidRec = mLowLatencyUidWatchList.valueAt(i);
+            boolean shouldBlame = uidRec.mD2dSatisfiesConnectionRequirement
+                    ? shouldBlameD2dAllowedApps : shouldBlameNonD2dAllowedApps;
+            if (!shouldBlame) continue;
+
+            // If the screen and foreground conditions are met,
+            // then the connection state change will affect blaming.
+            boolean hasValidScreenState = isScreenStateValidForApp(uidRec);
+            if (hasValidScreenState && uidRec.mIsFg) {
+                boolean hasValidConnection = isConnectionRequirementSatisfiedForApp(uidRec);
+                setBlameLowLatencyUid(uidRec.mUid, hasValidConnection);
+                activeUsersChanged = true;
+            }
+        }
+        if (activeUsersChanged) {
+            notifyLowLatencyActiveUsersChanged();
+        }
+    }
+
     protected synchronized void dump(PrintWriter pw) {
         pw.println("Locks acquired: "
                 + mFullHighPerfLocksAcquired + " full high perf, "
@@ -1219,6 +1319,7 @@ public class WifiLockManager {
         boolean mIsFg;
         boolean mIsFgExempted = false;
         boolean mIsScreenOnExempted = false;
+        boolean mD2dSatisfiesConnectionRequirement = false;
 
         UidRec(int uid) {
             mUid = uid;
