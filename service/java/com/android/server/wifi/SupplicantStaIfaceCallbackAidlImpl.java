@@ -1454,6 +1454,8 @@ class SupplicantStaIfaceCallbackAidlImpl extends ISupplicantStaIfaceCallback.Stu
                 return "TID_TO_LINK_MAP";
             case ISupplicantStaIfaceCallback.MloLinkInfoChangeReason.MULTI_LINK_RECONFIG_AP_REMOVAL:
                 return "MULTI_LINK_RECONFIG_AP_REMOVAL";
+            case ISupplicantStaIfaceCallback.MloLinkInfoChangeReason.MULTI_LINK_DYNAMIC_RECONFIG:
+                return "MULTI_LINK_DYNAMIC_RECONFIG";
             default:
                 return "UNKNOWN";
         }
@@ -1465,6 +1467,8 @@ class SupplicantStaIfaceCallbackAidlImpl extends ISupplicantStaIfaceCallback.Stu
                 return WifiMonitor.MloLinkInfoChangeReason.TID_TO_LINK_MAP;
             case ISupplicantStaIfaceCallback.MloLinkInfoChangeReason.MULTI_LINK_RECONFIG_AP_REMOVAL:
                 return WifiMonitor.MloLinkInfoChangeReason.MULTI_LINK_RECONFIG_AP_REMOVAL;
+            case ISupplicantStaIfaceCallback.MloLinkInfoChangeReason.MULTI_LINK_DYNAMIC_RECONFIG:
+                return WifiMonitor.MloLinkInfoChangeReason.MULTI_LINK_DYNAMIC_RECONFIG;
             default:
                 return WifiMonitor.MloLinkInfoChangeReason.UNKNOWN;
         }
