@@ -179,9 +179,11 @@ public class CoexManager {
     }
 
     @VisibleForTesting
-    /* package */ class CoexTelephonyCallback extends TelephonyCallback
-            implements TelephonyCallback.PhysicalChannelConfigListener {
+    /* package */ class CoexTelephonyCallback extends TelephonyCallback implements
+            TelephonyCallback.PhysicalChannelConfigListener,
+            TelephonyCallback.RadioPowerStateListener {
         private final int mSubId;
+        private boolean mIsRadioOn = true;
         private boolean mIsEmpty = true;
         private boolean mIsPendingEmpty = false;
         private final Runnable mClearCellChannelsRunnable = () -> {
@@ -198,9 +200,14 @@ public class CoexManager {
         public void onPhysicalChannelConfigChanged(
                 @NonNull List<PhysicalChannelConfig> configs) {
             if (mVerboseLoggingEnabled) {
-                Log.v(TAG, "onPhysicalChannelConfigChanged for subId: " + mSubId
-                        + " called with configs: " + configs);
+                Log.v(TAG, "onPhysicalChannelConfigChanged: subId=" + mSubId
+                        + ", isRadioOn=" + mIsRadioOn
+                        + ", configs=" + configs);
             }
+            // Ignore onPhysicalChannelConfigChanged if the radio isn't on, since it may still be
+            // called with non-empty values.
+            if (!mIsRadioOn) return;
+
             List<CoexUtils.CoexCellChannel> cellChannels = new ArrayList<>();
             for (PhysicalChannelConfig config : configs) {
                 cellChannels.add(new CoexUtils.CoexCellChannel(config, mSubId));
@@ -233,6 +240,17 @@ public class CoexManager {
                 return;
             }
             updateCoexUnsafeChannels(getCellChannelsForAllSubIds());
+        }
+
+        @java.lang.Override
+        public void onRadioPowerStateChanged(int state) {
+            if (mVerboseLoggingEnabled) {
+                Log.v(TAG, "onRadioPowerStateChanged[" + mSubId + "]: " + state);
+            }
+            mIsRadioOn = state == TelephonyManager.RADIO_POWER_ON;
+            // onPhysicalChannelConfigChanged isn't called if the radio turns off, so manually clear
+            // the cell channels if that happens.
+            if (!mIsRadioOn) updateCellChannels(Collections.emptyList());
         }
     }
 
