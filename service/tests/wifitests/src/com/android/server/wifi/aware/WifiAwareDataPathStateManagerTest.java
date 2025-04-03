@@ -2239,13 +2239,6 @@ public class WifiAwareDataPathStateManagerTest extends WifiBaseTest {
             collector.checkThat("factory name", "WIFI_AWARE_FACTORY",
                     equalTo(networkProviderCaptor.getValue().getName()));
 
-            // (1) get capabilities
-            mDut.queryCapabilities();
-            mMockLooper.dispatchAll();
-            inOrder.verify(mMockNative).getCapabilities(transactionId.capture());
-            mDut.onCapabilitiesUpdateResponse(transactionId.getValue(), capabilities);
-            mMockLooper.dispatchAll();
-
             // (2) enable usage
             mDut.enableUsage();
             mMockLooper.dispatchAll();
@@ -2270,6 +2263,9 @@ public class WifiAwareDataPathStateManagerTest extends WifiBaseTest {
                 any(),  eq(6), eq(TEST_FEATURE_ID));
 
         if (startUpSequence) {
+            inOrder.verify(mMockNative).getCapabilities(transactionId.capture());
+            mDut.onCapabilitiesUpdateResponse(transactionId.getValue(), capabilities);
+            mMockLooper.dispatchAll();
             for (int i = 0; i < maxNdiInterfaces; ++i) {
                 inOrder.verify(mMockNative).createAwareNetworkInterface(transactionId.capture(),
                         strCaptor.capture());
