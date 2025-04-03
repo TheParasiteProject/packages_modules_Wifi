@@ -121,6 +121,7 @@ import com.android.server.wifi.InterfaceConflictManager;
 import com.android.server.wifi.RunnerState;
 import com.android.server.wifi.WifiGlobals;
 import com.android.server.wifi.WifiInjector;
+import com.android.server.wifi.WifiLockManager;
 import com.android.server.wifi.WifiSettingsConfigStore;
 import com.android.server.wifi.aware.PairingConfigManager.PairingSecurityAssociationInfo;
 import com.android.server.wifi.hal.WifiNanIface.NanStatusCode;
@@ -681,7 +682,8 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
      */
     public void start(Context context, Looper looper, WifiAwareMetrics awareMetrics,
             WifiPermissionsUtil wifiPermissionsUtil, WifiPermissionsWrapper permissionsWrapper,
-            Clock clock, NetdWrapper netdWrapper, InterfaceConflictManager interfaceConflictMgr) {
+            Clock clock, NetdWrapper netdWrapper, InterfaceConflictManager interfaceConflictMgr,
+            WifiLockManager wifiLockManager) {
         Log.i(TAG, "start()");
 
         mContext = context;
@@ -695,7 +697,7 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
 
         mDataPathMgr = new WifiAwareDataPathStateManager(this, clock);
         mDataPathMgr.start(mContext, mSm.getHandler().getLooper(), awareMetrics,
-                wifiPermissionsUtil, permissionsWrapper, netdWrapper);
+                wifiPermissionsUtil, permissionsWrapper, netdWrapper, wifiLockManager);
 
         mPowerManager = mContext.getSystemService(PowerManager.class);
         mWifiManager = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
