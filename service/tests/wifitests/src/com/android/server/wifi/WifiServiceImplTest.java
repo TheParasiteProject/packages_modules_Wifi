@@ -9712,6 +9712,8 @@ public class WifiServiceImplTest extends WifiBaseTest {
     @Test
     public void testSetCarrierNetworkOffloadEnabledWithoutPermissionThrowsException()
             throws Exception {
+        when(mContext.checkPermission(eq(android.Manifest.permission.NETWORK_CARRIER_PROVISIONING),
+            anyInt(), anyInt())).thenReturn(PackageManager.PERMISSION_DENIED);
         try {
             mWifiServiceImpl.setCarrierNetworkOffloadEnabled(10, true, true);
             fail();
@@ -9719,9 +9721,31 @@ public class WifiServiceImplTest extends WifiBaseTest {
     }
 
     @Test
-    public void testSetCarrierNetworkOffloadEnabled() throws Exception {
+    public void testSetCarrierNetworkOffloadEnabledWithSettingsPerm() throws Exception {
         when(mContext.checkPermission(eq(android.Manifest.permission.NETWORK_SETTINGS),
+            anyInt(), anyInt())).thenReturn(PackageManager.PERMISSION_GRANTED);
+        mWifiServiceImpl.setCarrierNetworkOffloadEnabled(10, true, true);
+        verify(mWifiCarrierInfoManager).setCarrierNetworkOffloadEnabled(10, true, true);
+
+        mWifiServiceImpl.setCarrierNetworkOffloadEnabled(5, false, false);
+        verify(mWifiCarrierInfoManager).setCarrierNetworkOffloadEnabled(5, false, false);
+    }
+
+    @Test
+    public void testSetCarrierNetworkOffloadEnabledWithSetupWizardPerm() throws Exception {
+        when(mContext.checkPermission(eq(android.Manifest.permission.NETWORK_SETUP_WIZARD),
                 anyInt(), anyInt())).thenReturn(PackageManager.PERMISSION_GRANTED);
+        mWifiServiceImpl.setCarrierNetworkOffloadEnabled(10, true, true);
+        verify(mWifiCarrierInfoManager).setCarrierNetworkOffloadEnabled(10, true, true);
+
+        mWifiServiceImpl.setCarrierNetworkOffloadEnabled(5, false, false);
+        verify(mWifiCarrierInfoManager).setCarrierNetworkOffloadEnabled(5, false, false);
+    }
+
+    @Test
+    public void testSetCarrierNetworkOffloadEnabledWithCarrierProvisioningPerm() throws Exception {
+        when(mContext.checkPermission(eq(android.Manifest.permission.NETWORK_CARRIER_PROVISIONING),
+            anyInt(), anyInt())).thenReturn(PackageManager.PERMISSION_GRANTED);
         mWifiServiceImpl.setCarrierNetworkOffloadEnabled(10, true, true);
         verify(mWifiCarrierInfoManager).setCarrierNetworkOffloadEnabled(10, true, true);
 
