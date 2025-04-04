@@ -146,44 +146,15 @@ public class WifiLockManager {
     }
 
     // Check for conditions to activate high-perf lock
-    private boolean canActivateHighPerfLock(int ignoreMask) {
-        boolean check = true;
-
-        // Only condition is when Wifi is connected
-        if ((ignoreMask & IGNORE_WIFI_STATE_MASK) == 0) {
-            check = check && mStaConnected;
-        }
-
-        return check;
-    }
-
     private boolean canActivateHighPerfLock() {
-        return canActivateHighPerfLock(0);
+        // Only condition is when Wifi is connected
+        return mStaConnected;
     }
 
     // Check for conditions to activate low-latency lock
-    private boolean canActivateLowLatencyLock(int ignoreMask, UidRec uidRec) {
-        boolean check = true;
-
-        if ((ignoreMask & IGNORE_WIFI_STATE_MASK) == 0) {
-            check = check && isWifiConnectionActive();
-        }
-        if ((ignoreMask & IGNORE_SCREEN_STATE_MASK) == 0) {
-            check = check && mScreenOn;
-        }
-        if (uidRec != null) {
-            check = check && uidRec.mIsFg;
-        }
-
-        return check;
-    }
-
-    private boolean canActivateLowLatencyLock(int ignoreMask) {
-        return canActivateLowLatencyLock(ignoreMask, null);
-    }
-
-    private boolean canActivateLowLatencyLock() {
-        return canActivateLowLatencyLock(0, null);
+    private boolean canAppActivateLowLatencyLock(UidRec uidRec) {
+        return uidRec.mIsFg && isScreenStateValidForApp(uidRec)
+                && isConnectionRequirementSatisfiedForApp(uidRec);
     }
 
     private void onAppForeground(final int uid, final int importance) {
@@ -202,11 +173,11 @@ public class WifiLockManager {
             uidRec.mIsFg = newModeIsFg;
             updateOpMode();
 
-            // If conditions for lock activation are met,
-            // then UID either share the blame, or removed from sharing
-            // whether to start or stop the blame based on UID fg/bg state
-            if (canActivateLowLatencyLock(
-                    uidRec.mIsScreenOnExempted ? IGNORE_SCREEN_STATE_MASK : 0)) {
+            // If the connection and screen conditions are met,
+            // then the foreground state change will affect blaming.
+            boolean hasValidConnection = isConnectionRequirementSatisfiedForApp(uidRec);
+            boolean hasValidScreenState = isScreenStateValidForApp(uidRec);
+            if (hasValidConnection && hasValidScreenState) {
                 setBlameLowLatencyUid(uid, uidRec.mIsFg);
                 notifyLowLatencyActiveUsersChanged();
             }
@@ -437,7 +408,8 @@ public class WifiLockManager {
 
         mScreenOn = screenOn;
 
-        if (canActivateLowLatencyLock(IGNORE_SCREEN_STATE_MASK)) {
+        // If the connection requirement is met, then the screen state change may affect blaming.
+        if (isWifiConnectionActive()) {
             // Update the running mode
             updateOpMode();
             // Adjust blaming for UIDs in foreground
@@ -498,9 +470,7 @@ public class WifiLockManager {
         // Adjust blaming for UIDs carrying high perf locks
         // Note that blaming is adjusted only if needed,
         // since calling this API is reference counted
-        if (canActivateHighPerfLock(IGNORE_WIFI_STATE_MASK)) {
-            setBlameHiPerfLocks(mStaConnected);
-        }
+        setBlameHiPerfLocks(mStaConnected);
         handleConnectionChanged(true, mStaConnected);
     }
 
@@ -656,9 +626,7 @@ public class WifiLockManager {
             uidRec.mD2dSatisfiesConnectionRequirement =
                     doesD2dSatisfyConnectionRequirementForApp(uid);
 
-            if (canActivateLowLatencyLock(
-                    uidRec.mIsScreenOnExempted ? IGNORE_SCREEN_STATE_MASK : 0,
-                    uidRec)) {
+            if (canAppActivateLowLatencyLock(uidRec)) {
                 // Share the blame for this uid
                 setBlameLowLatencyUid(uid, true);
                 notifyLowLatencyActiveUsersChanged();
@@ -685,8 +653,7 @@ public class WifiLockManager {
             // Remove blame for this UID if it was already set
             // Note that blame needs to be stopped only if it was started before
             // to avoid calling the API unnecessarily, since it is reference counted
-            if (canActivateLowLatencyLock(uidRec.mIsScreenOnExempted ? IGNORE_SCREEN_STATE_MASK : 0,
-                    uidRec)) {
+            if (canAppActivateLowLatencyLock(uidRec)) {
                 setBlameLowLatencyUid(uid, false);
                 notifyLowLatencyActiveUsersChanged();
             }
