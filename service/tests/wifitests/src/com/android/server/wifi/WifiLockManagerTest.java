@@ -2356,4 +2356,39 @@ public class WifiLockManagerTest extends WifiBaseTest {
         verify(mBatteryStats).reportFullWifiLockReleasedFromSource(d2dAllowedWs);
         verifyNoMoreInteractions(mBatteryStats);
     }
+
+    /**
+     * Test that D2D connections do not count toward the connection requirement
+     * for non D2D-allowed apps, when a screen state change occurs.
+     */
+    @Test
+    public void testScreenStateChangeWithMultipleConnectionTypes() throws Exception {
+        // Acquire lock when app is in the foreground, screen is off, and P2P connection is active.
+        setScreenState(false);
+        mWifiLockManager.updateP2pConnected(true);
+        when(mActivityManager.getUidImportance(DEFAULT_TEST_UID_1)).thenReturn(
+                ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND);
+        assertTrue(mWifiLockManager.acquireWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "",
+                mBinder, mWorkSource));
+
+        // Low-latency should be disabled and the app should not be blamed.
+        assertEquals(WifiManager.WIFI_MODE_NO_LOCKS_HELD,
+                mWifiLockManager.getStrongestLockMode());
+        verifyNoInteractions(mBatteryStats);
+
+        // Enabling the screen should not update the blame, since the P2P connection
+        // does not satisfy this app's connection requirement.
+        setScreenState(true);
+        assertEquals(WifiManager.WIFI_MODE_NO_LOCKS_HELD,
+                mWifiLockManager.getStrongestLockMode());
+        verifyNoInteractions(mBatteryStats);
+
+        // Starting a STA connection and restarting the screen should update the blame.
+        setScreenState(false);
+        mWifiLockManager.updateWifiClientConnected(mClientModeManager, true);
+        setScreenState(true);
+        assertEquals(WifiManager.WIFI_MODE_FULL_LOW_LATENCY,
+                mWifiLockManager.getStrongestLockMode());
+        verify(mBatteryStats).reportFullWifiLockAcquiredFromSource(mWorkSource);
+    }
 }

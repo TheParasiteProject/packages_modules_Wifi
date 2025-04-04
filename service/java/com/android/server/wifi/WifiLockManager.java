@@ -104,10 +104,6 @@ public class WifiLockManager {
     private boolean mIsLowLatencyActivated = false;
     private WorkSource mLowLatencyBlamedWorkSource = new WorkSource();
     private WorkSource mHighPerfBlamedWorkSource = new WorkSource();
-    private enum BlameReason {
-        WIFI_CONNECTION_STATE_CHANGED,
-        SCREEN_STATE_CHANGED,
-    };
     private final Object mLock = new Object();
 
     WifiLockManager(
@@ -445,7 +441,7 @@ public class WifiLockManager {
             // Update the running mode
             updateOpMode();
             // Adjust blaming for UIDs in foreground
-            setBlameLowLatencyWatchList(BlameReason.SCREEN_STATE_CHANGED, screenOn);
+            updateBlameForScreenStateChange();
         }
     }
 
@@ -1191,26 +1187,6 @@ public class WifiLockManager {
         }
     }
 
-    private void setBlameLowLatencyWatchList(BlameReason reason, boolean shouldBlame) {
-        boolean notify = false;
-        for (int idx = 0; idx < mLowLatencyUidWatchList.size(); idx++) {
-            UidRec uidRec = mLowLatencyUidWatchList.valueAt(idx);
-            // The blame state of the UIDs should not be changed if the app is exempted from
-            // screen-on and the reason for blaming is screen state change.
-            if (uidRec.mIsScreenOnExempted && reason == BlameReason.SCREEN_STATE_CHANGED) {
-                continue;
-            }
-            // Affect the blame for only UIDs running in foreground
-            // UIDs running in the background are already not blamed,
-            // and they should remain in that state.
-            if (uidRec.mIsFg) {
-                setBlameLowLatencyUid(uidRec.mUid, shouldBlame);
-                notify = true;
-            }
-        }
-        if (notify) notifyLowLatencyActiveUsersChanged();
-    }
-
     private void updateBlameForConnectionStateChange(boolean shouldBlameD2dAllowedApps,
             boolean shouldBlameNonD2dAllowedApps) {
         boolean activeUsersChanged = false;
@@ -1226,6 +1202,26 @@ public class WifiLockManager {
             if (hasValidScreenState && uidRec.mIsFg) {
                 boolean hasValidConnection = isConnectionRequirementSatisfiedForApp(uidRec);
                 setBlameLowLatencyUid(uidRec.mUid, hasValidConnection);
+                activeUsersChanged = true;
+            }
+        }
+        if (activeUsersChanged) {
+            notifyLowLatencyActiveUsersChanged();
+        }
+    }
+
+    private void updateBlameForScreenStateChange() {
+        boolean activeUsersChanged = false;
+        for (int i = 0; i < mLowLatencyUidWatchList.size(); i++) {
+            // Only blame apps without the screen state exemption.
+            UidRec uidRec = mLowLatencyUidWatchList.valueAt(i);
+            if (uidRec.mIsScreenOnExempted) continue;
+
+            // If the connection and foreground conditions are met,
+            // then the screen state change will affect blaming.
+            boolean hasValidConnection = isConnectionRequirementSatisfiedForApp(uidRec);
+            if (hasValidConnection && uidRec.mIsFg) {
+                setBlameLowLatencyUid(uidRec.mUid, mScreenOn);
                 activeUsersChanged = true;
             }
         }
