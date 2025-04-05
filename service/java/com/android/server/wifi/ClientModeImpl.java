@@ -1047,6 +1047,13 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         removeMessages(WifiMonitor.QOS_POLICY_REQUEST_EVENT);
     }
 
+    private void handleP2pConnectionStateChanged(Message msg) {
+        if (msg != null && msg.obj != null) {
+            NetworkInfo info = (NetworkInfo) msg.obj;
+            mWifiLockManager.updateP2pConnected(info.isConnected());
+        }
+    }
+
     /**
      * Class to implement the MulticastLockManager.FilterController callback.
      */
@@ -3266,6 +3273,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 setMultiLinkInfoFromScanCache(stateChangeResult.bssid);
             }
             if (state == SupplicantState.ASSOCIATED) {
+                long txBytes = mFacade.getTotalTxBytes() - mFacade.getMobileTxBytes();
+                long rxBytes = mFacade.getTotalRxBytes() - mFacade.getMobileRxBytes();
+                updateLinkLayerStatsRssiSpeedFrequencyCapabilities(txBytes, rxBytes);
                 updateWifiInfoLinkParamsAfterAssociation();
             }
             mWifiInfo.setInformationElements(findMatchingInfoElements(stateChangeResult.bssid));
@@ -5112,7 +5122,11 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     }
                     break;
                 }
-                case WifiP2pServiceImpl.P2P_CONNECTION_CHANGED:
+                case WifiP2pServiceImpl.P2P_CONNECTION_CHANGED: {
+                    // Handle in the base state so that this applies to all states.
+                    handleP2pConnectionStateChanged(message);
+                    break;
+                }
                 case CMD_RESET_SIM_NETWORKS:
                 case WifiMonitor.NETWORK_CONNECTION_EVENT:
                 case WifiMonitor.NETWORK_DISCONNECTION_EVENT:

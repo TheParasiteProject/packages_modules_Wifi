@@ -84,6 +84,8 @@ public class WifiLockManager {
     private boolean mScreenOn = false;
     /** whether Wifi is connected on the primary ClientModeManager */
     private boolean mWifiConnected = false;
+    private boolean mP2pConnected = false;
+    private boolean mAwareConnected = false;
 
     // For shell command support
     private boolean mForceHiPerfMode = false;
@@ -454,6 +456,32 @@ public class WifiLockManager {
         updateOpMode();
     }
 
+    /**
+     * Handler for P2P connection state changes.
+     */
+    public void updateP2pConnected(boolean isConnected) {
+        if (mP2pConnected == isConnected) {
+            return;
+        }
+        if (mVerboseLoggingEnabled) {
+            Log.i(TAG, "Updating P2P connected state to " + isConnected);
+        }
+        mP2pConnected = isConnected;
+    }
+
+    /**
+     * Handler for Aware connection state changes.
+     */
+    public void updateAwareConnected(boolean isConnected) {
+        if (mAwareConnected == isConnected) {
+            return;
+        }
+        if (mVerboseLoggingEnabled) {
+            Log.i(TAG, "Updating Aware connected state to " + isConnected);
+        }
+        mAwareConnected = isConnected;
+    }
+
     private synchronized void setBlameHiPerfLocks(boolean shouldBlame) {
         for (WifiLock lock : mWifiLocks) {
             if (lock.mMode == WifiManager.WIFI_MODE_FULL_HIGH_PERF) {
@@ -496,6 +524,12 @@ public class WifiLockManager {
                 <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE)) {
             return true;
         }
+        // Exemption for applications that can project to a nearby device.
+        if (mWifiPermissionsUtil.checkRequestCompanionProfileNearbyDeviceStreamingPermission(uid)
+                && (importance
+                <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_SERVICE)) {
+            return true;
+        }
         // Add any exemption cases for applications regarding restricting Low latency locks to
         // running in the foreground.
         return false;
@@ -522,6 +556,10 @@ public class WifiLockManager {
     private boolean isAppExemptedFromScreenOn(int uid) {
         // Exemption for applications running with CAR Mode permissions.
         if (mWifiPermissionsUtil.checkRequestCompanionProfileAutomotiveProjectionPermission(uid)) {
+            return true;
+        }
+        // Exemption for applications that can project to a nearby device.
+        if (mWifiPermissionsUtil.checkRequestCompanionProfileNearbyDeviceStreamingPermission(uid)) {
             return true;
         }
         // Add more exemptions here
