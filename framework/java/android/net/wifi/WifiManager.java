@@ -5919,10 +5919,21 @@ public class WifiManager {
 
     /**
      * Check if input configuration is valid.
-     *
+     * <p>
+     * This will return {@code false} if a non-null BSSID is set but the caller does not have any of
+     * <ul>
+     *     <li>{@link android.Manifest.permission.NETWORK_SETTINGS}</li>
+     *     <li>{@link android.Manifest.permission.NETWORK_STACK}</li>
+     *     <li>{@link NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK}</li>
+     * </ul>
      * @param config a configuration would like to be checked.
      * @return true if config is valid, otherwise false.
      */
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.NETWORK_SETTINGS,
+            android.Manifest.permission.NETWORK_STACK,
+            NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK
+    }, conditional = true)
     public boolean validateSoftApConfiguration(@NonNull SoftApConfiguration config) {
         if (config == null) {
             throw new IllegalArgumentException(TAG + ": config can not be null");
