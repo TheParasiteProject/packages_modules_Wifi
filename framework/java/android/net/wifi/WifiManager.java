@@ -11623,21 +11623,21 @@ public class WifiManager {
 
     /**
      * DialogType for a simple dialog.
-     * @see {@link com.android.server.wifi.WifiDialogManager#createSimpleDialog}
+     * @see com.android.server.wifi.WifiDialogManager#createSimpleDialogBuilder
      * @hide
      */
     public static final int DIALOG_TYPE_SIMPLE = 1;
 
     /**
      * DialogType for a P2P Invitation Sent dialog.
-     * @see {@link com.android.server.wifi.WifiDialogManager#createP2pInvitationSentDialog}
+     * @see com.android.server.wifi.WifiDialogManager#createP2pInvitationSentDialog
      * @hide
      */
     public static final int DIALOG_TYPE_P2P_INVITATION_SENT = 2;
 
     /**
      * DialogType for a P2P Invitation Received dialog.
-     * @see {@link com.android.server.wifi.WifiDialogManager#createP2pInvitationReceivedDialog}
+     * @see com.android.server.wifi.WifiDialogManager#createP2pInvitationReceivedDialog
      * @hide
      */
     public static final int DIALOG_TYPE_P2P_INVITATION_RECEIVED = 3;
