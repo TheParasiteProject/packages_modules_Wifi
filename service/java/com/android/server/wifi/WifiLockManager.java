@@ -1198,18 +1198,30 @@ public class WifiLockManager {
     }
 
     protected synchronized void dump(PrintWriter pw) {
+        pw.println("Dump of WifiLockManager");
         pw.println("Locks acquired: "
                 + mFullHighPerfLocksAcquired + " full high perf, "
                 + mFullLowLatencyLocksAcquired + " full low latency");
         pw.println("Locks released: "
                 + mFullHighPerfLocksReleased + " full high perf, "
                 + mFullLowLatencyLocksReleased + " full low latency");
+        pw.println("Connection state: STA=" + mStaConnected + ", P2P=" + mP2pConnected
+                + ", Aware=" + mAwareConnected);
+        pw.println("Screen state: " + mScreenOn);
+        pw.println("Current operation mode: " + mCurrentOpMode);
 
         pw.println();
         pw.println("Locks held:");
         for (WifiLock lock : mWifiLocks) {
-            pw.print("    ");
-            pw.println(lock);
+            // Indent each record in the formatted output
+            pw.println("    " + lock);
+        }
+
+        pw.println();
+        pw.println("Low-latency uid watchlist:");
+        for (int i = 0; i < mLowLatencyUidWatchList.size(); i++) {
+            UidRec uidRec = mLowLatencyUidWatchList.valueAt(i);
+            pw.println("    " + uidRec);
         }
     }
 
@@ -1286,6 +1298,12 @@ public class WifiLockManager {
 
         UidRec(int uid) {
             mUid = uid;
+        }
+
+        public String toString() {
+            return "UidRec{uid=" + mUid + ", lockCount=" + mLockCount + ", isFg=" + mIsFg
+                    + ", isFgExempt=" + mIsFgExempted + ", isScreenExempt=" + mIsScreenOnExempted
+                    + ", d2dSatisfiesConnection=" + mD2dSatisfiesConnectionRequirement + "}";
         }
     }
 }
