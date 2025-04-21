@@ -2246,6 +2246,141 @@ public class WifiServiceImplTest extends WifiBaseTest {
     }
 
     /**
+     * Verify hotspot cannot be started with BSSID set if the caller does not have permission.
+     */
+    @Test
+    public void testStartTetheredHotspotRequestWithBssidAndNoPermission() {
+        assumeTrue(SdkLevel.isAtLeastB());
+        when(mContext.checkPermission(any(), anyInt(), anyInt()))
+                .thenReturn(PackageManager.PERMISSION_DENIED);
+        mLooper.startAutoDispatch();
+        SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
+                .setSsid("TestAp")
+                .setBssid(MacAddress.fromString("aa:22:33:aa:bb:cc"))
+                .setPassphrase("Password", SoftApConfiguration.SECURITY_TYPE_WPA2_PSK)
+                .setBand(SoftApConfiguration.BAND_2GHZ)
+                .build();
+        TetheringManager.TetheringRequest request = new TetheringManager.TetheringRequest.Builder(
+                TetheringManager.TETHERING_WIFI).setSoftApConfiguration(softApConfig).build();
+
+        mWifiServiceImpl.startTetheredHotspotRequest(request, mClientSoftApCallback,
+                TEST_PACKAGE_NAME);
+
+        verify(mActiveModeWarden, never()).startSoftAp(any(),
+                eq(new WorkSource(Binder.getCallingUid(), TEST_PACKAGE_NAME)));
+    }
+
+    /**
+     * Verify caller with NETWORK_SETTINGS can start hotspot with BSSID set.
+     */
+    @Test
+    public void testStartTetheredHotspotRequestWithBssidAndNetworkSettingsPermission() {
+        assumeTrue(SdkLevel.isAtLeastB());
+        when(mContext.checkPermission(any(), anyInt(), anyInt()))
+                .thenReturn(PackageManager.PERMISSION_DENIED);
+        when(mContext.checkPermission(eq(Manifest.permission.NETWORK_SETTINGS), anyInt(), anyInt()))
+                .thenReturn(PackageManager.PERMISSION_GRANTED);
+        mLooper.startAutoDispatch();
+        SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
+                .setSsid("TestAp")
+                .setBssid(MacAddress.fromString("aa:22:33:aa:bb:cc"))
+                .setPassphrase("Password", SoftApConfiguration.SECURITY_TYPE_WPA2_PSK)
+                .setBand(SoftApConfiguration.BAND_2GHZ)
+                .build();
+        TetheringManager.TetheringRequest request = new TetheringManager.TetheringRequest.Builder(
+                TetheringManager.TETHERING_WIFI).setSoftApConfiguration(softApConfig).build();
+
+        mWifiServiceImpl.startTetheredHotspotRequest(request, mClientSoftApCallback,
+                TEST_PACKAGE_NAME);
+
+        verify(mActiveModeWarden).startSoftAp(any(),
+                eq(new WorkSource(Binder.getCallingUid(), TEST_PACKAGE_NAME)));
+    }
+
+    /**
+     * Verify caller with NETWORK_SETUP_WIZARD can start hotspot with BSSID set.
+     */
+    @Test
+    public void testStartTetheredHotspotRequestWithBssidAndSetupWizardPermission() {
+        assumeTrue(SdkLevel.isAtLeastB());
+        when(mContext.checkPermission(any(), anyInt(), anyInt()))
+                .thenReturn(PackageManager.PERMISSION_DENIED);
+        when(mContext.checkPermission(eq(Manifest.permission.NETWORK_SETUP_WIZARD), anyInt(),
+                anyInt()))
+                .thenReturn(PackageManager.PERMISSION_GRANTED);
+        mLooper.startAutoDispatch();
+        SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
+                .setSsid("TestAp")
+                .setBssid(MacAddress.fromString("aa:22:33:aa:bb:cc"))
+                .setPassphrase("Password", SoftApConfiguration.SECURITY_TYPE_WPA2_PSK)
+                .setBand(SoftApConfiguration.BAND_2GHZ)
+                .build();
+        TetheringManager.TetheringRequest request = new TetheringManager.TetheringRequest.Builder(
+                TetheringManager.TETHERING_WIFI).setSoftApConfiguration(softApConfig).build();
+
+        mWifiServiceImpl.startTetheredHotspotRequest(request, mClientSoftApCallback,
+                TEST_PACKAGE_NAME);
+
+        verify(mActiveModeWarden).startSoftAp(any(),
+                eq(new WorkSource(Binder.getCallingUid(), TEST_PACKAGE_NAME)));
+    }
+
+    /**
+     * Verify caller with NETWORK_STACK can start hotspot with BSSID set.
+     */
+    @Test
+    public void testStartTetheredHotspotRequestWithBssidAndNetworkStackPermission() {
+        assumeTrue(SdkLevel.isAtLeastB());
+        when(mContext.checkPermission(any(), anyInt(), anyInt()))
+                .thenReturn(PackageManager.PERMISSION_DENIED);
+        when(mContext.checkPermission(eq(Manifest.permission.NETWORK_STACK), anyInt(), anyInt()))
+                .thenReturn(PackageManager.PERMISSION_GRANTED);
+        mLooper.startAutoDispatch();
+        SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
+                .setSsid("TestAp")
+                .setBssid(MacAddress.fromString("aa:22:33:aa:bb:cc"))
+                .setPassphrase("Password", SoftApConfiguration.SECURITY_TYPE_WPA2_PSK)
+                .setBand(SoftApConfiguration.BAND_2GHZ)
+                .build();
+        TetheringManager.TetheringRequest request = new TetheringManager.TetheringRequest.Builder(
+                TetheringManager.TETHERING_WIFI).setSoftApConfiguration(softApConfig).build();
+
+        mWifiServiceImpl.startTetheredHotspotRequest(request, mClientSoftApCallback,
+                TEST_PACKAGE_NAME);
+
+        verify(mActiveModeWarden).startSoftAp(any(),
+                eq(new WorkSource(Binder.getCallingUid(), TEST_PACKAGE_NAME)));
+    }
+
+    /**
+     * Verify caller with MAINLINE_NETWORK_STACK can start hotspot with BSSID set.
+     */
+    @Test
+    public void testStartTetheredHotspotRequestWithBssidAndMainlineNetworkStackPermission() {
+        assumeTrue(SdkLevel.isAtLeastB());
+        when(mContext.checkPermission(any(), anyInt(), anyInt()))
+                .thenReturn(PackageManager.PERMISSION_DENIED);
+        when(mContext.checkPermission(eq(NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK), anyInt(),
+                anyInt()))
+                .thenReturn(PackageManager.PERMISSION_GRANTED);
+        mLooper.startAutoDispatch();
+        SoftApConfiguration softApConfig = new SoftApConfiguration.Builder()
+                .setSsid("TestAp")
+                .setBssid(MacAddress.fromString("aa:22:33:aa:bb:cc"))
+                .setPassphrase("Password", SoftApConfiguration.SECURITY_TYPE_WPA2_PSK)
+                .setBand(SoftApConfiguration.BAND_2GHZ)
+                .build();
+        TetheringManager.TetheringRequest request = new TetheringManager.TetheringRequest.Builder(
+                TetheringManager.TETHERING_WIFI).setSoftApConfiguration(softApConfig).build();
+
+        mWifiServiceImpl.startTetheredHotspotRequest(request, mClientSoftApCallback,
+                TEST_PACKAGE_NAME);
+
+        verify(mActiveModeWarden).startSoftAp(any(),
+                eq(new WorkSource(Binder.getCallingUid(), TEST_PACKAGE_NAME)));
+    }
+
+    /**
      * Verify caller with proper permission and valid config does start softap.
      */
     @Test
