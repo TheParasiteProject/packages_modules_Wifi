@@ -1745,14 +1745,15 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     .c(uid).flush();
             return;
         }
-        WifiDialogManager.DialogHandle dialogHandle = mWifiDialogManager.createSimpleDialog(
-                res.getString(R.string.wifi_enable_request_dialog_title, appName),
-                res.getString(R.string.wifi_enable_request_dialog_message),
-                res.getString(R.string.wifi_enable_request_dialog_positive_button),
-                res.getString(R.string.wifi_enable_request_dialog_negative_button),
-                null /* neutralButtonText */,
-                dialogCallback,
-                mWifiThreadRunner);
+        WifiDialogManager.DialogHandle dialogHandle = mWifiDialogManager.createSimpleDialogBuilder()
+                .setTitle(res.getString(R.string.wifi_enable_request_dialog_title, appName))
+                .setMessage(res.getString(R.string.wifi_enable_request_dialog_message))
+                .setPositiveButtonText(
+                        res.getString(R.string.wifi_enable_request_dialog_positive_button))
+                .setNegativeButtonText(
+                        res.getString(R.string.wifi_enable_request_dialog_negative_button))
+                .setCallback(dialogCallback, mWifiThreadRunner)
+                .build();
         mWifiEnableRequestDialogHandles.put(uid, dialogHandle);
         dialogHandle.launchDialog();
         mLog.info("setWifiEnabled dialog launched for package=% uid=%").c(packageName)

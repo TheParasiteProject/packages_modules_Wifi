@@ -752,40 +752,6 @@ public class WifiDialogManager {
     }
 
     /**
-     * Creates a simple dialog with optional title, message, and positive/negative/neutral buttons.
-     *
-     * @param title                Title of the dialog.
-     * @param message              Message of the dialog.
-     * @param positiveButtonText   Text of the positive button or {@code null} for no button.
-     * @param negativeButtonText   Text of the negative button or {@code null} for no button.
-     * @param neutralButtonText    Text of the neutral button or {@code null} for no button.
-     * @param callback             Callback to receive the dialog response.
-     * @param callbackThreadRunner WifiThreadRunner to run the callback on.
-     * @return DialogHandle        Handle for the dialog, or {@code null} if no dialog could
-     *                             be created.
-     */
-    @AnyThread
-    @NonNull
-    public DialogHandle createSimpleDialog(
-            @Nullable String title,
-            @Nullable String message,
-            @Nullable String positiveButtonText,
-            @Nullable String negativeButtonText,
-            @Nullable String neutralButtonText,
-            @NonNull SimpleDialogCallback callback,
-            @NonNull WifiThreadRunner callbackThreadRunner) {
-        // TODO: Remove this method and move clients to SimpleDialogBuilder directly.
-        return new SimpleDialogBuilder()
-                .setTitle(title)
-                .setMessage(message)
-                .setPositiveButtonText(positiveButtonText)
-                .setNegativeButtonText(negativeButtonText)
-                .setNeutralButtonText(neutralButtonText)
-                .setCallback(callback, callbackThreadRunner)
-                .build();
-    }
-
-    /**
      * Creates a legacy simple dialog on the system process with optional title, message, and
      * positive/negative/neutral buttons.
      *
