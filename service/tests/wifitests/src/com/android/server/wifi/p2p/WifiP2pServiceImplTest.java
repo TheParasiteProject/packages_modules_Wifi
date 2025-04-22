@@ -1494,9 +1494,10 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         when(mWifiInjector.getLastCallerInfoManager()).thenReturn(mLastCallerInfoManager);
         when(mWifiInjector.getWifiP2pConnection()).thenReturn(mWifiP2pConnection);
 
-        when(mWifiDialogManager.createP2pInvitationReceivedDialog(any(), anyBoolean(), any(),
-                anyInt(), anyInt(), any(), any())).thenReturn(mDialogHandle);
-        when(mWifiDialogManager.createP2pInvitationSentDialog(any(), any(), anyInt()))
+        when(mWifiDialogManager.createP2pInvitationReceivedDialog(any(), anyBoolean(),
+                anyBoolean(), any(), any(), anyInt(), anyInt(), any(), any()))
+                .thenReturn(mDialogHandle);
+        when(mWifiDialogManager.createP2pInvitationSentDialog(any(), any(), any(), anyInt()))
                 .thenReturn(mDialogHandle);
         when(mWifiInjector.getClock()).thenReturn(mClock);
         when(mWifiInjector.getInterfaceConflictManager()).thenReturn(mInterfaceConflictManager);
@@ -6453,7 +6454,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
             verify(mAlertDialog).show();
         } else {
             verify(mWifiDialogManager).createP2pInvitationSentDialog(
-                    pdEvent.device.deviceName, pdEvent.wpsPin, Display.DEFAULT_DISPLAY);
+                    pdEvent.device.deviceName, pdEvent.wpsPin, null,
+                    Display.DEFAULT_DISPLAY);
             verify(mDialogHandle).launchDialog();
         }
     }
@@ -6482,8 +6484,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
             verify(mAlertDialog).show();
         } else {
             verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                    eq(pdEvent.device.deviceName), eq(false), eq(pdEvent.wpsPin),
-                    anyInt(), anyInt(), any(), any());
+                    eq(pdEvent.device.deviceName), eq(false), eq(false), eq(pdEvent.wpsPin),
+                    any(), anyInt(), anyInt(), any(), any());
             verify(mDialogHandle).launchDialog();
         }
     }
@@ -7007,8 +7009,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
             verify(mAlertDialog).show();
         } else {
             verify(mWifiDialogManager).createP2pInvitationReceivedDialog(anyString(), anyBoolean(),
-                    any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS), eq(Display.DEFAULT_DISPLAY),
-                    any(), any());
+                    anyBoolean(), any(), any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS),
+                    eq(Display.DEFAULT_DISPLAY), any(), any());
             verify(mDialogHandle).launchDialog();
         }
     }
@@ -7036,7 +7038,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
 
         sendNegotiationRequestEvent(config);
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(anyString(),
-                anyBoolean(), any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS),
+                anyBoolean(), anyBoolean(), any(), any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS),
                 eq(someNonDefaultDisplayId), any(), any());
         verify(mDialogHandle).launchDialog();
     }
@@ -7065,8 +7067,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         // "simple" client connect (no display ID)
         sendNegotiationRequestEvent(config);
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(anyString(), anyBoolean(),
-                any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS), eq(Display.DEFAULT_DISPLAY), any(),
-                any());
+                anyBoolean(), any(), any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS),
+                eq(Display.DEFAULT_DISPLAY), any(), any());
         verify(mDialogHandle).launchDialog();
     }
 
@@ -7872,8 +7874,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 pdEvent);
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(mTestWifiP2pDevice.deviceAddress), anyBoolean(),
-                any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS), anyInt(), any(), any());
+                eq(mTestWifiP2pDevice.deviceAddress), anyBoolean(), anyBoolean(),
+                any(), any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS), anyInt(), any(), any());
         verify(mDialogHandle).launchDialog();
 
         // Handle it programmatically.
@@ -7887,11 +7889,12 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         reset(mWifiDialogManager);
         reset(mDialogHandle);
         verify(mWifiDialogManager, never()).createP2pInvitationReceivedDialog(
-                any(), anyBoolean(), any(), anyInt(), anyInt(), any(), any());
+                any(), anyBoolean(), anyBoolean(), any(), any(), anyInt(), anyInt(), any(), any());
 
-        when(mWifiDialogManager.createP2pInvitationReceivedDialog(any(), anyBoolean(), any(),
-                anyInt(), anyInt(), any(), any())).thenReturn(mDialogHandle);
-        when(mWifiDialogManager.createP2pInvitationSentDialog(any(), any(), anyInt()))
+        when(mWifiDialogManager.createP2pInvitationReceivedDialog(any(), anyBoolean(),
+                anyBoolean(), any(), any(), anyInt(), anyInt(), any(), any()))
+                .thenReturn(mDialogHandle);
+        when(mWifiDialogManager.createP2pInvitationSentDialog(any(), any(), any(), anyInt()))
                 .thenReturn(mDialogHandle);
         when(mClock.getElapsedSinceBootMillis()).thenReturn(P2P_PEER_AUTH_TIMEOUT_MS + 1L);
 
@@ -7901,8 +7904,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
 
         // Another dialog should be triggered.
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(mTestWifiP2pDevice.deviceAddress), anyBoolean(),
-                any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS), anyInt(), any(), any());
+                eq(mTestWifiP2pDevice.deviceAddress), anyBoolean(), anyBoolean(),
+                any(), any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS), anyInt(), any(), any());
         verify(mDialogHandle).launchDialog();
     }
 
@@ -8517,7 +8520,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         // Framework doesn't send connect to supplicant if comeback is set to true
         verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
         verify(mWifiDialogManager).createP2pInvitationSentDialog(
-                eq(mTestWifiP2pV2Device.deviceName), pincodeCaptor.capture(),
+                eq(mTestWifiP2pV2Device.deviceName), pincodeCaptor.capture(), eq(null),
                 eq(Display.DEFAULT_DISPLAY));
         String pincode = pincodeCaptor.getValue();
         assertTrue(pincode.matches("\\d{8}"));
@@ -8575,7 +8578,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         // Framework doesn't send connect to supplicant if comeback is set to true
         verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
         verify(mWifiDialogManager).createP2pInvitationSentDialog(
-                eq(mTestWifiP2pV2Device.deviceName), passphraseCaptor.capture(),
+                eq(mTestWifiP2pV2Device.deviceName), eq(null), passphraseCaptor.capture(),
                 eq(Display.DEFAULT_DISPLAY));
         String passphrase = passphraseCaptor.getValue();
         assertTrue(passphrase.matches(".*[\\x00-\\x7F]{8}.*"));
@@ -8633,8 +8636,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(pdEvent.device.deviceName), eq(true),
-                displayPinOrPassphraseCaptor.capture(), anyInt(), anyInt(), any(), any());
+                eq(pdEvent.device.deviceName), eq(true), eq(false),
+                displayPinOrPassphraseCaptor.capture(), any(), anyInt(), anyInt(), any(), any());
         verify(mDialogHandle).launchDialog();
         assertTrue(TextUtils.isEmpty(displayPinOrPassphraseCaptor.getValue()));
 
@@ -8682,8 +8685,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(pdEvent.device.deviceName), eq(true),
-                displayPinOrPassphraseCaptor.capture(), anyInt(), anyInt(), any(), any());
+                eq(pdEvent.device.deviceName), eq(false), eq(true),
+                displayPinOrPassphraseCaptor.capture(), any(), anyInt(), anyInt(), any(), any());
         verify(mDialogHandle).launchDialog();
         assertTrue(TextUtils.isEmpty(displayPinOrPassphraseCaptor.getValue()));
 
@@ -8720,7 +8723,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 pdEvent);
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(pdEvent.device.deviceName), eq(false), any(),
+                eq(pdEvent.device.deviceName), eq(false), eq(false), any(), any(),
                 anyInt(), anyInt(), any(), any());
         verify(mDialogHandle).launchDialog();
         verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
@@ -8761,8 +8764,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 pdEvent);
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(pdEvent.device.deviceName), eq(true),
-                displayPinOrPassphraseCaptor.capture(), anyInt(), anyInt(), any(), any());
+                eq(pdEvent.device.deviceName), eq(true), eq(false),
+                displayPinOrPassphraseCaptor.capture(), any(), anyInt(), anyInt(), any(), any());
         verify(mDialogHandle).launchDialog();
         assertTrue(TextUtils.isEmpty(displayPinOrPassphraseCaptor.getValue()));
 
@@ -8804,8 +8807,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 pdEvent);
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(pdEvent.device.deviceName), eq(true),
-                displayPinOrPassphraseCaptor.capture(), anyInt(), anyInt(), any(), any());
+                eq(pdEvent.device.deviceName), eq(false), eq(true),
+                displayPinOrPassphraseCaptor.capture(), any(), anyInt(), anyInt(), any(), any());
         verify(mDialogHandle).launchDialog();
         assertTrue(TextUtils.isEmpty(displayPinOrPassphraseCaptor.getValue()));
 
@@ -8849,8 +8852,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 pdEvent);
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(pdEvent.device.deviceName), eq(false), pincodeCaptor.capture(),
-                anyInt(), anyInt(), any(), any());
+                eq(pdEvent.device.deviceName), eq(false), eq(false),
+                pincodeCaptor.capture(), any(), anyInt(), anyInt(), any(), any());
         String pincode = pincodeCaptor.getValue();
         assertTrue(pincode.matches("\\d{8}"));
         verify(mDialogHandle).launchDialog();
@@ -8895,8 +8898,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 pdEvent);
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(pdEvent.device.deviceName), eq(false), passphraseCaptor.capture(),
-                anyInt(), anyInt(), any(), any());
+                eq(pdEvent.device.deviceName), eq(false), eq(false),
+                any(), passphraseCaptor.capture(), anyInt(), anyInt(), any(), any());
         String passphrase = passphraseCaptor.getValue();
         assertTrue(passphrase.matches(".*[\\x00-\\x7F]{8}.*"));
         verify(mDialogHandle).launchDialog();
@@ -8940,7 +8943,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 pdEvent);
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(pdEvent.device.deviceName), eq(false), any(),
+                eq(pdEvent.device.deviceName), eq(false), eq(false), any(), any(),
                 anyInt(), anyInt(), any(), any());
         verify(mDialogHandle).launchDialog();
         verify(mWifiNative, never()).authorizeConnectRequestOnGroupOwner(any(), anyString());
@@ -8980,8 +8983,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 pdEvent);
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(pdEvent.device.deviceName), eq(true),
-                displayPinOrPassphraseCaptor.capture(), anyInt(), anyInt(), any(), any());
+                eq(pdEvent.device.deviceName), eq(true), eq(false),
+                displayPinOrPassphraseCaptor.capture(), any(), anyInt(), anyInt(), any(), any());
         verify(mDialogHandle).launchDialog();
         assertTrue(TextUtils.isEmpty(displayPinOrPassphraseCaptor.getValue()));
 
@@ -9021,8 +9024,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 pdEvent);
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(pdEvent.device.deviceName), eq(true),
-                displayPinOrPassphraseCaptor.capture(), anyInt(), anyInt(), any(), any());
+                eq(pdEvent.device.deviceName), eq(false), eq(true),
+                displayPinOrPassphraseCaptor.capture(), any(), anyInt(), anyInt(), any(), any());
         verify(mDialogHandle).launchDialog();
         assertTrue(TextUtils.isEmpty(displayPinOrPassphraseCaptor.getValue()));
 
@@ -9062,8 +9065,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 pdEvent);
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(pdEvent.device.deviceName), eq(false), pincodeCaptor.capture(),
-                anyInt(), anyInt(), any(), any());
+                eq(pdEvent.device.deviceName), eq(false), eq(false), pincodeCaptor.capture(),
+                any(), anyInt(), anyInt(), any(), any());
         String pincode = pincodeCaptor.getValue();
         assertTrue(pincode.matches("\\d{8}"));
         verify(mDialogHandle).launchDialog();
@@ -9107,8 +9110,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 pdEvent);
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                eq(pdEvent.device.deviceName), eq(false), passphraseCaptor.capture(),
-                anyInt(), anyInt(), any(), any());
+                eq(pdEvent.device.deviceName), eq(false), eq(false),
+                any(), passphraseCaptor.capture(), anyInt(), anyInt(), any(), any());
         String passphrase = passphraseCaptor.getValue();
         assertTrue(passphrase.matches(".*[\\x00-\\x7F]{8}.*"));
         verify(mDialogHandle).launchDialog();
@@ -9401,7 +9404,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PIN_TO_SERVICE);
         // Expect isPinRequested to false for displaying the pincode
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                any(), eq(false), any(), anyInt(), anyInt(), any(), any());
+                any(), eq(false), eq(false), any(), any(), anyInt(), anyInt(), any(), any());
         verify(mDialogHandle).launchDialog();
         verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
     }
@@ -9420,7 +9423,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 WifiP2pManager.CONNECTION_REQUEST_DEFER_TO_SERVICE);
         // Expect isPinRequested to true for entering the pincode
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
-                any(), eq(true), any(), anyInt(), anyInt(), any(), any());
+                any(), eq(true), eq(false), any(), any(), anyInt(), anyInt(), any(), any());
         verify(mDialogHandle).launchDialog();
         verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
     }
@@ -9454,7 +9457,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PIN_TO_SERVICE, binder);
         verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
         verify(mWifiDialogManager).createP2pInvitationSentDialog(
-                any(), any(),
+                any(), any(), eq(null),
                 eq(Display.DEFAULT_DISPLAY));
     }
 
@@ -9488,7 +9491,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 WifiP2pManager.CONNECTION_REQUEST_ACCEPT, binder);
         verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
         verify(mWifiDialogManager, never()).createP2pInvitationSentDialog(
-                any(), any(),
+                any(), any(), any(),
                 eq(Display.DEFAULT_DISPLAY));
 
         sendSetConnectionRequestResultMsg(mClientMessenger,
@@ -9496,7 +9499,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 WifiP2pManager.CONNECTION_REQUEST_REJECT, binder);
         verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
         verify(mWifiDialogManager, never()).createP2pInvitationSentDialog(
-                any(), any(),
+                any(), any(), any(),
                 eq(Display.DEFAULT_DISPLAY));
 
         sendSetConnectionRequestResultMsg(mClientMessenger,
@@ -9504,7 +9507,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 WifiP2pManager.CONNECTION_REQUEST_DEFER_TO_SERVICE, binder);
         verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
         verify(mWifiDialogManager, never()).createP2pInvitationSentDialog(
-                any(), any(),
+                any(), any(), any(),
                 eq(Display.DEFAULT_DISPLAY));
     }
 
@@ -9529,7 +9532,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PIN_TO_SERVICE, binder);
         verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
         verify(mWifiDialogManager, never()).createP2pInvitationSentDialog(
-                any(), any(),
+                any(), any(), any(),
                 eq(Display.DEFAULT_DISPLAY));
     }
 }

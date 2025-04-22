@@ -910,7 +910,9 @@ public class WifiDialogManager {
         P2pInvitationReceivedDialogHandle(
                 final @Nullable String deviceName,
                 final boolean isPinRequested,
+                final boolean isPasswordRequested,
                 @Nullable String displayPin,
+                @Nullable String displayPassword,
                 int timeoutMs,
                 int displayId,
                 @Nullable P2pInvitationReceivedDialogCallback callback,
@@ -919,7 +921,9 @@ public class WifiDialogManager {
             if (intent != null) {
                 intent.putExtra(WifiManager.EXTRA_P2P_DEVICE_NAME, deviceName)
                         .putExtra(WifiManager.EXTRA_P2P_PIN_REQUESTED, isPinRequested)
+                        .putExtra(WifiManager.EXTRA_P2P_PASSWORD_REQUESTED, isPasswordRequested)
                         .putExtra(WifiManager.EXTRA_P2P_DISPLAY_PIN, displayPin)
+                        .putExtra(WifiManager.EXTRA_P2P_DISPLAY_PASSWORD, displayPassword)
                         .putExtra(WifiManager.EXTRA_DIALOG_TIMEOUT_MS, timeoutMs);
                 setIntent(intent);
             }
@@ -967,7 +971,11 @@ public class WifiDialogManager {
      *
      * @param deviceName           Name of the device sending the invitation.
      * @param isPinRequested       True if a PIN was requested and a PIN input UI should be shown.
+     * @param isPasswordRequested  True if a password was requested and a password input UI
+     *                             should be shown.
      * @param displayPin           Display PIN, or {@code null} if no PIN should be displayed
+     * @param displayPassword      Display Password, or {@code null} if no Password should be
+     *                             displayed
      * @param timeoutMs            Timeout for the dialog in milliseconds. 0 indicates no timeout.
      * @param displayId            The ID of the Display on which to place the dialog
      *                             (Display.DEFAULT_DISPLAY
@@ -982,7 +990,9 @@ public class WifiDialogManager {
     public DialogHandle createP2pInvitationReceivedDialog(
             @Nullable String deviceName,
             boolean isPinRequested,
+            boolean isPasswordRequested,
             @Nullable String displayPin,
+            @Nullable String displayPassword,
             int timeoutMs,
             int displayId,
             @Nullable P2pInvitationReceivedDialogCallback callback,
@@ -991,7 +1001,9 @@ public class WifiDialogManager {
                 new P2pInvitationReceivedDialogHandle(
                         deviceName,
                         isPinRequested,
+                        isPasswordRequested,
                         displayPin,
+                        displayPassword,
                         timeoutMs,
                         displayId,
                         callback,
@@ -1043,11 +1055,13 @@ public class WifiDialogManager {
         P2pInvitationSentDialogHandle(
                 @Nullable final String deviceName,
                 @Nullable final String displayPin,
+                @Nullable final String displayPassword,
                 int displayId) {
             Intent intent = getBaseLaunchIntent(WifiManager.DIALOG_TYPE_P2P_INVITATION_SENT);
             if (intent != null) {
                 intent.putExtra(WifiManager.EXTRA_P2P_DEVICE_NAME, deviceName)
-                        .putExtra(WifiManager.EXTRA_P2P_DISPLAY_PIN, displayPin);
+                        .putExtra(WifiManager.EXTRA_P2P_DISPLAY_PIN, displayPin)
+                        .putExtra(WifiManager.EXTRA_P2P_DISPLAY_PASSWORD, displayPassword);
                 setIntent(intent);
             }
             setDisplayId(displayId);
@@ -1058,7 +1072,9 @@ public class WifiDialogManager {
      * Creates a P2P Invitation Sent dialog.
      *
      * @param deviceName           Name of the device the invitation was sent to.
-     * @param displayPin           display PIN
+     * @param displayPin           Display PIN, or {@code null} if no PIN should be displayed.
+     * @param displayPassword      Display Password, or {@code null} if no Password should be
+     *                             displayed.
      * @param displayId            display ID
      * @return DialogHandle        Handle for the dialog, or {@code null} if no dialog could
      *                             be created.
@@ -1068,8 +1084,9 @@ public class WifiDialogManager {
     public DialogHandle createP2pInvitationSentDialog(
             @Nullable String deviceName,
             @Nullable String displayPin,
+            @Nullable String displayPassword,
             int displayId) {
         return new DialogHandle(new P2pInvitationSentDialogHandle(deviceName, displayPin,
-                displayId));
+                displayPassword, displayId));
     }
 }
