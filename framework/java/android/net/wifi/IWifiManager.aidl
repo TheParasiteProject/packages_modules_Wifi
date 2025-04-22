@@ -558,6 +558,9 @@ interface IWifiManager {
     void storeCapturedData(int triggerType, boolean isFullCapture, long triggerStartTimeMillis,
             long triggerStopTimeMillis, in IIntegerListener listener);
 
+    void setScreenOffScanSchedule(int movingScanInterval, int stationaryScanInterval,
+            int scanIterations, int scanMultiplier);
+
     boolean isUsdSubscriberSupported();
 
     boolean isUsdPublisherSupported();

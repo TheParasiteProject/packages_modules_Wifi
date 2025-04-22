@@ -867,6 +867,7 @@ package android.net.wifi {
     method @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION, android.Manifest.permission.NETWORK_SETTINGS, android.Manifest.permission.NETWORK_SETUP_WIZARD}) public void setPnoScanState(int);
     method @RequiresPermission(android.Manifest.permission.NETWORK_SETTINGS) public void setScanAlwaysAvailable(boolean);
     method @RequiresPermission(android.Manifest.permission.NETWORK_SETTINGS) public void setScanThrottleEnabled(boolean);
+    method @FlaggedApi("com.android.wifi.flags.wifi_pno_scan_schedule_api") @RequiresPermission(anyOf={android.Manifest.permission.NETWORK_SETTINGS, android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION}) public void setScreenOffScanSchedule(@Nullable android.net.wifi.WifiManager.ScreenOffScanSchedule);
     method @RequiresPermission(anyOf={android.Manifest.permission.NETWORK_SETTINGS, android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION}) public void setScreenOnScanSchedule(@Nullable java.util.List<android.net.wifi.WifiManager.ScreenOnScanSchedule>);
     method @RequiresPermission(anyOf={android.Manifest.permission.NETWORK_SETTINGS, android.Manifest.permission.OVERRIDE_WIFI_CONFIG}) public boolean setSoftApConfiguration(@NonNull android.net.wifi.SoftApConfiguration);
     method @RequiresPermission(anyOf={android.Manifest.permission.NETWORK_SETTINGS, android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION}, conditional=true) public void setSsidsAllowlist(@NonNull java.util.Set<android.net.wifi.WifiSsid>);
@@ -932,6 +933,7 @@ package android.net.wifi {
     field public static final int API_SET_NETWORK_SELECTION_CONFIG = 8; // 0x8
     field public static final int API_SET_ONE_SHOT_SCREEN_ON_CONNECTIVITY_SCAN_DELAY = 7; // 0x7
     field @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") public static final int API_SET_PNO_SCAN_ENABLED = 36; // 0x24
+    field @FlaggedApi("com.android.wifi.flags.wifi_pno_scan_schedule_api") public static final int API_SET_PNO_SCAN_SCHEDULE = 38; // 0x26
     field public static final int API_SET_SCAN_SCHEDULE = 6; // 0x6
     field public static final int API_SET_TDLS_ENABLED = 34; // 0x22
     field public static final int API_SET_TDLS_ENABLED_WITH_MAC_ADDRESS = 35; // 0x23
@@ -1080,6 +1082,22 @@ package android.net.wifi {
     method public default void notifyStatusUpdate(int, boolean);
     method public default void requestNudOperation(int);
     method public void triggerUpdateOfWifiUsabilityStats(int);
+  }
+
+  @FlaggedApi("com.android.wifi.flags.wifi_pno_scan_schedule_api") public static class WifiManager.ScreenOffScanSchedule {
+    method @NonNull public java.time.Duration getMovingScanInterval();
+    method public int getScanIterations();
+    method public int getScanMultiplier();
+    method @NonNull public java.time.Duration getStationaryScanInterval();
+  }
+
+  public static final class WifiManager.ScreenOffScanSchedule.Builder {
+    ctor public WifiManager.ScreenOffScanSchedule.Builder();
+    method @NonNull public android.net.wifi.WifiManager.ScreenOffScanSchedule build();
+    method @NonNull public android.net.wifi.WifiManager.ScreenOffScanSchedule.Builder setMovingScanInterval(@NonNull java.time.Duration);
+    method @NonNull public android.net.wifi.WifiManager.ScreenOffScanSchedule.Builder setScanIterations(@IntRange(from=1) int);
+    method @NonNull public android.net.wifi.WifiManager.ScreenOffScanSchedule.Builder setScanMultiplier(@IntRange(from=1) int);
+    method @NonNull public android.net.wifi.WifiManager.ScreenOffScanSchedule.Builder setStationaryScanInterval(@NonNull java.time.Duration);
   }
 
   public static class WifiManager.ScreenOnScanSchedule {

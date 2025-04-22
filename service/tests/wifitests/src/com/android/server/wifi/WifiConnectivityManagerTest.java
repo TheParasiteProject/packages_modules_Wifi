@@ -6465,4 +6465,82 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         callback.onScreenStateChanged(screenOn);
         inOrder.verify(mWifiNS).setScreenState(screenOn);
     }
+
+    @Test
+    public void testSetExternalScreenOffScanSchedule() {
+        setWifiEnabled(true);
+
+        when(mClock.getElapsedSinceBootMillis()).thenReturn(0L);
+        // Set initial PNO scan schedule parameters
+        int movingScanIntervalMillis = 10000; // 10 seconds
+        int stationaryScanIntervalMillis = 15000; // 15 seconds
+        int scanIterations = 3;
+        int scanMultiplier = 2;
+
+        // Set the external screen off scan schedule
+        mWifiConnectivityManager.setExternalScreenOffScanSchedule(movingScanIntervalMillis,
+                stationaryScanIntervalMillis, scanIterations, scanMultiplier);
+
+        // starts a PNO scan
+        mWifiConnectivityManager.setDeviceMobilityState(
+                WifiManager.DEVICE_MOBILITY_STATE_STATIONARY);
+        setScreenState(false);
+        mWifiConnectivityManager.handleConnectionStateChanged(
+                mPrimaryClientModeManager,
+                WifiConnectivityManager.WIFI_STATE_DISCONNECTED);
+        // Verify that the correct scan intervals are used based on device mobility state
+        verify(mWifiScanner).startPnoScan(
+                argThat(new ArgumentMatcher<ScanSettings>() {
+                    @Override
+                    public boolean matches(ScanSettings argument) {
+                        return argument.periodInMs == stationaryScanIntervalMillis;
+                    }
+                }),
+                argThat(new ArgumentMatcher<PnoSettings>() {
+                    @Override
+                    public boolean matches(PnoSettings argument) {
+                        return argument.scanIterations == scanIterations
+                                && argument.scanIntervalMultiplier == scanMultiplier;
+                    }
+                }),
+                any());
+        // Verify correct PNO parameters are used when device is moving
+        setScreenState(true);
+        mWifiConnectivityManager.setDeviceMobilityState(
+                WifiManager.DEVICE_MOBILITY_STATE_HIGH_MVMT);
+        setScreenState(false);
+        verify(mWifiScanner).startPnoScan(
+                argThat(new ArgumentMatcher<ScanSettings>() {
+                    @Override
+                    public boolean matches(ScanSettings argument) {
+                        return argument.periodInMs == movingScanIntervalMillis;
+                    }
+                }),
+                argThat(new ArgumentMatcher<PnoSettings>() {
+                    @Override
+                    public boolean matches(PnoSettings argument) {
+                        return argument.scanIterations == scanIterations
+                                && argument.scanIntervalMultiplier == scanMultiplier;
+                    }
+                }),
+                any());
+
+        // Reset PNO scan parameters back to overlay default and verify again
+        mWifiConnectivityManager.setExternalScreenOffScanSchedule(0, 0, 0, 0);
+        verify(mWifiScanner).startPnoScan(
+                argThat(new ArgumentMatcher<ScanSettings>() {
+                    @Override
+                    public boolean matches(ScanSettings argument) {
+                        return argument.periodInMs == MOVING_PNO_SCAN_INTERVAL_MILLIS;
+                    }
+                }),
+                argThat(new ArgumentMatcher<PnoSettings>() {
+                    @Override
+                    public boolean matches(PnoSettings argument) {
+                        return argument.scanIterations == EXPECTED_PNO_ITERATIONS
+                                && argument.scanIntervalMultiplier == EXPECTED_PNO_MULTIPLIER;
+                    }
+                }),
+                any());
+    }
 }
