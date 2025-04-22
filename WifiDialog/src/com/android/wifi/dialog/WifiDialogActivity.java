@@ -341,6 +341,8 @@ public class WifiDialogActivity extends Activity  {
                         intent.getStringExtra(WifiManager.EXTRA_DIALOG_MESSAGE_URL),
                         intent.getIntExtra(WifiManager.EXTRA_DIALOG_MESSAGE_URL_START, 0),
                         intent.getIntExtra(WifiManager.EXTRA_DIALOG_MESSAGE_URL_END, 0),
+                        intent.getStringArrayListExtra(WifiManager.EXTRA_DIALOG_LIST_LABELS),
+                        intent.getStringArrayListExtra(WifiManager.EXTRA_DIALOG_LIST_CONTENTS),
                         intent.getStringExtra(WifiManager.EXTRA_DIALOG_POSITIVE_BUTTON_TEXT),
                         intent.getStringExtra(WifiManager.EXTRA_DIALOG_NEGATIVE_BUTTON_TEXT),
                         intent.getStringExtra(WifiManager.EXTRA_DIALOG_NEUTRAL_BUTTON_TEXT));
@@ -423,6 +425,8 @@ public class WifiDialogActivity extends Activity  {
             @Nullable String messageUrl,
             int messageUrlStart,
             int messageUrlEnd,
+            @Nullable List<String> listLabels,
+            @Nullable List<String> listContents,
             @Nullable String positiveButtonText,
             @Nullable String negativeButtonText,
             @Nullable String neutralButtonText) {
@@ -443,6 +447,7 @@ public class WifiDialogActivity extends Activity  {
                 }
             }
         }
+        // TODO: Add the labels/contents to the alert dialog custom view.
         AlertDialog dialog = getWifiAlertDialogBuilder("wifi_dialog")
                 .setTitle(title)
                 .setMessage(spannableMessage)
@@ -485,6 +490,8 @@ public class WifiDialogActivity extends Activity  {
                     + " title=" + title
                     + " message=" + message
                     + " url=[" + messageUrl + "," + messageUrlStart + "," + messageUrlEnd + "]"
+                    + " listLabels="  + listLabels
+                    + " listContents=" + listContents
                     + " positiveButtonText=" + positiveButtonText
                     + " negativeButtonText=" + negativeButtonText
                     + " neutralButtonText=" + neutralButtonText);
