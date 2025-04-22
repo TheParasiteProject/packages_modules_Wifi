@@ -73,12 +73,13 @@ import java.util.Set;
  * A class representing a configured Wi-Fi network, including the
  * security configuration.
  *
- * @deprecated Use {@link WifiNetworkSpecifier.Builder} to create {@link NetworkSpecifier} and
- * {@link WifiNetworkSuggestion.Builder} to create {@link WifiNetworkSuggestion}. This class can
- * still be used with privileged APIs such as
+ * Non privileged caller should use {@link WifiNetworkSpecifier.Builder}
+ * to create {@link NetworkSpecifier} and {@link WifiNetworkSuggestion.Builder}
+ * to create {@link WifiNetworkSuggestion}.
+ * This class can still be used with privileged APIs only such as
  * {@link WifiManager#addNetwork(WifiConfiguration)}.
  */
-@Deprecated
+@FlaggedApi(Flags.FLAG_UN_DEPRECATED_WIFICONFIGURATION)
 public class WifiConfiguration implements Parcelable {
     private static final String TAG = "WifiConfiguration";
     /**
