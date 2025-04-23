@@ -501,11 +501,13 @@
           <!-- Params from strings.xml that can be overlayed -->
 
           <!-- Params from styles.xml that can be overlayed -->
+          <item type="style" name="wifi_section" />
+          <item type="style" name="wifi_dialog" />
           <item type="style" name="wifi_item" />
           <item type="style" name="wifi_item_label" />
           <item type="style" name="wifi_item_content" />
-          <item type="style" name="wifi_section" />
-          <item type="style" name="wifi_dialog" />
+          <item type="style" name="wifi_dialog_list_divider" />
+
           <item type="style" name="wifi_p2p_invitation_received_dialog" />
           <item type="style" name="wifi_p2p_dialog_timeout" />
           <item type="style" name="wifi_p2p_dialog_row_label" />
@@ -531,6 +533,8 @@
           <!-- Params from drawable/ that can be overlayed -->
 
           <!-- Params from layout/ that can be overlayed -->
+          <item type="layout" name="wifi_dialog_list" />
+          <item type="layout" name="wifi_dialog_list_item" />
           <item type="layout" name="wifi_p2p_dialog" />
           <item type="layout" name="wifi_p2p_dialog_row" />
           <!-- Params from layout/ that can be overlayed -->
