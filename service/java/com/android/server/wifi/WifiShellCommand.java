@@ -21,6 +21,7 @@ import static android.net.NetworkCapabilities.NET_CAPABILITY_OEM_PAID;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_OEM_PRIVATE;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_TRUSTED;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
+import static android.net.TetheringManager.TETHERING_WIFI;
 import static android.net.wifi.WifiConfiguration.METERED_OVERRIDE_METERED;
 import static android.net.wifi.WifiManager.ACTION_REMOVE_SUGGESTION_DISCONNECT;
 import static android.net.wifi.WifiManager.ACTION_REMOVE_SUGGESTION_LINGER;
@@ -52,6 +53,9 @@ import android.net.MacAddress;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.net.TetheringManager;
+import android.net.TetheringManager.StartTetheringCallback;
+import android.net.TetheringManager.TetheringRequest;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IDppCallback;
 import android.net.wifi.ILastCallerListener;
@@ -108,6 +112,9 @@ import com.android.modules.utils.BasicShellCommandHandler;
 import com.android.modules.utils.ParceledListSlice;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.ClientMode.LinkProbeCallback;
+import com.android.server.wifi.WifiDialogManager.DialogHandle;
+import com.android.server.wifi.WifiDialogManager.SimpleDialogBuilder;
+import com.android.server.wifi.WifiDialogManager.SimpleDialogCallback;
 import com.android.server.wifi.coex.CoexManager;
 import com.android.server.wifi.coex.CoexUtils;
 import com.android.server.wifi.hal.WifiChip;
@@ -133,6 +140,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -920,6 +928,43 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 case "start-softap": {
                     CountDownLatch countDownLatch = new CountDownLatch(1);
                     SoftApConfiguration config = buildSoftApConfiguration(pw);
+                    // Starting in B, a DHCP server will not be started for AP ifaces that weren't
+                    // requested by TetheringManager#startTethering.
+                    // TODO: This provides internet access on the AP iface if there is a suitable
+                    //       upstream available. This matches historical behavior, but consider
+                    //       starting the IpServer in local-only mode since the current clients of
+                    //       this command don't need to verify internet connection.
+                    if (SdkLevel.isAtLeastB()) {
+                        final TetheringRequest tr = new TetheringRequest.Builder(TETHERING_WIFI)
+                                .setSoftApConfiguration(config)
+                                .build();
+                        TetheringManager mTetheringManager =
+                                mContext.getSystemService(TetheringManager.class);
+                        AtomicBoolean callbackCalled = new AtomicBoolean(false);
+                        mTetheringManager.startTethering(tr, mContext.getMainExecutor(),
+                                new StartTetheringCallback() {
+                                    @Override
+                                    public void onTetheringStarted() {
+                                        pw.println("Soft AP started.");
+                                        callbackCalled.set(true);
+                                        countDownLatch.countDown();
+                                    }
+
+                                    @Override
+                                    public void onTetheringFailed(int e) {
+                                        pw.println("Soft AP start failed with tether error: " + e
+                                                + ". Please check config parameters.");
+                                        callbackCalled.set(true);
+                                        countDownLatch.countDown();
+                                    }
+                                });
+                        countDownLatch.await(10000, TimeUnit.MILLISECONDS);
+                        if (!callbackCalled.get()) {
+                            pw.println("Soft AP start timed out.");
+                        }
+                        return 0;
+                    }
+
                     SoftApCallbackProxy softApCallback =
                             new SoftApCallbackProxy(pw, countDownLatch);
                     mWifiService.registerSoftApCallback(softApCallback);
@@ -1512,6 +1557,80 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     return 0;
                 }
                 case "launch-dialog-simple":
+                    SimpleDialogBuilder dialogBuilder =
+                            mWifiDialogManager.createSimpleDialogBuilder();
+                    String dialogOption = getNextOption();
+                    long simpleTimeoutMs = 15 * 1000;
+                    while (dialogOption != null) {
+                        switch (dialogOption) {
+                            case "-t":
+                                dialogBuilder.setTitle(getNextArgRequired());
+                                break;
+                            case "-m":
+                                dialogBuilder.setMessage(getNextArgRequired());
+                                break;
+                            case "-l":
+                                dialogBuilder.setMessageUrl(
+                                        getNextArgRequired() /* messageUrl */,
+                                        Integer.valueOf(getNextArgRequired()) /* messageUrlStart */,
+                                        Integer.valueOf(getNextArgRequired()) /* messageUrlEnd */);
+                                break;
+                            case "-y":
+                                dialogBuilder.setPositiveButtonText(getNextArgRequired());
+                                break;
+                            case "-n":
+                                dialogBuilder.setNegativeButtonText(getNextArgRequired());
+                                break;
+                            case "-x":
+                                dialogBuilder.setNeutralButtonText(getNextArgRequired());
+                                break;
+                            case "-c":
+                                simpleTimeoutMs = Integer.parseInt(getNextArgRequired());
+                                break;
+                            default:
+                                pw.println("Ignoring unknown option " + dialogOption);
+                                break;
+                        }
+                        dialogOption = getNextOption();
+                    }
+                    ArrayBlockingQueue<String> simpleQueue = new ArrayBlockingQueue<>(1);
+                    SimpleDialogCallback dialogCallback =
+                            new SimpleDialogCallback() {
+                                @Override
+                                public void onPositiveButtonClicked() {
+                                    simpleQueue.offer("Positive button was clicked.");
+                                }
+
+                                @Override
+                                public void onNegativeButtonClicked() {
+                                    simpleQueue.offer("Negative button was clicked.");
+                                }
+
+                                @Override
+                                public void onNeutralButtonClicked() {
+                                    simpleQueue.offer("Neutral button was clicked.");
+                                }
+
+                                @Override
+                                public void onCancelled() {
+                                    simpleQueue.offer("Dialog was cancelled.");
+                                }
+                            };
+                    dialogBuilder.setCallback(dialogCallback, mWifiThreadRunner);
+                    DialogHandle simpleDialogHandle = dialogBuilder.build();
+                    simpleDialogHandle.launchDialog();
+                    pw.println("Launched dialog. Waiting up to " + simpleTimeoutMs + " ms for"
+                            + " user response before dismissing...");
+                    String simpleDialogResponse = simpleQueue.poll(simpleTimeoutMs,
+                            TimeUnit.MILLISECONDS);
+                    if (simpleDialogResponse == null) {
+                        pw.println("No response received. Dismissing dialog.");
+                        simpleDialogHandle.dismissDialog();
+                    } else {
+                        pw.println(simpleDialogResponse);
+                    }
+                    return 0;
+                case "launch-dialog-simple-legacy":
                     String title = null;
                     String message = null;
                     String messageUrl = null;
@@ -1520,12 +1639,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     String positiveButtonText = null;
                     String negativeButtonText = null;
                     String neutralButtonText = null;
-                    String dialogOption = getNextOption();
-                    boolean simpleTimeoutSpecified = false;
-                    long simpleTimeoutMs = 15 * 1000;
-                    boolean useLegacy = false;
-                    while (dialogOption != null) {
-                        switch (dialogOption) {
+                    String legacyDialogOption = getNextOption();
+                    long legacyTimeoutMs = 15 * 1000;
+                    while (legacyDialogOption != null) {
+                        switch (legacyDialogOption) {
                             case "-t":
                                 title = getNextArgRequired();
                                 break;
@@ -1547,77 +1664,59 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                                 neutralButtonText = getNextArgRequired();
                                 break;
                             case "-c":
-                                simpleTimeoutMs = Integer.parseInt(getNextArgRequired());
-                                simpleTimeoutSpecified = true;
-                                break;
-                            case "-s":
-                                useLegacy = true;
+                                legacyTimeoutMs = Integer.parseInt(getNextArgRequired());
                                 break;
                             default:
-                                pw.println("Ignoring unknown option " + dialogOption);
+                                pw.println("Ignoring unknown option " + legacyDialogOption);
                                 break;
                         }
-                        dialogOption = getNextOption();
+                        legacyDialogOption = getNextOption();
                     }
-                    ArrayBlockingQueue<String> simpleQueue = new ArrayBlockingQueue<>(1);
-                    WifiDialogManager.SimpleDialogCallback wifiEnableRequestCallback =
-                            new WifiDialogManager.SimpleDialogCallback() {
+                    ArrayBlockingQueue<String> legacyDialogQueue = new ArrayBlockingQueue<>(1);
+                    SimpleDialogCallback wifiEnableRequestCallback =
+                            new SimpleDialogCallback() {
                                 @Override
                                 public void onPositiveButtonClicked() {
-                                    simpleQueue.offer("Positive button was clicked.");
+                                    legacyDialogQueue.offer("Positive button was clicked.");
                                 }
 
                                 @Override
                                 public void onNegativeButtonClicked() {
-                                    simpleQueue.offer("Negative button was clicked.");
+                                    legacyDialogQueue.offer("Negative button was clicked.");
                                 }
 
                                 @Override
                                 public void onNeutralButtonClicked() {
-                                    simpleQueue.offer("Neutral button was clicked.");
+                                    legacyDialogQueue.offer("Neutral button was clicked.");
                                 }
 
                                 @Override
                                 public void onCancelled() {
-                                    simpleQueue.offer("Dialog was cancelled.");
+                                    legacyDialogQueue.offer("Dialog was cancelled.");
                                 }
                             };
-                    WifiDialogManager.DialogHandle simpleDialogHandle;
-                    if (useLegacy) {
-                        simpleDialogHandle = mWifiDialogManager.createLegacySimpleDialogWithUrl(
-                                title,
-                                message,
-                                messageUrl,
-                                messageUrlStart,
-                                messageUrlEnd,
-                                positiveButtonText,
-                                negativeButtonText,
-                                neutralButtonText,
-                                wifiEnableRequestCallback,
-                                mWifiThreadRunner);
-                    } else {
-                        simpleDialogHandle = mWifiDialogManager.createSimpleDialogWithUrl(
-                                title,
-                                message,
-                                messageUrl,
-                                messageUrlStart,
-                                messageUrlEnd,
-                                positiveButtonText,
-                                negativeButtonText,
-                                neutralButtonText,
-                                wifiEnableRequestCallback,
-                                mWifiThreadRunner);
-                    }
-                    simpleDialogHandle.launchDialog();
-                    pw.println("Launched dialog. Waiting up to " + simpleTimeoutMs + " ms for"
-                            + " user response before dismissing...");
-                    String simpleDialogResponse = simpleQueue.poll(simpleTimeoutMs,
+                    DialogHandle legacyDialogHandle =
+                            mWifiDialogManager.createLegacySimpleDialogWithUrl(
+                                    title,
+                                    message,
+                                    messageUrl,
+                                    messageUrlStart,
+                                    messageUrlEnd,
+                                    positiveButtonText,
+                                    negativeButtonText,
+                                    neutralButtonText,
+                                    wifiEnableRequestCallback,
+                                    mWifiThreadRunner);
+                    legacyDialogHandle.launchDialog();
+                    pw.println("Launched legacy dialog. Waiting up to " + legacyTimeoutMs
+                            + " ms for user response before dismissing...");
+                    String legacyDialogResponse = legacyDialogQueue.poll(legacyTimeoutMs,
                             TimeUnit.MILLISECONDS);
-                    if (simpleDialogResponse == null) {
+                    if (legacyDialogResponse == null) {
                         pw.println("No response received. Dismissing dialog.");
-                        simpleDialogHandle.dismissDialog();
+                        legacyDialogHandle.dismissDialog();
                     } else {
-                        pw.println(simpleDialogResponse);
+                        pw.println(legacyDialogResponse);
                     }
                     return 0;
                 case "launch-dialog-p2p-invitation-sent": {
@@ -1707,7 +1806,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                             p2pInvRecQueue.offer("Invitation declined");
                         }
                     };
-                    WifiDialogManager.DialogHandle p2pInvitationReceivedDialogHandle =
+                    DialogHandle p2pInvitationReceivedDialogHandle =
                             mWifiDialogManager.createP2pInvitationReceivedDialog(
                                     deviceName,
                                     isPinRequested,
@@ -3065,7 +3164,18 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    -n - Negative Button Text");
         pw.println("    -x - Neutral Button Text");
         pw.println("    -c - Optional timeout in milliseconds");
-        pw.println("    -s - Use the legacy dialog implementation on the system process");
+        pw.println("  launch-dialog-simple-legacy [-t <title>] [-m <message>]"
+                + " [-l <url> <url_start> <url_end>] [-y <positive_button_text>]"
+                + " [-n <negative_button_text>] [-x <neutral_button_text>] [-c <timeout_millis>]");
+        pw.println("    Launches a legacy dialog (i.e. on the system process) and waits up to 15"
+                + " seconds to print the response.");
+        pw.println("    -t - Title");
+        pw.println("    -m - Message");
+        pw.println("    -l - URL of the message, with the start and end index inside the message");
+        pw.println("    -y - Positive Button Text");
+        pw.println("    -n - Negative Button Text");
+        pw.println("    -x - Neutral Button Text");
+        pw.println("    -c - Optional timeout in milliseconds");
         pw.println("  launch-dialog-p2p-invitation-sent <device_name> [-d <pin>]"
                 + " [-i <display_id>]");
         pw.println("    Launches a P2P Invitation Sent dialog.");
