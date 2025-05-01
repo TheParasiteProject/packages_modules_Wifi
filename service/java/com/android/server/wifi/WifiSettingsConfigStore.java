@@ -215,6 +215,12 @@ public class WifiSettingsConfigStore {
     public static final Key<Boolean> D2D_ALLOWED_WHEN_INFRA_STA_DISABLED =
             new Key<>("d2d_allowed_when_infra_sta_disabled", false);
 
+    /**
+     * Whether the user allows or not to notify when a high-quality public network is available.
+     */
+    public static final Key<Boolean> WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON =
+            new Key<>("wifi_networks_available_notification_on", true);
+
     // List of all keys which require to backup and restore.
     private static final List<Key> sBackupRestoreKeys = List.of(
             WIFI_WEP_ALLOWED,

@@ -534,7 +534,8 @@ public class WifiInjector {
                 wifiLooper, mFrameworkFacade, mClock, mWifiMetrics,
                 mWifiConfigManager, mWifiConfigStore, mConnectHelper,
                 new ConnectToNetworkNotificationBuilder(mContext, mFrameworkFacade),
-                mMakeBeforeBreakManager, mWifiNotificationManager, mWifiPermissionsUtil);
+                mMakeBeforeBreakManager, mWifiNotificationManager, mWifiPermissionsUtil,
+                mSettingsConfigStore, mFeatureFlags);
         mMultiInternetManager = new MultiInternetManager(mActiveModeWarden, mFrameworkFacade,
                 mContext, mCmiMonitor, mSettingsStore, mWifiHandler, mClock);
         mExternalPnoScanRequestManager = new ExternalPnoScanRequestManager(mWifiHandler, mContext);

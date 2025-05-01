@@ -124,6 +124,7 @@ import android.net.wifi.WifiUsabilityStatsEntry.RateStats;
 import android.net.wifi.WifiUsabilityStatsEntry.ScanResultWithSameFreq;
 import android.net.wifi.twt.TwtRequest;
 import android.net.wifi.twt.TwtSessionCallback;
+import android.net.wifi.util.Environment;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -132,6 +133,7 @@ import android.os.OutcomeReceiver;
 import android.os.RemoteException;
 import android.os.connectivity.WifiActivityEnergyInfo;
 import android.os.test.TestLooper;
+import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.util.ArraySet;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
@@ -140,6 +142,7 @@ import androidx.test.filters.SmallTest;
 
 import com.android.modules.utils.HandlerExecutor;
 import com.android.modules.utils.build.SdkLevel;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.x.com.android.modules.utils.ParceledListSlice;
 
 import com.google.common.collect.ImmutableList;
@@ -4614,5 +4617,32 @@ public class WifiManagerTest {
         // Thus we just use "mContext.getAttributionSource" to verify it.
         assertEquals(mContext.getAttributionSource(),
                 bundleCaptor.getValue().getParcelable(EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE));
+    }
+
+    @RequiresFlagsEnabled(Flags.FLAG_MULTI_USER_WIFI_ENHANCEMENT)
+    @Test
+    public void testSetOpenNetworkNotifierEnabled() throws Exception {
+        assumeTrue(Environment.isSdkNewerThanB());
+        mWifiManager.setOpenNetworkNotifierEnabled(true);
+        verify(mWifiService).setOpenNetworkNotifierEnabled(true);
+        mWifiManager.setOpenNetworkNotifierEnabled(false);
+        verify(mWifiService).setOpenNetworkNotifierEnabled(false);
+    }
+
+    @RequiresFlagsEnabled(Flags.FLAG_MULTI_USER_WIFI_ENHANCEMENT)
+    @Test
+    public void testIsOpenNetworkNotifierEnabled() throws Exception {
+        assumeTrue(Environment.isSdkNewerThanB());
+        Consumer<Boolean> resultsSetCallback = mock(Consumer.class);
+        SynchronousExecutor executor = mock(SynchronousExecutor.class);
+        // Null executor/callback exception.
+        assertThrows("null executor should trigger exception", NullPointerException.class,
+                () -> mWifiManager.isOpenNetworkNotifierEnabled(null, resultsSetCallback));
+        assertThrows("null listener should trigger exception", NullPointerException.class,
+                () -> mWifiManager.isOpenNetworkNotifierEnabled(executor, null));
+        // Query and verify.
+        mWifiManager.isOpenNetworkNotifierEnabled(executor, resultsSetCallback);
+        verify(mWifiService).isOpenNetworkNotifierEnabled(
+                any(IBooleanListener.Stub.class));
     }
 }

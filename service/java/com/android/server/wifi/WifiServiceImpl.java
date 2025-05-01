@@ -564,6 +564,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
     private ApplicationQosPolicyRequestHandler mApplicationQosPolicyRequestHandler;
     private final AfcManager mAfcManager;
     private final TwtManager mTwtManager;
+    private final OpenNetworkNotifier mOpenNetworkNotifier;
 
     /**
      * The wrapper of SoftApCallback is used in WifiService internally.
@@ -802,6 +803,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     mContext.getResources().getIdentifier("config_deviceSupportsWifiUsd", "bool",
                             "android"));
         }
+        mOpenNetworkNotifier = mWifiInjector.getOpenNetworkNotifier();
     }
 
     /**
@@ -8200,7 +8202,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
 
     private void resetNotificationManager() {
         mWifiInjector.getWifiNotificationManager().createNotificationChannels();
-        mWifiInjector.getOpenNetworkNotifier().clearPendingNotification(false);
+        mOpenNetworkNotifier.clearPendingNotification(false);
         mWifiCarrierInfoManager.resetNotification();
         mWifiNetworkSuggestionsManager.resetNotification();
         mWifiInjector.getWakeupController().resetNotification();
@@ -9595,5 +9597,52 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         }
         mWifiThreadRunner.post(() -> mWifiConfigManager.refreshMacRandomization(netId),
                 TAG + "refreshMacRandomization");
+    }
+
+    /**
+     * See {@link WifiManager#setOpenNetworkNotifierEnabled(boolean)}
+     */
+    @Override
+    public void setOpenNetworkNotifierEnabled(boolean enable) {
+        if (!Environment.isSdkNewerThanB()) {
+            throw new UnsupportedOperationException();
+        }
+        int callingUid = Binder.getCallingUid();
+        if (!isSettingsOrSuw(Binder.getCallingPid(), callingUid)) {
+            throw new SecurityException("Uid " + callingUid
+                    + " is not allowed to set open network notifier");
+        }
+        mLog.info("setOpenNetworkNotifierEnabled uid=% enable=%")
+                .c(callingUid)
+                .c(enable)
+                .flush();
+        mWifiThreadRunner.post(
+                () -> mOpenNetworkNotifier.setSettingsEnabled(enable));
+    }
+
+    /**
+     * See {@link WifiManager#isOpenNetworkNotifierEnabled(Executor, Consumer)}
+     */
+    @Override
+    public void isOpenNetworkNotifierEnabled(@NonNull IBooleanListener listener) {
+        if (!Environment.isSdkNewerThanB()) {
+            throw new UnsupportedOperationException();
+        }
+        Objects.requireNonNull(listener, "listener cannot be null");
+        int callingUid = Binder.getCallingUid();
+        if (!isSettingsOrSuw(Binder.getCallingPid(), callingUid)) {
+            throw new SecurityException("Uid " + callingUid
+                    + " is not allowed to get open network notifier");
+        }
+        if (mVerboseLoggingEnabled) {
+            mLog.info("isOpenNetworkNotifierEnabled uid=%").c(callingUid).flush();
+        }
+        mWifiThreadRunner.post(() -> {
+            try {
+                listener.onResult(mOpenNetworkNotifier.isSettingEnabled());
+            } catch (RemoteException e) {
+                Log.e(TAG, e.getMessage(), e);
+            }
+        }, TAG + "#isOpenNetworkNotifierEnabled");
     }
 }

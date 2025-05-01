@@ -13411,4 +13411,65 @@ public class WifiManager {
             throw e.rethrowFromSystemServer();
         }
     }
+
+    /**
+     * Set if the foreground user allows to notify when a high-quality public network is available.
+     *
+     * @param enable Whether or not the foreground user allows to notify when a high-quality public
+     *               network is available.
+     * @throws SecurityException if the caller does not have permission.
+     * @hide
+     */
+    @SystemApi
+    @RequiresApi(37)
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.NETWORK_SETTINGS,
+            android.Manifest.permission.NETWORK_SETUP_WIZARD
+    })
+    @FlaggedApi(Flags.FLAG_MULTI_USER_WIFI_ENHANCEMENT)
+    public void setOpenNetworkNotifierEnabled(boolean enable) {
+        try {
+            mService.setOpenNetworkNotifierEnabled(enable);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Get if the foreground user allows to notify when a high-quality public network is available.
+     * Default to {@code true}, unless changed by privileged applications via
+     * {@link #setOpenNetworkNotifierEnabled(boolean)}.
+     *
+     * @param executor        The executor on which callback will be invoked.
+     * @param resultsCallback An asynchronous callback that will return {@code Boolean} indicating
+     *                        whether the open network notifier is enabled or disabled.
+     * @throws SecurityException if the caller does not have permission.
+     * @hide
+     */
+    @SystemApi
+    @RequiresApi(37)
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.NETWORK_SETTINGS,
+            android.Manifest.permission.NETWORK_SETUP_WIZARD
+    })
+    @FlaggedApi(Flags.FLAG_MULTI_USER_WIFI_ENHANCEMENT)
+    public void isOpenNetworkNotifierEnabled(@NonNull @CallbackExecutor Executor executor,
+            @NonNull Consumer<Boolean> resultsCallback) {
+        Objects.requireNonNull(executor, "executor cannot be null");
+        Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+        try {
+            mService.isOpenNetworkNotifierEnabled(
+                    new IBooleanListener.Stub() {
+                        @Override
+                        public void onResult(boolean value) {
+                            Binder.clearCallingIdentity();
+                            executor.execute(() -> {
+                                resultsCallback.accept(value);
+                            });
+                        }
+                    });
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
 }
