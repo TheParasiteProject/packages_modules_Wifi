@@ -11821,6 +11821,10 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
     @Test
     public void testTetheredSoftApTrackerWhenCountryCodeChanged() throws Exception {
+        when(mWifiSettingsConfigStore.get(WifiSettingsConfigStore.WIFI_SOFT_AP_COUNTRY_CODE))
+                .thenReturn(TEST_COUNTRY_CODE);
+        when(mWifiSettingsConfigStore.get(WifiSettingsConfigStore.WIFI_AVAILABLE_SOFT_AP_FREQS_MHZ))
+                .thenReturn("[2452]" /* Channel 9 */);
         mWifiServiceImpl.handleBootCompleted();
         mLooper.dispatchAll();
 
@@ -11873,6 +11877,21 @@ public class WifiServiceImplTest extends WifiBaseTest {
                 .getSupportedChannelList(SoftApConfiguration.BAND_2GHZ).length);
         verify(mWifiNative, times(2)).getUsableChannels(eq(WifiScanner.WIFI_BAND_24_GHZ), anyInt(),
                 anyInt());
+
+        // Country code update back to original while HAL still not started
+        mWifiServiceImpl.mCountryCodeTracker.onCountryCodeChangePending(TEST_COUNTRY_CODE);
+        mLooper.dispatchAll();
+        if (SdkLevel.isAtLeastT()) {
+            verify(mIOnWifiDriverCountryCodeChangedListener, never())
+                    .onDriverCountryCodeChanged(TEST_NEW_COUNTRY_CODE);
+        }
+        verify(mClientSoftApCallback, times(2))
+                .onCapabilityChanged(capabilityArgumentCaptor.capture());
+        // The supported channels in soft AP capability were restored.
+        assertEquals(1, capabilityArgumentCaptor.getValue()
+                .getSupportedChannelList(SoftApConfiguration.BAND_2GHZ).length);
+        assertEquals(9, capabilityArgumentCaptor.getValue()
+                .getSupportedChannelList(SoftApConfiguration.BAND_2GHZ)[0]);
     }
 
     /**
