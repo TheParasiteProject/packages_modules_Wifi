@@ -5990,5 +5990,49 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         inOrder.verify(mMockNativeManager).releaseAware();
         verifyNoMoreInteractions(mockCallback1, mMockNative);
     }
+
+    /**
+     * Tests the behavior of WifiAwareDiscoverySessionState.getPeerIdOrAddIfNew() and
+     * WifiAwareDiscoverySessionState.getPeerInfo.
+     */
+    @Test
+    public void testDiscoverySessionStatePeerIdMapping() {
+        int instanceId = 123;
+        byte[] mac1 = new byte[] {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
+        byte[] mac2 = new byte[] {0x12, 0x13, 0x14, 0x15, 0x16, 0x17};
+        WifiAwareDiscoverySessionState session = new WifiAwareDiscoverySessionState(
+                /* wifiAwareNativeApi= */ null,
+                /* sessionId= */ 100,
+                /* pubSubId= */ (byte) 0,
+                /* callback= */ null,
+                /* isPublishSession= */ true,
+                /* isRangingEnabled= */ false,
+                /* creationTime= */ 1234L,
+                /* instantModeEnabled= */ false,
+                /* instantModeBand= */ 0,
+                /* isSuspendable= */ false,
+                /* pairingConfig= */ null);
+
+        int peerId1 = session.getPeerIdOrAddIfNew(instanceId, mac1);
+        int peerId2 = session.getPeerIdOrAddIfNew(instanceId, mac2);
+        int peerId1Again = session.getPeerIdOrAddIfNew(instanceId, mac1);
+
+        assertEquals("Same MAC should return same peer ID", peerId1, peerId1Again);
+        assertNotEquals("Different MACs should return different peer IDs", peerId1, peerId2);
+
+        WifiAwareDiscoverySessionState.PeerInfo peerInfo1 = session.getPeerInfo(peerId1);
+        assertNotNull("PeerInfo(1) cannot be null", peerInfo1);
+        assertEquals("InstanceId(1) mismatch", instanceId, peerInfo1.mInstanceId);
+        assertTrue("Mac(1) mismatch", Arrays.equals(mac1, peerInfo1.mMac));
+        assertNotNull("PeerHandle(1) cannot be null", peerInfo1.mPeerHandle);
+        assertEquals(" PeerId(1) mismatch", peerId1, peerInfo1.mPeerHandle.peerId);
+
+        WifiAwareDiscoverySessionState.PeerInfo peerInfo2 = session.getPeerInfo(peerId2);
+        assertNotNull("PeerInfo(2) cannot be null", peerInfo2);
+        assertEquals("InstanceId(2) mismatch", instanceId, peerInfo2.mInstanceId);
+        assertTrue("Mac(2) mismatch", Arrays.equals(mac2, peerInfo2.mMac));
+        assertNotNull("PeerHandle(2) cannot be null", peerInfo2.mPeerHandle);
+        assertEquals("PeerId(2) mismatch", peerId2, peerInfo2.mPeerHandle.peerId);
+    }
 }
 
