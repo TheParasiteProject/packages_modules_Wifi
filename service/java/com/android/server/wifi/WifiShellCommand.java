@@ -213,7 +213,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
             "force-overlay-config-value",
             "get-softap-supported-features",
             "get-wifi-supported-features",
-            "get-overlay-config-values"
+            "get-overlay-config-values",
+            "get-carrier-network-offload",
     };
 
     private static final Map<String, Pair<NetworkRequest, ConnectivityManager.NetworkCallback>>
@@ -1585,6 +1586,9 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                                         Integer.valueOf(getNextArgRequired()) /* messageUrlStart */,
                                         Integer.valueOf(getNextArgRequired()) /* messageUrlEnd */);
                                 break;
+                            case "-i":
+                                dialogBuilder.setListItems(buildDialogList());
+                                break;
                             case "-y":
                                 dialogBuilder.setPositiveButtonText(getNextArgRequired());
                                 break;
@@ -2674,6 +2678,22 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     }
                     mWifiThreadRunner.post(mWifiAwareManager::resetPairedDevices);
                     return 0;
+                case "get-carrier-network-offload":
+                    String arg1 = getNextArgRequired();
+                    int subId = -1;
+                    try {
+                        subId = Integer.parseInt(arg1);
+                    } catch (NumberFormatException e) {
+                        pw.println("Invalid argument to 'get-carrier-network-offload' "
+                                + "- 'subId' must be an Integer");
+                        return -1;
+                    }
+                    boolean enabled = mWifiCarrierInfoManager.isCarrierNetworkOffloadEnabled(subId,
+                            true);
+                    pw.println("merged network offload:" + (enabled ? "enabled" : "disabled"));
+                    enabled = mWifiCarrierInfoManager.isCarrierNetworkOffloadEnabled(subId, false);
+                    pw.println("not merged network offload:" + (enabled ? "enabled" : "disabled"));
+                    return 0;
                 default:
                     return handleDefaultCommands(cmd);
             }
@@ -3121,6 +3141,16 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         return cellChannels;
     }
 
+    private List<Pair<String, String>> buildDialogList() {
+        List<Pair<String, String>> list = new ArrayList<>();
+        String nextArg = peekNextArg();
+        while (nextArg != null && !nextArg.startsWith("-")) {
+            list.add(new Pair<>(getNextArgRequired(), getNextArgRequired()));
+            nextArg = peekNextArg();
+        }
+        return list;
+    }
+
     private int sendLinkProbe(PrintWriter pw) throws InterruptedException {
         // Note: should match WifiNl80211Manager#SEND_MGMT_FRAME_TIMEOUT_MS
         final int sendMgmtFrameTimeoutMs = 1000;
@@ -3402,9 +3432,15 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println(
                 "    Reset the WiFi resources cache which will cause them to be reloaded next "
                         + "time they are accessed. Necessary if overlays are manually modified.");
-        pw.println("  launch-dialog-simple [-t <title>] [-m <message>]"
-                + " [-l <url> <url_start> <url_end>] [-y <positive_button_text>]"
-                + " [-n <negative_button_text>] [-x <neutral_button_text>] [-c <timeout_millis>]");
+        pw.println("  launch-dialog-simple"
+                + " [-t <title>]"
+                + " [-m <message>]"
+                + " [-l <url> <url_start> <url_end>]"
+                + " [-i <label1> <content1> ... <labelN> <contentN>]"
+                + " [-y <positive_button_text>]"
+                + " [-n <negative_button_text>]"
+                + " [-x <neutral_button_text>]"
+                + " [-c <timeout_millis>]");
         pw.println("    Launches a simple dialog and waits up to 15 seconds to"
                 + " print the response.");
         pw.println("    -t - Title");
@@ -3502,6 +3538,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    each on a separate line.");
         pw.println("  get-wifi-supported-features");
         pw.println("    Gets the features supported by WifiManager");
+        pw.println("  get-carrier-network-offload <subId>");
+        pw.println("    Gets whether the carrier network offload is enabled or not for this subId");
     }
 
     private void onHelpPrivileged(PrintWriter pw) {
