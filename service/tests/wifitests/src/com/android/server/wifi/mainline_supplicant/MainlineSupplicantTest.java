@@ -48,6 +48,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
 /**
  * Unit tests for {@link MainlineSupplicant}.
  */
@@ -215,5 +218,24 @@ public class MainlineSupplicantTest {
         IStaInterface.UsdSubscribeConfig aidlConfig =
                 MainlineSupplicant.frameworkToHalUsdSubscribeConfig(frameworkConfig);
         verifyUsdBaseConfigDefaultValues(aidlConfig.baseConfig);
+    }
+
+    /**
+     * Verify that the dump method properly tracks the active interfaces.
+     */
+    @Test
+    public void testDumpActiveInterfaces() throws Exception {
+        validateServiceStart();
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+
+        // Interface has not been added, so the interface name should not be in the dump.
+        mDut.dump(pw);
+        assertFalse(sw.toString().contains(IFACE_NAME));
+
+        // Interface name should appear in the dump after it has been added.
+        assertTrue(mDut.addStaInterface(IFACE_NAME));
+        mDut.dump(pw);
+        assertTrue(sw.toString().contains(IFACE_NAME));
     }
 }
