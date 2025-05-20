@@ -168,6 +168,7 @@ import android.net.wifi.IOnWifiActivityEnergyInfoListener;
 import android.net.wifi.IOnWifiDriverCountryCodeChangedListener;
 import android.net.wifi.IOnWifiUsabilityStatsListener;
 import android.net.wifi.IPnoScanResultsCallback;
+import android.net.wifi.IPrivilegedConfiguredNetworksListener;
 import android.net.wifi.IScanResultsCallback;
 import android.net.wifi.ISoftApCallback;
 import android.net.wifi.IStringListener;
@@ -13527,4 +13528,56 @@ public class WifiServiceImplTest extends WifiBaseTest {
         verify(mRequestInfo, never()).unlinkDeathRecipient();
         stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
     }
+
+    /**
+     * Test that query privileged network list.
+     */
+    @Test
+    public void testQueryPrivilegedConfiguredNetworks() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
+        IPrivilegedConfiguredNetworksListener listener =
+                mock(IPrivilegedConfiguredNetworksListener.class);
+        doThrow(new SecurityException()).when(mContext)
+                .enforceCallingOrSelfPermission(
+                        eq(android.Manifest.permission.READ_WIFI_CREDENTIAL), eq("WifiService"));
+        assertThrows("No read credential permission should trigger exception",
+                SecurityException.class,
+                () -> mWifiServiceImpl.queryPrivilegedConfiguredNetworks(listener,
+                mExtras));
+
+        doNothing().when(mContext)
+                .enforceCallingOrSelfPermission(
+                        eq(android.Manifest.permission.READ_WIFI_CREDENTIAL), eq("WifiService"));
+        doThrow(new SecurityException()).when(mWifiPermissionsUtil).enforceNearbyDevicesPermission(
+                any(), anyBoolean(), any());
+        assertThrows("No nearby permission should trigger exception",
+                SecurityException.class,
+                () -> mWifiServiceImpl.queryPrivilegedConfiguredNetworks(listener,
+                mExtras));
+        // Test with permission
+        InOrder inOrder = inOrder(listener);
+        doNothing().when(mWifiPermissionsUtil).enforceNearbyDevicesPermission(
+                any(), anyBoolean(), any());
+        when(mWifiConfigManager.getConfiguredNetworksWithPasswords())
+                .thenReturn(null);
+        mLooper.startAutoDispatch();
+        mWifiServiceImpl.queryPrivilegedConfiguredNetworks(listener,
+                mExtras);
+        stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
+        inOrder.verify(listener).onResult(eq(null), anyString());
+
+        when(mWifiConfigManager.getConfiguredNetworksWithPasswords())
+                .thenReturn(TEST_WIFI_CONFIGURATION_LIST);
+        ArgumentCaptor<ParceledListSlice<WifiConfiguration>> configListCaptor =
+                ArgumentCaptor.forClass(ParceledListSlice.class);
+        mLooper.startAutoDispatch();
+        mWifiServiceImpl.queryPrivilegedConfiguredNetworks(listener,
+                mExtras);
+        stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
+        verify(listener).onResult(configListCaptor.capture(), eq(""));
+
+        WifiConfigurationTestUtil.assertConfigurationsEqualForBackup(
+                TEST_WIFI_CONFIGURATION_LIST, configListCaptor.getValue().getList());
+    }
 }
+
