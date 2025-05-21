@@ -38,6 +38,7 @@ import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.wifi.SupplicantStaIfaceHal;
+import com.android.server.wifi.WifiGlobals;
 import com.android.server.wifi.WifiNative;
 import com.android.server.wifi.WifiThreadRunner;
 import com.android.server.wifi.usd.UsdNativeManager;
@@ -75,12 +76,16 @@ public class MainlineSupplicant {
     private Map<String, IStaInterface> mActiveStaIfaces = new HashMap<>();
     private Map<String, IStaInterfaceCallback> mStaIfaceCallbacks = new HashMap<>();
     private UsdNativeManager.UsdEventsCallback mUsdEventsCallback = null;
+    private boolean mVerboseLoggingEnabled = false;
+    private boolean mVerboseHalLoggingEnabled = false;
+    private final WifiGlobals mWifiGlobals;
 
     public MainlineSupplicant(@NonNull WifiThreadRunner wifiThreadRunner,
-            @NonNull WifiContext context) {
+            @NonNull WifiContext context, @NonNull WifiGlobals wifiGlobals) {
         mWifiThreadRunner = wifiThreadRunner;
         mContext = context;
         mResourceCache = mContext.getResourceCache();
+        mWifiGlobals = wifiGlobals;
         mServiceDeathRecipient = new SupplicantDeathRecipient();
         mIsServiceAvailable = canServiceBeAccessed();
     }
@@ -195,6 +200,7 @@ public class MainlineSupplicant {
                 mWaitForDeathLatch = null;
                 mIMainlineSupplicant.asBinder()
                         .linkToDeath(mServiceDeathRecipient, /* flags= */  0);
+                setDebugParams(mVerboseHalLoggingEnabled);
             } catch (RemoteException e) {
                 handleRemoteException(e, "startService");
                 return false;
@@ -211,6 +217,41 @@ public class MainlineSupplicant {
     public boolean isActive() {
         synchronized (mLock) {
             return mIMainlineSupplicant != null;
+        }
+    }
+
+    /**
+     * Configure verbose logging for this class.
+     *
+     * @param fwVerboseEnabled Whether verbose logging should be enabled in the framework.
+     * @param halVerboseEnabled Whether verbose logging should be enabled in the HAL.
+     */
+    public void enableVerboseLogging(boolean fwVerboseEnabled, boolean halVerboseEnabled) {
+        synchronized (mLock) {
+            mVerboseLoggingEnabled = fwVerboseEnabled;
+            mVerboseHalLoggingEnabled = halVerboseEnabled;
+            setDebugParams(halVerboseEnabled);
+            Log.i(TAG, "Set verbose logging. Framework=" + mVerboseLoggingEnabled
+                    + ", HAL=" + mVerboseHalLoggingEnabled);
+        }
+    }
+
+    private void setDebugParams(boolean halVerboseEnabled) {
+        synchronized (mLock) {
+            final String methodName = "setDebugParams";
+            if (!checkIsActiveAndLogError(methodName)) {
+                return;
+            }
+            try {
+                byte debugLevel = IMainlineSupplicant.DebugLevel.INFO;
+                boolean showKeys = halVerboseEnabled
+                        && mWifiGlobals.getShowKeyVerboseLoggingModeEnabled();
+                mIMainlineSupplicant.setDebugParams(debugLevel, showKeys);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodName);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodName);
+            }
         }
     }
 
