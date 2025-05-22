@@ -2838,6 +2838,10 @@ public class WifiNetworkSuggestionsManager {
     }
 
     /**
+     * Tag to be used in dumpsys request
+     */
+    public static final String DUMP_ARG = "WifiNetworkSuggestionsManager";
+    /**
      * Dump of {@link WifiNetworkSuggestionsManager}.
      */
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
@@ -2852,8 +2856,9 @@ public class WifiNetworkSuggestionsManager {
                     + (appInfo.carrierId != TelephonyManager.UNKNOWN_CARRIER_ID));
             for (ExtendedWifiNetworkSuggestion extNetworkSuggestion
                     : appInfo.extNetworkSuggestions.values()) {
-                pw.println("Network: " + extNetworkSuggestion);
+                pw.println(extNetworkSuggestion);
             }
+            pw.println();
         }
         pw.println("WifiNetworkSuggestionsManager - Networks End ----");
     }
