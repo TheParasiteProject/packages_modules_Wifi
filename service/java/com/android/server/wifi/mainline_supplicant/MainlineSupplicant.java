@@ -42,6 +42,7 @@ import com.android.server.wifi.WifiThreadRunner;
 import com.android.server.wifi.usd.UsdNativeManager;
 import com.android.wifi.flags.Flags;
 
+import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -703,6 +704,20 @@ public class MainlineSupplicant {
                 handleRemoteException(e, methodName);
             }
             return false;
+        }
+    }
+
+    /**
+     * Dump information about the internal state.
+     *
+     * @param pw PrintWriter to write the dump to
+     */
+    public void dump(@NonNull PrintWriter pw) {
+        synchronized (mLock) {
+            pw.println("Dump of MainlineSupplicant");
+            pw.println("isAvailable: " + isAvailable());
+            pw.println("isActive: " + isActive());
+            pw.println("activeStaIfaces: " + mActiveStaIfaces.keySet());
         }
     }
 
