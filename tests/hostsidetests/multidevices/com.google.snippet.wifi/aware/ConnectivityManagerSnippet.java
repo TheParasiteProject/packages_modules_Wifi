@@ -55,6 +55,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 
 public class ConnectivityManagerSnippet implements Snippet {
+
     private static final String EVENT_KEY_CB_NAME = "callbackName";
     private static final String EVENT_KEY_NETWORK = "network";
     private static final String EVENT_KEY_NETWORK_CAP = "networkCapabilities";
@@ -70,9 +71,9 @@ public class ConnectivityManagerSnippet implements Snippet {
     private final ConnectivityManager mConnectivityManager;
 
     private final ConcurrentHashMap<String, ServerSocket> mServerSockets =
-                  new ConcurrentHashMap<>();
+            new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, NetworkCallback> mNetworkCallBacks =
-                  new ConcurrentHashMap<>();
+            new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Socket> mSockets = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, OutputStream> mOutputStreams =
             new ConcurrentHashMap<>();
@@ -84,6 +85,7 @@ public class ConnectivityManagerSnippet implements Snippet {
      * operations.
      */
     class ConnectivityManagerSnippetException extends Exception {
+
         ConnectivityManagerSnippetException(String msg) {
             super(msg);
         }
@@ -94,19 +96,24 @@ public class ConnectivityManagerSnippet implements Snippet {
         mConnectivityManager = mContext.getSystemService(ConnectivityManager.class);
         if (mConnectivityManager == null) {
             throw new ConnectivityManagerSnippetException(
-                "ConnectivityManager not "
-                + "available.");
+                "ConnectivityManager not available.");
         }
     }
 
     public class NetworkCallback extends ConnectivityManager.NetworkCallback {
-
         String mCallBackId;
         Network mNetWork;
         NetworkCapabilities mNetworkCapabilities;
-
         NetworkCallback(String callBackId) {
             mCallBackId = callBackId;
+        }
+
+        @Override
+        public void onAvailable(Network network) {
+            SnippetEvent event = new SnippetEvent(mCallBackId, "NetworkCallback");
+            event.getData().putString(EVENT_KEY_CB_NAME, "onAvailable");
+            mNetWork = network;
+            EventCache.getInstance().postEvent(event);
         }
 
         @Override
@@ -194,6 +201,7 @@ public class ConnectivityManagerSnippet implements Snippet {
             return null;
         return iface.getInetAddresses();
     }
+
     /**
      * Returns the link local IPv6 address of the interface.
      *
@@ -250,17 +258,15 @@ public class ConnectivityManagerSnippet implements Snippet {
     }
 
     /**
-     * Requests a network with the specified network request and sets a callback for network
-     * events.
+     * Requests a network with the specified network request and sets a callback for network events.
      *
-     * @param callBackId              A unique identifier assigned automatically by Mobly. This is
-     *                                used as the request ID for further operations and event
-     *                                handling.
-     * @param request                 The NetworkRequest object that specifies the desired network
-     *                                characteristics.
-     * @param requestNetWorkId        A unique ID to support managing multiple network sessions.
+     * @param callBackId A unique identifier assigned automatically by Mobly. This is used as the
+     *     request ID for further operations and event handling.
+     * @param request The NetworkRequest object that specifies the desired network
+     *     characteristics.
+     * @param requestNetWorkId A unique ID to support managing multiple network sessions.
      * @param requestNetworkTimeoutMs The timeout period (in milliseconds) after which the network
-     *                                request will expire if no suitable network is found.
+     *     request will expire if no suitable network is found.
      */
     @AsyncRpc(description = "Request a network.")
     public void connectivityRequestNetwork(String callBackId, String requestNetWorkId,
@@ -293,8 +299,8 @@ public class ConnectivityManagerSnippet implements Snippet {
      * separate thread is started to handle the socket accept operation asynchronously. The accepted
      * socket is stored and used for further communication (read/write).
      *
-     * @param callbackId A unique identifier assigned automatically by Mobly to track the event and
-     *                   response.
+     * @param callbackId A unique identifier assigned automatically by Mobly to track the event
+     *     and response.
      * @return The port number assigned by the local system.
      */
     @AsyncRpc(description = "Start a server socket to accept incoming connections.")
@@ -382,7 +388,7 @@ public class ConnectivityManagerSnippet implements Snippet {
      * Reads from a socket.
      *
      * @param sessionId To support multiple network requests happening simultaneously
-     * @param len       The number of bytes to read.
+     * @param len The number of bytes to read.
      */
     @Rpc(description = "Reads from a socket.")
     public String connectivityReadSocket(String sessionId, int len)
@@ -405,7 +411,7 @@ public class ConnectivityManagerSnippet implements Snippet {
      * Writes to a socket.
      *
      * @param sessionId To support multiple network requests happening simultaneously
-     * @param message   The message to send.
+     * @param message The message to send.
      * @throws ConnectivityManagerSnippetException
      */
     @Rpc(description = "Writes to a socket.")
@@ -500,7 +506,7 @@ public class ConnectivityManagerSnippet implements Snippet {
      * Creates a socket using Wi-Fi Aware's peer-to-peer connection capabilities. Only TCP transport
      * protocol is supported. The method uses the session ID to track and manage the socket.
      *
-     * @param sessionId     A unique ID to manage multiple network requests simultaneously.
+     * @param sessionId A unique ID to manage multiple network requests simultaneously.
      * @param peerLocalPort The port number of the peer device.
      */
     @Rpc(description = "Create to a socket.")
