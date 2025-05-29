@@ -6033,6 +6033,8 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 WifiScoreCard wifiScoreCard = mWifiInjector.getWifiScoreCard();
                 String networkListBase64 = wifiScoreCard.getNetworkListBase64(true);
                 pw.println(networkListBase64);
+            } else if (WifiNetworkSuggestionsManager.DUMP_ARG.equals(arg0)) {
+                mWifiNetworkSuggestionsManager.dump(fd, pw, args);
             } else {
                 pw.println("Verbose logging is " + (mVerboseLoggingEnabled ? "on" : "off"));
                 pw.println("mVerboseLoggingLevel " + mVerboseLoggingLevel);
