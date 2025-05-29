@@ -29,10 +29,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import android.content.Context;
+import android.net.wifi.WifiContext;
 import android.net.wifi.usd.PublishConfig;
 import android.net.wifi.usd.SubscribeConfig;
 import android.net.wifi.util.Environment;
+import android.net.wifi.util.WifiResourceCache;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.test.TestLooper;
@@ -62,7 +63,8 @@ public class MainlineSupplicantTest {
     private @Mock IBinder mIBinderMock;
     private @Mock WifiNative.SupplicantDeathEventHandler mFrameworkDeathHandler;
     private @Mock IStaInterface mIStaInterface;
-    private @Mock Context mContext;
+    private @Mock WifiContext mContext;
+    private @Mock WifiResourceCache mResourceCache;
     private MainlineSupplicantSpy mDut;
     private TestLooper mLooper = new TestLooper();
 
@@ -87,6 +89,7 @@ public class MainlineSupplicantTest {
         MockitoAnnotations.initMocks(this);
         when(mIMainlineSupplicantMock.asBinder()).thenReturn(mIBinderMock);
         when(mIMainlineSupplicantMock.addStaInterface(anyString())).thenReturn(mIStaInterface);
+        when(mContext.getResourceCache()).thenReturn(mResourceCache);
         mDut = new MainlineSupplicantSpy();
     }
 
