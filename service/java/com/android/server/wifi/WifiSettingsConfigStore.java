@@ -312,7 +312,8 @@ public class WifiSettingsConfigStore {
             // user-specific keys and keys that support B&R.
             mUserPrivateKeys.addAll(Set.of(
                     WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON,
-                    WIFI_WAKEUP_ENABLED
+                    WIFI_WAKEUP_ENABLED,
+                    WIFI_SCAN_ALWAYS_AVAILABLE
             ));
         }
     }
@@ -469,7 +470,8 @@ public class WifiSettingsConfigStore {
         // Key.defaultValue when not retrieved from SharedStoreData.
         final List<Key> keysForMigrationFromDefaultValue = List.of(
                 WIFI_WEP_ALLOWED /* no Settings.Global */,
-                D2D_ALLOWED_WHEN_INFRA_STA_DISABLED /* no Settings.Global */
+                D2D_ALLOWED_WHEN_INFRA_STA_DISABLED /* no Settings.Global */,
+                WIFI_SCAN_ALWAYS_AVAILABLE /* already migrated to SharedStoreData */
         );
         for (Key key : keysForMigrationFromDefaultValue) {
             if (!mSharedToPrivateMigrationDataHolder.containsKey(key.key)) {
