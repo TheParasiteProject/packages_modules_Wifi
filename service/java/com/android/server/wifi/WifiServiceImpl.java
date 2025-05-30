@@ -6035,6 +6035,8 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 pw.println(networkListBase64);
             } else if (WifiNetworkSuggestionsManager.DUMP_ARG.equals(arg0)) {
                 mWifiNetworkSuggestionsManager.dump(fd, pw, args);
+            } else if (WifiCarrierInfoManager.DUMP_ARG.equals(arg0)) {
+                mWifiCarrierInfoManager.dump(fd, pw, args);
             } else {
                 pw.println("Verbose logging is " + (mVerboseLoggingEnabled ? "on" : "off"));
                 pw.println("mVerboseLoggingLevel " + mVerboseLoggingLevel);
