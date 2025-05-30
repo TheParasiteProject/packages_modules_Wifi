@@ -6037,6 +6037,8 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 mWifiNetworkSuggestionsManager.dump(fd, pw, args);
             } else if (WifiCarrierInfoManager.DUMP_ARG.equals(arg0)) {
                 mWifiCarrierInfoManager.dump(fd, pw, args);
+            } else if (PasspointManager.DUMP_ARG.equals(arg0)) {
+                mPasspointManager.dump(pw, true);
             } else {
                 pw.println("Verbose logging is " + (mVerboseLoggingEnabled ? "on" : "off"));
                 pw.println("mVerboseLoggingLevel " + mVerboseLoggingLevel);
@@ -6091,7 +6093,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 pw.println();
                 pw.println("WifiApConfigStore config: " + mWifiApConfigStore.getApConfiguration());
                 pw.println();
-                mPasspointManager.dump(pw);
+                mPasspointManager.dump(pw, false);
                 mWifiInjector.getPasspointNetworkNominateHelper().dump(pw);
                 pw.println();
                 mWifiInjector.getWifiDiagnostics().captureBugReportData(
