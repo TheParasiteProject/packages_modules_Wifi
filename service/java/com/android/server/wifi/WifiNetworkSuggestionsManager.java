@@ -48,7 +48,6 @@ import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.WifiSsid;
 import android.net.wifi.hotspot2.PasspointConfiguration;
-import android.net.wifi.util.BuildProperties;
 import android.os.Process;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
@@ -2838,6 +2837,10 @@ public class WifiNetworkSuggestionsManager {
     }
 
     /**
+     * Tag to be used in dumpsys request
+     */
+    public static final String DUMP_ARG = "WifiNetworkSuggestionsManager";
+    /**
      * Dump of {@link WifiNetworkSuggestionsManager}.
      */
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
@@ -2852,8 +2855,9 @@ public class WifiNetworkSuggestionsManager {
                     + (appInfo.carrierId != TelephonyManager.UNKNOWN_CARRIER_ID));
             for (ExtendedWifiNetworkSuggestion extNetworkSuggestion
                     : appInfo.extNetworkSuggestions.values()) {
-                pw.println("Network: " + extNetworkSuggestion);
+                pw.println(extNetworkSuggestion);
             }
+            pw.println();
         }
         pw.println("WifiNetworkSuggestionsManager - Networks End ----");
     }
