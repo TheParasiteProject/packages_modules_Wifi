@@ -24,6 +24,7 @@ import android.net.wifi.WifiContext;
 import android.net.wifi.usd.Config;
 import android.net.wifi.usd.PublishConfig;
 import android.net.wifi.usd.SubscribeConfig;
+import android.net.wifi.util.BuildProperties;
 import android.net.wifi.util.Environment;
 import android.net.wifi.util.WifiResourceCache;
 import android.os.IBinder;
@@ -146,9 +147,10 @@ public class MainlineSupplicant {
      */
     private boolean canServiceBeAccessed() {
         // Requires an Android B+ Selinux policy, a copy of the binary, and device support.
+        BuildProperties buildProperties = BuildProperties.getInstance();
         return Environment.isSdkAtLeastB() && Flags.mainlineSupplicant()
                 && Environment.isMainlineSupplicantBinaryInWifiApex()
-                && isOverlayEnabled() && !isUnsupportedDevice();
+                && isOverlayEnabled() && !isUnsupportedDevice() && !buildProperties.isUserBuild();
     }
 
     /**
