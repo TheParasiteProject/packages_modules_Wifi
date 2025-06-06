@@ -125,6 +125,7 @@ import android.net.wifi.IOnWifiActivityEnergyInfoListener;
 import android.net.wifi.IOnWifiDriverCountryCodeChangedListener;
 import android.net.wifi.IOnWifiUsabilityStatsListener;
 import android.net.wifi.IPnoScanResultsCallback;
+import android.net.wifi.IPrivilegedConfiguredNetworksListener;
 import android.net.wifi.IScanResultsCallback;
 import android.net.wifi.ISoftApCallback;
 import android.net.wifi.IStringListener;
@@ -9526,5 +9527,42 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             return false;
         }
         return mWifiNative.isUsdPublisherSupported();
+    }
+
+    /**
+     * See {@link WifiManager#queryPrivilegedConfiguredNetworks()}
+     *
+     * @param listener listener to get the list of configured networks with real preSharedKey
+     * @param extras - Bundle of extra information
+     */
+    @RequiresApi(Build.VERSION_CODES.S)
+    @Override
+    public void queryPrivilegedConfiguredNetworks(
+            @NonNull IPrivilegedConfiguredNetworksListener listener, Bundle extras) {
+        if (!SdkLevel.isAtLeastS()) {
+            throw new UnsupportedOperationException();
+        }
+        Objects.requireNonNull(listener, "listener cannot be null");
+        Objects.requireNonNull(extras, "extras cannot be null");
+        enforceReadCredentialPermission();
+        mWifiPermissionsUtil.enforceNearbyDevicesPermission(
+                extras.getParcelable(WifiManager.EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE),
+                false, TAG + " queryPrivilegedConfiguredNetworks");
+        mWifiThreadRunner.post(() -> {
+            try {
+                List<WifiConfiguration> configs =
+                        mWifiConfigManager.getConfiguredNetworksWithPasswords();
+                if (configs != null) {
+                    listener.onResult(
+                            new ParceledListSlice<>(
+                                    WifiConfigurationUtil.convertMultiTypeConfigsToLegacyConfigs(
+                                            configs, false)), "");
+                } else {
+                    listener.onResult(null, "get null when querying networks");
+                }
+            } catch (RemoteException e) {
+                Log.e(TAG, e.getMessage(), e);
+            }
+        }, TAG + "#queryPrivilegedConfiguredNetworks");
     }
 }
