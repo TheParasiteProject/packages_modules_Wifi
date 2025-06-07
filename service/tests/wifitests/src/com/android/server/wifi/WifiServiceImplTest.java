@@ -168,6 +168,7 @@ import android.net.wifi.IOnWifiActivityEnergyInfoListener;
 import android.net.wifi.IOnWifiDriverCountryCodeChangedListener;
 import android.net.wifi.IOnWifiUsabilityStatsListener;
 import android.net.wifi.IPnoScanResultsCallback;
+import android.net.wifi.IPrivilegedConfiguredNetworksListener;
 import android.net.wifi.IScanResultsCallback;
 import android.net.wifi.ISoftApCallback;
 import android.net.wifi.IStringListener;
@@ -11821,6 +11822,10 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
     @Test
     public void testTetheredSoftApTrackerWhenCountryCodeChanged() throws Exception {
+        when(mWifiSettingsConfigStore.get(WifiSettingsConfigStore.WIFI_SOFT_AP_COUNTRY_CODE))
+                .thenReturn(TEST_COUNTRY_CODE);
+        when(mWifiSettingsConfigStore.get(WifiSettingsConfigStore.WIFI_AVAILABLE_SOFT_AP_FREQS_MHZ))
+                .thenReturn("[2452]" /* Channel 9 */);
         mWifiServiceImpl.handleBootCompleted();
         mLooper.dispatchAll();
 
@@ -11873,6 +11878,21 @@ public class WifiServiceImplTest extends WifiBaseTest {
                 .getSupportedChannelList(SoftApConfiguration.BAND_2GHZ).length);
         verify(mWifiNative, times(2)).getUsableChannels(eq(WifiScanner.WIFI_BAND_24_GHZ), anyInt(),
                 anyInt());
+
+        // Country code update back to original while HAL still not started
+        mWifiServiceImpl.mCountryCodeTracker.onCountryCodeChangePending(TEST_COUNTRY_CODE);
+        mLooper.dispatchAll();
+        if (SdkLevel.isAtLeastT()) {
+            verify(mIOnWifiDriverCountryCodeChangedListener, never())
+                    .onDriverCountryCodeChanged(TEST_NEW_COUNTRY_CODE);
+        }
+        verify(mClientSoftApCallback, times(2))
+                .onCapabilityChanged(capabilityArgumentCaptor.capture());
+        // The supported channels in soft AP capability were restored.
+        assertEquals(1, capabilityArgumentCaptor.getValue()
+                .getSupportedChannelList(SoftApConfiguration.BAND_2GHZ).length);
+        assertEquals(9, capabilityArgumentCaptor.getValue()
+                .getSupportedChannelList(SoftApConfiguration.BAND_2GHZ)[0]);
     }
 
     /**
@@ -12572,11 +12592,10 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verify(mContext).registerReceiver(mBroadcastReceiverCaptor.capture(),
                 argThat((IntentFilter filter) ->
-                        filter.hasAction(ACTION_SHUTDOWN)),
-                isNull(),
-                any(Handler.class));
+                        filter.hasAction(ACTION_SHUTDOWN)));
         Intent intent = new Intent(ACTION_SHUTDOWN);
         mBroadcastReceiverCaptor.getValue().onReceive(mContext, intent);
+        mLooper.dispatchAll();
         verify(mActiveModeWarden).notifyShuttingDown();
         verify(mWifiScoreCard).resetAllConnectionStates();
         verify(mWifiConfigManager).writeDataToStorage();
@@ -13527,4 +13546,56 @@ public class WifiServiceImplTest extends WifiBaseTest {
         verify(mRequestInfo, never()).unlinkDeathRecipient();
         stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
     }
+
+    /**
+     * Test that query privileged network list.
+     */
+    @Test
+    public void testQueryPrivilegedConfiguredNetworks() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
+        IPrivilegedConfiguredNetworksListener listener =
+                mock(IPrivilegedConfiguredNetworksListener.class);
+        doThrow(new SecurityException()).when(mContext)
+                .enforceCallingOrSelfPermission(
+                        eq(android.Manifest.permission.READ_WIFI_CREDENTIAL), eq("WifiService"));
+        assertThrows("No read credential permission should trigger exception",
+                SecurityException.class,
+                () -> mWifiServiceImpl.queryPrivilegedConfiguredNetworks(listener,
+                mExtras));
+
+        doNothing().when(mContext)
+                .enforceCallingOrSelfPermission(
+                        eq(android.Manifest.permission.READ_WIFI_CREDENTIAL), eq("WifiService"));
+        doThrow(new SecurityException()).when(mWifiPermissionsUtil).enforceNearbyDevicesPermission(
+                any(), anyBoolean(), any());
+        assertThrows("No nearby permission should trigger exception",
+                SecurityException.class,
+                () -> mWifiServiceImpl.queryPrivilegedConfiguredNetworks(listener,
+                mExtras));
+        // Test with permission
+        InOrder inOrder = inOrder(listener);
+        doNothing().when(mWifiPermissionsUtil).enforceNearbyDevicesPermission(
+                any(), anyBoolean(), any());
+        when(mWifiConfigManager.getConfiguredNetworksWithPasswords())
+                .thenReturn(null);
+        mLooper.startAutoDispatch();
+        mWifiServiceImpl.queryPrivilegedConfiguredNetworks(listener,
+                mExtras);
+        stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
+        inOrder.verify(listener).onResult(eq(null), anyString());
+
+        when(mWifiConfigManager.getConfiguredNetworksWithPasswords())
+                .thenReturn(TEST_WIFI_CONFIGURATION_LIST);
+        ArgumentCaptor<ParceledListSlice<WifiConfiguration>> configListCaptor =
+                ArgumentCaptor.forClass(ParceledListSlice.class);
+        mLooper.startAutoDispatch();
+        mWifiServiceImpl.queryPrivilegedConfiguredNetworks(listener,
+                mExtras);
+        stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
+        verify(listener).onResult(configListCaptor.capture(), eq(""));
+
+        WifiConfigurationTestUtil.assertConfigurationsEqualForBackup(
+                TEST_WIFI_CONFIGURATION_LIST, configListCaptor.getValue().getList());
+    }
 }
+

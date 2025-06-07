@@ -325,10 +325,26 @@ flag {
 }
 
 flag {
+    name: "icm_dialog_timeout"
+    namespace: "wifi"
+    description: "Timeout for InterfaceConflictManager dialogs."
+    bug: "416621831"
+}
+
+flag {
     name: "band_optimization_control"
     is_exported: true
     namespace: "wifi"
     description: "Caller can force softap ap band to bypass the frameworks auto appends bands feature."
     bug: "403649308"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "get_config_empty_reason"
+    is_exported: true
+    namespace: "wifi"
+    description: "provide a detail when getting configs, not just empty list in error case"
+    bug: "404558943"
     is_fixed_read_only: true
 }
