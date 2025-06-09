@@ -1468,6 +1468,10 @@ public class WifiConfigManager {
 
         // Add debug information for network addition.
         newInternalConfig.creatorUid = newInternalConfig.lastUpdateUid = uid;
+        if (Environment.isSdkNewerThanB()
+                && mFeatureFlags.multiUserWifiEnhancement()) {
+            newInternalConfig.setCreatorUserId(mCurrentUserId);
+        }
         newInternalConfig.creatorName = newInternalConfig.lastUpdateName =
                 packageName != null ? packageName : mContext.getPackageManager().getNameForUid(uid);
         newInternalConfig.lastUpdated = mClock.getWallClockMillis();
@@ -1504,6 +1508,10 @@ public class WifiConfigManager {
         if (overrideCreator) {
             newInternalConfig.creatorName = newInternalConfig.lastUpdateName;
             newInternalConfig.creatorUid = uid;
+            if (Environment.isSdkNewerThanB()
+                    && mFeatureFlags.multiUserWifiEnhancement()) {
+                newInternalConfig.setCreatorUserId(mCurrentUserId);
+            }
         }
         return newInternalConfig;
     }
