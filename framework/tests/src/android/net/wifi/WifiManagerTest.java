@@ -4515,6 +4515,12 @@ public class WifiManagerTest {
                         customConfig, mExecutor, null));
     }
 
+    @Test
+    public void testRefreshMacRandomizationToWifiServiceImpl() throws Exception {
+        mWifiManager.refreshMacRandomization(TEST_NETWORK_ID);
+        verify(mWifiService).refreshMacRandomization(eq(TEST_NETWORK_ID));
+    }
+
     /**
      * Verify an IllegalArgumentException is thrown if listener is not provided.
      */

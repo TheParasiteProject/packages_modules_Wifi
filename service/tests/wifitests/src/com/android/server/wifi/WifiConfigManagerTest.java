@@ -6815,8 +6815,50 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     @Test
     public void testGetPersistRandomMacAddress() {
         WifiConfiguration network = WifiConfigurationTestUtil.createPskNetwork();
+        String key = network.getNetworkKey();
+        if (network.persistentMacRandomizationSeed != 0) {
+            key += "-" + Integer.toString(network.persistentMacRandomizationSeed);
+        }
         mWifiConfigManager.getPersistentMacAddress(network);
-        verify(mMacAddressUtil).calculatePersistentMacForSta(eq(network.getNetworkKey()), anyInt());
+        verify(mMacAddressUtil).calculatePersistentMacForSta(eq(key), anyInt());
+    }
+
+    /**
+     * Check persist random Mac Address generation seed changes after persistentMacRandomizationSeed
+     * is incremented
+     */
+    @Test
+    public void testPersistRandomMacAddressUpdated() {
+        WifiConfiguration network = WifiConfigurationTestUtil.createPskNetwork();
+        String networkKey = network.getNetworkKey();
+        mWifiConfigManager.getPersistentMacAddress(network);
+        verify(mMacAddressUtil).calculatePersistentMacForSta(networkKey, Process.WIFI_UID);
+        network.persistentMacRandomizationSeed++;
+        mWifiConfigManager.getPersistentMacAddress(network);
+        verify(mMacAddressUtil).calculatePersistentMacForSta(networkKey + "-1", Process.WIFI_UID);
+    }
+
+    /**
+     * Test refreshMacRandomization method refreshes MAC randomization related values.
+     */
+    @Test
+    public void testRefreshMacRandomization() {
+        setUpWifiConfigurationForNonPersistentRandomization();
+        WifiConfiguration config = getFirstInternalWifiConfiguration();
+        int networkId = config.networkId;
+        long dhcpLeaseTimeInSeconds =
+                (WifiConfigManager.NON_PERSISTENT_MAC_REFRESH_MS_MIN / 1000) + 5;
+        mWifiConfigManager.updateRandomizedMacExpireTime(config, dhcpLeaseTimeInSeconds);
+        config = mWifiConfigManager.getConfiguredNetwork(networkId);
+        int persistentMacRandomizationSeed = config.persistentMacRandomizationSeed;
+        assertNotEquals(0, config.randomizedMacLastModifiedTimeMs);
+        assertNotEquals(0, config.randomizedMacExpirationTimeMs);
+
+        mWifiConfigManager.refreshMacRandomization(config.networkId);
+        config = mWifiConfigManager.getConfiguredNetwork(networkId);
+        assertEquals(0, config.randomizedMacLastModifiedTimeMs);
+        assertEquals(0, config.randomizedMacExpirationTimeMs);
+        assertEquals(persistentMacRandomizationSeed + 1, config.persistentMacRandomizationSeed);
     }
 
     private void verifyAddUpgradableNetwork(

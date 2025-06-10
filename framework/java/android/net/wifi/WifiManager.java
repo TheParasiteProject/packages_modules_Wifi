@@ -13383,4 +13383,32 @@ public class WifiManager {
             throw e.rethrowFromSystemServer();
         }
     }
+
+    /** Replace the persistently generated random MAC address for the specified wifi network with a
+     * newly generated random MAC address. The new randomized MAC will be used the next time the
+     * device connects to the network. If the specified wifi network is already connected when this
+     * API is called, the MAC address won't change until the next time that network is connected.
+     * <p>
+     * This does not change phone's factory MAC.
+     *
+     * @param networkId the ID of the network as returned by {@link #addNetwork} or {@link
+     *        #getConfiguredNetworks}.
+     *
+     * @throws SecurityException if the caller has no permission
+     * @throws IllegalArgumentException if networkId is invalid
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_REFRESH_MAC_RANDOMIZATION_API)
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.NETWORK_SETTINGS,
+            android.Manifest.permission.NETWORK_SETUP_WIZARD
+    })
+    public void refreshMacRandomization(@IntRange(from = 0) int networkId) {
+        try {
+            mService.refreshMacRandomization(networkId);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
 }
