@@ -332,6 +332,15 @@ flag {
 }
 
 flag {
+    name: "improve_ranging_api"
+    is_exported: true
+    namespace: "wifi"
+    description: "Improve ranging APIs"
+    bug: "402768126"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "band_optimization_control"
     is_exported: true
     namespace: "wifi"
