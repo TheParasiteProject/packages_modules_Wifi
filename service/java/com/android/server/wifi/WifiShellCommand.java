@@ -93,6 +93,7 @@ import android.net.wifi.aware.DiscoverySessionCallback;
 import android.net.wifi.aware.PeerHandle;
 import android.net.wifi.aware.PublishConfig;
 import android.net.wifi.aware.PublishDiscoverySession;
+import android.net.wifi.aware.ServiceDiscoveryInfo;
 import android.net.wifi.aware.SubscribeConfig;
 import android.net.wifi.aware.SubscribeDiscoverySession;
 import android.net.wifi.aware.WifiAwareDataPathSecurityConfig;
@@ -2566,14 +2567,13 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                                             sDiscoverySession = session;
                                         }
 
-                                        public void onServiceDiscovered(PeerHandle peerHandle,
-                                                byte[] serviceSpecificInfo,
-                                                List<byte[]> matchFilter) {
-                                            Log.d(TAG, "onServiceDiscovered " + peerHandle.peerId);
-                                            sPeerHandle = peerHandle;
-                                            if (SdkLevel.isAtLeastU()) {
+                                        public void onServiceDiscovered(ServiceDiscoveryInfo info) {
+                                            sPeerHandle = info.getPeerHandle();
+                                            Log.d(TAG, "onServiceDiscovered " + sPeerHandle.peerId);
+                                            if (SdkLevel.isAtLeastU()
+                                                    && info.getPairedAlias() == null) {
                                                 sDiscoverySession.initiateBootstrappingRequest(
-                                                        peerHandle,
+                                                        sPeerHandle,
                                                         Integer.parseInt(bootMethods));
                                             }
                                         }

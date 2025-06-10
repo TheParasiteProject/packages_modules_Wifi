@@ -5261,7 +5261,9 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
                     + ", peerDiscoveryMac=" + String.valueOf(HexEncoding.encode(peerMac))
                     + ", serviceSpecificInfo=" + Arrays.toString(serviceSpecificInfo)
                     + ", matchFilter=" + Arrays.toString(matchFilter)
-                    + ", rangingIndication=" + rangingIndication + ", rangeMm=" + rangeMm);
+                    + ", rangingIndication=" + rangingIndication + ", rangeMm=" + rangeMm
+                    + ", nonce=" + Arrays.toString(nonce)
+                    + ", tag=" + Arrays.toString(tag));
         }
 
         Pair<WifiAwareClientState, WifiAwareDiscoverySessionState> data =
@@ -5445,6 +5447,7 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
             if (enableCache && requestType == NAN_PAIRING_REQUEST_TYPE_SETUP) {
                 mPairingConfigManager.addPairedDeviceSecurityAssociation(
                         client.getCallingPackage(), info.mAlias, npksa);
+                Log.v(TAG, "onPairingConfirmReceivedLocal:" + npksa.toString());
             }
             return true;
         }
