@@ -13561,7 +13561,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         assertThrows("No read credential permission should trigger exception",
                 SecurityException.class,
                 () -> mWifiServiceImpl.queryPrivilegedConfiguredNetworks(listener,
-                mExtras));
+                        mExtras));
 
         doNothing().when(mContext)
                 .enforceCallingOrSelfPermission(
@@ -13571,7 +13571,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         assertThrows("No nearby permission should trigger exception",
                 SecurityException.class,
                 () -> mWifiServiceImpl.queryPrivilegedConfiguredNetworks(listener,
-                mExtras));
+                        mExtras));
         // Test with permission
         InOrder inOrder = inOrder(listener);
         doNothing().when(mWifiPermissionsUtil).enforceNearbyDevicesPermission(
@@ -13596,6 +13596,27 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
         WifiConfigurationTestUtil.assertConfigurationsEqualForBackup(
                 TEST_WIFI_CONFIGURATION_LIST, configListCaptor.getValue().getList());
+    }
+
+    @Test
+    public void testRefreshMacRandomizationWithPermission() {
+        // No permission to call API
+        when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(false);
+        when(mWifiPermissionsUtil.checkNetworkSetupWizardPermission(anyInt())).thenReturn(false);
+        assertThrows(SecurityException.class,
+                () -> mWifiServiceImpl.refreshMacRandomization(TEST_NETWORK_ID));
+
+        // Has permission to call API
+        when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(true);
+        // Invalid argument
+        assertThrows(IllegalArgumentException.class,
+                () -> mWifiServiceImpl.refreshMacRandomization(
+                        WifiConfiguration.INVALID_NETWORK_ID));
+
+        // Valid argument
+        mWifiServiceImpl.refreshMacRandomization(TEST_NETWORK_ID);
+        mLooper.dispatchAll();
+        verify(mWifiConfigManager).refreshMacRandomization(eq(TEST_NETWORK_ID));
     }
 }
 

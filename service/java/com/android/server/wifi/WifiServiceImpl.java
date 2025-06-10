@@ -9573,4 +9573,27 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             }
         }, TAG + "#queryPrivilegedConfiguredNetworks");
     }
+
+    /**
+     * See {@link WifiManager#refreshMacRandomization()}
+     **/
+    @Override
+    public void refreshMacRandomization(int netId) {
+        // Check invalid argument
+        if (netId < 0) {
+            throw new IllegalArgumentException("networkId cannot be negative");
+        }
+        // Permission check.
+        int uid = Binder.getCallingUid();
+        if (!mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)
+                && !mWifiPermissionsUtil.checkNetworkSetupWizardPermission(uid)) {
+            throw new SecurityException(
+                    "Uid=" + uid + " is not allowed to refreshMacRandomization");
+        }
+        if (mVerboseLoggingEnabled) {
+            mLog.info("refreshMacRandomization uid=% netId=%").c(uid).c(netId).flush();
+        }
+        mWifiThreadRunner.post(() -> mWifiConfigManager.refreshMacRandomization(netId),
+                TAG + "refreshMacRandomization");
+    }
 }

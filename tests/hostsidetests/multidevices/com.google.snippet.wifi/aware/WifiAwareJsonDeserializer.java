@@ -20,6 +20,7 @@ package com.google.snippet.wifi.aware;
 import android.net.MacAddress;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.net.wifi.WifiNetworkSpecifier;
 import android.net.wifi.aware.AwarePairingConfig;
 import android.net.wifi.aware.PeerHandle;
 import android.net.wifi.aware.PublishConfig;
@@ -82,6 +83,12 @@ public class WifiAwareJsonDeserializer {
     private static final String TRANSPORT_TYPE = "transport_type";
     private static final String CAPABILITY = "capability";
     private static final String NETWORK_SPECIFIER_PARCEL = "network_specifier_parcel";
+    private static final String NETWORK_SPECIFIER = "network_specifier";
+    // JSON Keys for NetworkRequest and WifiNetworkSpecifier
+    private static final String BSSID = "bssid";
+    private static final String PSK = "psk";
+    private static final String REMOVE_CAPABILITY = "remove_capability";
+    private static final String SSID = "ssid";
     //WifiAwareDataPathSecurityConfig specific
     private static final String CIPHER_SUITE = "cipher_suite";
     private static final String SECURITY_CONFIG_PMK = "pmk";
@@ -304,8 +311,34 @@ public class WifiAwareJsonDeserializer {
                 requestBuilder.addCapability(capability);
             }
             return requestBuilder.build();
+        } else if (transportType == NetworkCapabilities.TRANSPORT_WIFI) {
+            requestBuilder.addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
+            if (jsonObject.has(NETWORK_SPECIFIER)) {
+                JSONObject specifierJson = jsonObject.getJSONObject(NETWORK_SPECIFIER);
+                WifiNetworkSpecifier.Builder wifiSpecBuilder = new WifiNetworkSpecifier.Builder();
+                if (specifierJson.has(SSID)) {
+                    wifiSpecBuilder.setSsid(specifierJson.getString(SSID));
+                }
+                if (specifierJson.has(BSSID)) {
+                    try {
+                        wifiSpecBuilder.setBssid(
+                                MacAddress.fromString(specifierJson.getString(BSSID)));
+                    } catch (IllegalArgumentException e) {
+                        throw new JSONException("Error parsing BSSID: " + e.getMessage());
+                    }
+                }
+                if (specifierJson.has(PSK)) {
+                    wifiSpecBuilder.setWpa2Passphrase(specifierJson.getString(PSK));
+                }
+                requestBuilder.setNetworkSpecifier(wifiSpecBuilder.build());
+            }
+            if (jsonObject.has(REMOVE_CAPABILITY)) {
+                int capabilityToRemove = jsonObject.getInt(REMOVE_CAPABILITY);
+                requestBuilder.removeCapability(capabilityToRemove);
+            }
+            return requestBuilder.build();
         }
-        return null;
+        else return null;
     }
 
     /**

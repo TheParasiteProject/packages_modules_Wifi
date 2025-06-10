@@ -348,3 +348,12 @@ flag {
     bug: "404558943"
     is_fixed_read_only: true
 }
+
+flag {
+    name: "refresh_mac_randomization_api"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add new API to refresh random mac address"
+    bug: "395017801"
+    is_fixed_read_only: true
+}
