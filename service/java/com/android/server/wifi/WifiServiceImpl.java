@@ -9543,11 +9543,11 @@ public class WifiServiceImpl extends IWifiManager.Stub {
      * @param listener listener to get the list of configured networks with real preSharedKey
      * @param extras - Bundle of extra information
      */
-    @RequiresApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     @Override
     public void queryPrivilegedConfiguredNetworks(
             @NonNull IPrivilegedConfiguredNetworksListener listener, Bundle extras) {
-        if (!SdkLevel.isAtLeastS()) {
+        if (!SdkLevel.isAtLeastT()) {
             throw new UnsupportedOperationException();
         }
         Objects.requireNonNull(listener, "listener cannot be null");

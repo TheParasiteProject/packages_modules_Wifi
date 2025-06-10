@@ -13349,12 +13349,12 @@ public class WifiManager {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_GET_CONFIG_EMPTY_REASON)
-    @RequiresApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     @SystemApi
     @RequiresPermission(allOf = {NEARBY_WIFI_DEVICES, READ_WIFI_CREDENTIAL})
     public void queryPrivilegedConfiguredNetworks(@NonNull @CallbackExecutor Executor executor,
             @NonNull OutcomeReceiver<List<WifiConfiguration>, Error> resultsCallback) {
-        if (!SdkLevel.isAtLeastS()) {
+        if (!SdkLevel.isAtLeastT()) {
             throw new UnsupportedOperationException();
         }
         Objects.requireNonNull(executor, "executor cannot be null");
