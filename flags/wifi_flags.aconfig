@@ -366,3 +366,12 @@ flag {
     bug: "395017801"
     is_fixed_read_only: true
 }
+
+flag {
+    name: "external_approver_support_for_wfdr2_password_based_bootstrapping"
+    is_exported: true
+    namespace: "wifi"
+    description: "Enables the use of an external approver mechanism during the WFDR2 password-based pairing bootstrapping process"
+    bug: "409802099"
+    is_fixed_read_only: true
+}
