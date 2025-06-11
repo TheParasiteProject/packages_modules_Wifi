@@ -4579,7 +4579,7 @@ public class WifiManagerTest {
 
     @Test
     public void testAyncGetPrivilegedConfiguredNetworks() throws Exception {
-        assumeTrue(SdkLevel.isAtLeastS());
+        assumeTrue(SdkLevel.isAtLeastT());
         OutcomeReceiver<List<WifiConfiguration>, Error> resultsSetCallback =
                 new OutcomeReceiver<>() {
                     @Override

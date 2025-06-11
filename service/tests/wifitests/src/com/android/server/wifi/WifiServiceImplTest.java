@@ -13552,7 +13552,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
      */
     @Test
     public void testQueryPrivilegedConfiguredNetworks() throws Exception {
-        assumeTrue(SdkLevel.isAtLeastS());
+        assumeTrue(SdkLevel.isAtLeastT());
         IPrivilegedConfiguredNetworksListener listener =
                 mock(IPrivilegedConfiguredNetworksListener.class);
         doThrow(new SecurityException()).when(mContext)
