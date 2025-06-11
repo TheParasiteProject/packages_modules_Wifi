@@ -10729,6 +10729,38 @@ public class WifiServiceImplTest extends WifiBaseTest {
     }
 
     @Test
+    public void testSetScreenOffScanSchedule() {
+        assumeTrue(SdkLevel.isAtLeastT());
+
+        // verify invalid argument will throw exception
+        assertThrows(IllegalArgumentException.class,
+                () -> mWifiServiceImpl.setScreenOffScanSchedule(-1, -1, -1, -1));
+
+        // verify no permission will throw exception
+        when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(false);
+        when(mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(anyInt()))
+                .thenReturn(false);
+        assertThrows(SecurityException.class,
+                () -> mWifiServiceImpl.setScreenOffScanSchedule(0, 0 , 0, 0));
+
+        // verify correct calling with permission
+        when(mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(anyInt()))
+                .thenReturn(true);
+        int movingScanIntervalMillis = 20000;
+        int stationaryScanIntervalMillis = 40000;
+        int scanIterations = 3;
+        int scanMultiplier = 3;
+        mWifiServiceImpl.setScreenOffScanSchedule(movingScanIntervalMillis,
+                stationaryScanIntervalMillis, scanIterations, scanMultiplier);
+        mLooper.dispatchAll();
+        verify(mWifiConnectivityManager).setExternalScreenOffScanSchedule(
+                movingScanIntervalMillis, stationaryScanIntervalMillis,
+                scanIterations, scanMultiplier);
+        verify(mLastCallerInfoManager).put(eq(WifiManager.API_SET_PNO_SCAN_SCHEDULE), anyInt(),
+                anyInt(), anyInt(), any(), eq(true));
+    }
+
+    @Test
     public void testSetOneShotScreenOnConnectivityScanDelayMillis() {
         assumeTrue(SdkLevel.isAtLeastT());
         int delayMs = 1234;
