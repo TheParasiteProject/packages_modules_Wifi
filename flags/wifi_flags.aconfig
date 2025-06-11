@@ -341,6 +341,15 @@ flag {
 }
 
 flag {
+    name: "wifi_pno_scan_schedule_api"
+    is_exported: true
+    namespace: "wifi"
+    description: "For new API added to Android B for PNO scan interval modifications"
+    bug: "399014087"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "get_config_empty_reason"
     is_exported: true
     namespace: "wifi"

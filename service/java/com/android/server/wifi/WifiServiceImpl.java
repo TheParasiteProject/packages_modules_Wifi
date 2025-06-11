@@ -4117,6 +4117,38 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 scanScheduleSeconds != null);
     }
 
+    /**
+     * See {@link WifiManager#setScreenOffScanSchedule(ScreenOffScanSchedule)}
+     */
+    @Override
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    public void setScreenOffScanSchedule(int movingScanIntervalMillis,
+            int stationaryScanIntervalMillis, int scanIterations, int scanMultiplier) {
+        if (!SdkLevel.isAtLeastT()) {
+            throw new UnsupportedOperationException();
+        }
+        if ((movingScanIntervalMillis < 0) || (stationaryScanIntervalMillis < 0)
+                || (scanIterations < 0) || (scanMultiplier < 0)) {
+            throw new IllegalArgumentException(
+                    "Scan intervals and iterations should be non-negative");
+        }
+        int uid = Binder.getCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)
+                && !mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)) {
+            throw new SecurityException("Uid=" + uid + ", is not allowed to set PNO scan schedule");
+        }
+        mLog.info("movingScanIntervalSeconds=% stationaryScanIntervalSeconds=% "
+                        + "scanIterations=% scanMultiplier=% uid=%")
+                .c(movingScanIntervalMillis).c(stationaryScanIntervalMillis).c(scanIterations)
+                .c(scanMultiplier).c(uid).flush();
+
+        mWifiThreadRunner.post(() -> mWifiConnectivityManager.setExternalScreenOffScanSchedule(
+                movingScanIntervalMillis, stationaryScanIntervalMillis,
+                        scanIterations, scanMultiplier), TAG + "#setScreenOffScanSchedule");
+        mLastCallerInfoManager.put(WifiManager.API_SET_PNO_SCAN_SCHEDULE, Process.myTid(),
+                uid, Binder.getCallingPid(), "<unknown>", true);
+    }
+
     @Override
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     public void setOneShotScreenOnConnectivityScanDelayMillis(int delayMs) {
@@ -9543,11 +9575,11 @@ public class WifiServiceImpl extends IWifiManager.Stub {
      * @param listener listener to get the list of configured networks with real preSharedKey
      * @param extras - Bundle of extra information
      */
-    @RequiresApi(Build.VERSION_CODES.S)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     @Override
     public void queryPrivilegedConfiguredNetworks(
             @NonNull IPrivilegedConfiguredNetworksListener listener, Bundle extras) {
-        if (!SdkLevel.isAtLeastS()) {
+        if (!SdkLevel.isAtLeastT()) {
             throw new UnsupportedOperationException();
         }
         Objects.requireNonNull(listener, "listener cannot be null");
