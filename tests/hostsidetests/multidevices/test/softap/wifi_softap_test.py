@@ -119,7 +119,13 @@ class WifiSoftApTest(base_test.BaseTestClass):
       self.host.wifi.wifiUnregisterSoftApCallback()
 
   def test_local_only_softap_disconnect(self):
-    """Tests local-only SoftAp disconnection."""
+    """Tests local-only SoftAp disconnection.
+
+    This test will only run on devices with SDK level >= 33, which support
+    local-only SoftAp feature.
+    """
+    wifi_test_utils.skip_if_not_meet_min_sdk_level(self.host, 33)
+    wifi_test_utils.skip_if_not_meet_min_sdk_level(self.client, 33)
     self._test_softap_disconnect(use_local_only=True)
 
   def test_tethering_softap_disconnect(self):

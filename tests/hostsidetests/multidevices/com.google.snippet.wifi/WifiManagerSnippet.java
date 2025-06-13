@@ -106,7 +106,7 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
             String macAddress = null;
             if (!clients.isEmpty()) {
                 // In our Mobly test cases, there is only ever one other device.
-                WifiClient client = clients.getFirst();
+                WifiClient client = clients.get(0);
                 macAddress = client.getMacAddress().toString();
             }
             event.getData().putString("clientMacAddress", macAddress);
@@ -123,7 +123,7 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
             int disconnectReason = REASON_UNKNOWN;
             if (!clients.isEmpty()) {
                 // In our Mobly test cases, there is only ever one other device.
-                WifiClient client = clients.getFirst();
+                WifiClient client = clients.get(0);
                 macAddress = client.getMacAddress().toString();
                 disconnectReason = client.getDisconnectReason();
             }
