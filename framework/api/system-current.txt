@@ -1789,8 +1789,8 @@ package android.net.wifi.rtt {
   }
 
   public final class ResponderConfig implements android.os.Parcelable {
-    ctor public ResponderConfig(@NonNull android.net.MacAddress, int, boolean, int, int, int, int, int);
-    ctor public ResponderConfig(@NonNull android.net.wifi.aware.PeerHandle, int, boolean, int, int, int, int, int);
+    ctor @Deprecated @FlaggedApi("com.android.wifi.flags.improve_ranging_api") public ResponderConfig(@NonNull android.net.MacAddress, int, boolean, int, int, int, int, int);
+    ctor @Deprecated @FlaggedApi("com.android.wifi.flags.improve_ranging_api") public ResponderConfig(@NonNull android.net.wifi.aware.PeerHandle, int, boolean, int, int, int, int, int);
     method @NonNull public static android.net.wifi.rtt.ResponderConfig fromWifiAwarePeerHandleWithDefaults(@NonNull android.net.wifi.aware.PeerHandle);
     method @NonNull public static android.net.wifi.rtt.ResponderConfig fromWifiAwarePeerMacAddressWithDefaults(@NonNull android.net.MacAddress);
     field public static final int CHANNEL_WIDTH_160MHZ = 3; // 0x3
