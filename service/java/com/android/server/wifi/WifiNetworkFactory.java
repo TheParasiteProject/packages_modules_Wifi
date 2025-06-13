@@ -1414,9 +1414,6 @@ public class WifiNetworkFactory extends NetworkFactory {
         if (mClientModeManager != null) {
             // Set to false anyway, because no network request is active.
             mWifiConnectivityManager.setSpecificNetworkRequestInProgress(false);
-            if (mContext.getResources().getBoolean(R.bool.config_wifiUseHalApiToDisableFwRoaming)) {
-                mClientModeManager.enableRoaming(true); // Re-enable roaming.
-            }
             if (mVerboseLoggingEnabled) {
                 Log.v(TAG, "removeClientModeManager, role: " + mClientModeManagerRole);
             }
@@ -1480,14 +1477,6 @@ public class WifiNetworkFactory extends NetworkFactory {
             // collection.
             mCmiListener = new CmiListener();
             mClientModeImplMonitor.registerListener(mCmiListener);
-        }
-        // Disable roaming.
-        if (mContext.getResources().getBoolean(R.bool.config_wifiUseHalApiToDisableFwRoaming)) {
-            // Note: This is an old HAL API, but since it wasn't being exercised before, we are
-            // being extra cautious and only using it on devices running >= S.
-            if (!mClientModeManager.enableRoaming(false)) {
-                Log.w(TAG, "Failed to disable roaming");
-            }
         }
     }
 

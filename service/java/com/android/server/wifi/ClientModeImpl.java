@@ -4624,6 +4624,14 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
     }
 
     private void connectToNetwork(WifiConfiguration config) {
+        if (mContext.getResources().getBoolean(R.bool.config_wifiUseHalApiToDisableFwRoaming)) {
+            // Enable firmware roaming unless targeting a specific BSSID
+            boolean enableRoaming = SUPPLICANT_BSSID_ANY.equals(mTargetBssid);
+            if (!enableRoaming(enableRoaming)) {
+                Log.w(TAG, "Failed to change roaming to "
+                        + (enableRoaming ? "enabled" : "disabled"));
+            }
+        }
         if ((config != null) && mWifiNative.connectToNetwork(mInterfaceName, config)) {
             // Update the internal config once the connection request is accepted.
             mWifiConfigManager.setNetworkLastUsedSecurityParams(config.networkId,
