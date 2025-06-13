@@ -31,6 +31,7 @@ import android.os.Looper;
 import androidx.test.filters.SmallTest;
 
 import com.android.server.wifi.util.WifiPermissionsUtil;
+import com.android.wifi.flags.FeatureFlags;
 
 import org.junit.After;
 import org.junit.Before;
@@ -59,6 +60,8 @@ public class AvailableNetworkNotifierTest extends WifiBaseTest {
     @Mock MakeBeforeBreakManager mMakeBeforeBreakManager;
     @Mock WifiNotificationManager mWifiNotificationManager;
     @Mock WifiPermissionsUtil mWifiPermissionsUtil;
+    @Mock WifiSettingsConfigStore mWifiSettingsConfigStore;
+    @Mock FeatureFlags mFeatureFlags;
 
     BroadcastReceiver mBroadcastReceiver;
 
@@ -73,6 +76,7 @@ public class AvailableNetworkNotifierTest extends WifiBaseTest {
                 "AvailableNetworkNotifierTest",
                 "storeDataIdentifier",
                 "toggleSettingsName",
+                WifiSettingsConfigStore.WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON,
                 1, // notificationIdentifier
                 1, // nominatorId
                 mContext,
@@ -86,7 +90,9 @@ public class AvailableNetworkNotifierTest extends WifiBaseTest {
                 mConnectToNetworkNotificationBuilder,
                 mMakeBeforeBreakManager,
                 mWifiNotificationManager,
-                mWifiPermissionsUtil);
+                mWifiPermissionsUtil,
+                mWifiSettingsConfigStore,
+                mFeatureFlags);
 
         ArgumentCaptor<BroadcastReceiver> captor = ArgumentCaptor.forClass(BroadcastReceiver.class);
         verify(mContext).registerReceiver(captor.capture(), any(), any(), any());
