@@ -2015,15 +2015,6 @@ public class WifiConnectivityManager {
         if (!shouldConnect()) {
             return;
         }
-        if (mContext.getResources().getBoolean(R.bool.config_wifiUseHalApiToDisableFwRoaming)) {
-            // If network with specified BSSID, disable roaming. Otherwise enable the roaming.
-            boolean enableRoaming = targetNetwork.BSSID == null
-                    || targetNetwork.BSSID.equals(ClientModeImpl.SUPPLICANT_BSSID_ANY);
-            if (!clientModeManager.enableRoaming(enableRoaming)) {
-                Log.w(TAG, "Failed to change roaming to "
-                        + (enableRoaming ? "enabled" : "disabled"));
-            }
-        }
         clientModeManager.startConnectToNetwork(
                 targetNetwork.networkId, Process.WIFI_UID, targetBssid);
     }

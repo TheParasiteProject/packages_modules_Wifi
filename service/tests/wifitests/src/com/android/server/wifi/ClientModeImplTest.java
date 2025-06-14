@@ -707,6 +707,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         mResources.setInteger(R.integer.config_wifiLinkBandwidthUpdateThresholdPercent, 25);
         mResources.setInteger(R.integer.config_wifiClientModeImplNumLogRecs, 100);
         mResources.setBoolean(R.bool.config_wifiEnableLinkedNetworkRoaming, true);
+        mResources.setBoolean(R.bool.config_wifiUseHalApiToDisableFwRoaming, true);
         when(mContext.getResources()).thenReturn(mResources);
 
         when(mWifiGlobals.getPollRssiIntervalMillis()).thenReturn(3000);
@@ -2371,8 +2372,11 @@ public class ClientModeImplTest extends WifiBaseTest {
     @Test
     public void testIdleModeChanged_firmwareRoamingLocalOnlyCase() throws Exception {
         // mock connected network to be local only
-        connect();
+        mConnectedNetwork.BSSID = TEST_BSSID_STR;
         mConnectedNetwork.fromWifiNetworkSpecifier = true;
+        connect();
+        verify(mWifiNative).enableFirmwareRoaming(anyString(),
+                eq(WifiNative.DISABLE_FIRMWARE_ROAMING));
 
         // Enable feature, then verify firmware roaming is disabled when idle mode is entered
         when(mWifiGlobals.isDisableFirmwareRoamingInIdleMode()).thenReturn(true);
@@ -2380,7 +2384,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         mCmi.onIdleModeChanged(true);
         setScreenState(false);
         mLooper.dispatchAll();
-        verify(mWifiNative).enableFirmwareRoaming(anyString(),
+        verify(mWifiNative, times(2)).enableFirmwareRoaming(anyString(),
                 eq(WifiNative.DISABLE_FIRMWARE_ROAMING));
 
         // Verify firmware roaming is not enabled when idle mode exited
@@ -8083,13 +8087,16 @@ public class ClientModeImplTest extends WifiBaseTest {
     public void testRoamingModeOnDisconnectPrimary() throws Exception {
         when(mClientModeManager.getRole()).thenReturn(ROLE_CLIENT_PRIMARY);
         connect();
+        // not forcing a BSSID, expect firmware roaming enabled
+        verify(mWifiNative).enableFirmwareRoaming(anyString(),
+                eq(WifiNative.ENABLE_FIRMWARE_ROAMING));
         mCmi.disconnect();
         mLooper.dispatchAll();
         mCmi.sendMessage(WifiMonitor.SUPPLICANT_STATE_CHANGE_EVENT, 0, 0,
                 new StateChangeResult(0, WifiSsid.fromUtf8Text(mConnectedNetwork.SSID),
                         TEST_BSSID_STR, sFreq, SupplicantState.DISCONNECTED));
         mLooper.dispatchAll();
-        verify(mWifiNative).enableFirmwareRoaming(anyString(),
+        verify(mWifiNative, times(2)).enableFirmwareRoaming(anyString(),
                 eq(WifiNative.ENABLE_FIRMWARE_ROAMING));
     }
 
@@ -8099,14 +8106,19 @@ public class ClientModeImplTest extends WifiBaseTest {
     @Test
     public void testRoamingModeOnDisconnectSecondary() throws Exception {
         when(mClientModeManager.getRole()).thenReturn(ROLE_CLIENT_SECONDARY_TRANSIENT);
+        mConnectedNetwork.BSSID = TEST_BSSID_STR;
         connect();
+        // forcing BSSID, expect firmware roaming disabled
+        verify(mWifiNative).enableFirmwareRoaming(anyString(),
+                eq(WifiNative.DISABLE_FIRMWARE_ROAMING));
         mCmi.disconnect();
         mLooper.dispatchAll();
         mCmi.sendMessage(WifiMonitor.SUPPLICANT_STATE_CHANGE_EVENT, 0, 0,
                 new StateChangeResult(0, WifiSsid.fromUtf8Text(mConnectedNetwork.SSID),
                         TEST_BSSID_STR, sFreq, SupplicantState.DISCONNECTED));
         mLooper.dispatchAll();
-        verify(mWifiNative, never()).enableFirmwareRoaming(anyString(), anyInt());
+        verify(mWifiNative, never()).enableFirmwareRoaming(anyString(),
+                eq(WifiNative.ENABLE_FIRMWARE_ROAMING));
     }
 
     @Test

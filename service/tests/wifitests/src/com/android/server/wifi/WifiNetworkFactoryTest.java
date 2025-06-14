@@ -256,9 +256,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
                 .thenReturn(mCompanionDeviceManager);
         when(mContext.getSystemService(PowerManager.class)).thenReturn(mPowerManager);
         when(mResources.getBoolean(
-                eq(R.bool.config_wifiUseHalApiToDisableFwRoaming)))
-                .thenReturn(true);
-        when(mResources.getBoolean(
                 eq(R.bool.config_wifiMultiStaLocalOnlyConcurrencyEnabled)))
                 .thenReturn(false);
         when(mResources.getInteger(R.integer.config_wifiNetworkSpecifierMaxPreferredChannels))
@@ -1926,8 +1923,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         // Verify that we sent the connection success callback.
         verify(mNetworkRequestMatchCallback).onUserSelectionConnectSuccess(
                 argThat(new WifiConfigMatcher(mSelectedNetwork)));
-        // Verify we disabled fw roaming.
-        verify(mClientModeManager).enableRoaming(false);
 
         // Now release the active network request.
         mWifiNetworkFactory.releaseNetworkFor(mNetworkRequest);
@@ -1936,7 +1931,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         // Ensure that we toggle auto-join state.
         verify(mWifiConnectivityManager).setSpecificNetworkRequestInProgress(true);
         verify(mWifiConnectivityManager).setSpecificNetworkRequestInProgress(false);
-        verify(mClientModeManager).enableRoaming(true);
     }
 
     /**
@@ -1945,9 +1939,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
     @Test
     public void testNetworkSpecifierHandleConnectionSuccessWhenUseHalApiIsDisabled()
             throws Exception {
-        when(mResources.getBoolean(
-                eq(R.bool.config_wifiUseHalApiToDisableFwRoaming)))
-                .thenReturn(false);
         sendNetworkRequestAndSetupForConnectionStatus();
 
         // Send network connection success indication.
@@ -1958,8 +1949,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         // Verify that we sent the connection success callback.
         verify(mNetworkRequestMatchCallback).onUserSelectionConnectSuccess(
                 argThat(new WifiConfigMatcher(mSelectedNetwork)));
-        // Verify we disabled fw roaming.
-        verify(mClientModeManager, never()).enableRoaming(false);
 
         // Now release the active network request.
         mWifiNetworkFactory.releaseNetworkFor(mNetworkRequest);
@@ -1968,7 +1957,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         // Ensure that we toggle auto-join state.
         verify(mWifiConnectivityManager).setSpecificNetworkRequestInProgress(true);
         verify(mWifiConnectivityManager).setSpecificNetworkRequestInProgress(false);
-        verify(mClientModeManager, never()).enableRoaming(true);
     }
 
     /**
@@ -1988,8 +1976,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         // Verify that we sent the connection success callback.
         verify(mNetworkRequestMatchCallback).onUserSelectionConnectSuccess(
                 argThat(new WifiConfigMatcher(mSelectedNetwork)));
-        // Verify we disabled fw roaming.
-        verify(mClientModeManager).enableRoaming(false);
 
         // Now release the active network request.
         mWifiNetworkFactory.releaseNetworkFor(mNetworkRequest);
@@ -1997,7 +1983,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         verify(mWifiMetrics).incrementNetworkRequestApiNumConnectSuccessOnSecondaryIface();
         // Ensure that we toggle auto-join state even for the secondary CMM.
         verify(mWifiConnectivityManager).setSpecificNetworkRequestInProgress(false);
-        verify(mClientModeManager).enableRoaming(true);
     }
 
     /**
@@ -2017,8 +2002,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         // Verify that we sent the connection success callback.
         verify(mNetworkRequestMatchCallback).onUserSelectionConnectSuccess(
                 argThat(new WifiConfigMatcher(mSelectedNetwork)));
-        // Verify we disabled fw roaming.
-        verify(mClientModeManager).enableRoaming(false);
         verify(mWifiMetrics).incrementNetworkRequestApiNumConnectSuccessOnSecondaryIface();
 
         // Disconnect from AP
@@ -2032,7 +2015,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         verify(mActiveModeWarden).removeClientModeManager(mClientModeManager);
         // Ensure that we toggle auto-join state even for the secondary CMM.
         verify(mWifiConnectivityManager).setSpecificNetworkRequestInProgress(false);
-        verify(mClientModeManager).enableRoaming(true);
         assertEquals(0, mWifiNetworkFactory
                 .getSpecificNetworkRequestUids(mSelectedNetwork, TEST_BSSID_1).size());
     }
@@ -2560,7 +2542,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         assertNotNull(mSelectedNetwork);
         mWifiNetworkFactory.handleConnectionAttemptEnded(
                 WifiMetrics.ConnectionEvent.FAILURE_NONE, mSelectedNetwork, TEST_BSSID_1, WifiMetricsProto.ConnectionEvent.FAILURE_REASON_UNKNOWN);
-        verify(mClientModeManager).enableRoaming(false);
 
         NetworkRequest oldRequest = new NetworkRequest(mNetworkRequest);
         // Send second request.
@@ -2590,7 +2571,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
 
         verify(mClientModeManager, times(3)).getRole();
         verify(mWifiConnectivityManager).setSpecificNetworkRequestInProgress(false);
-        verify(mClientModeManager).enableRoaming(true);
         verify(mActiveModeWarden).removeClientModeManager(any());
 
         verifyNoMoreInteractions(mWifiConnectivityManager, mWifiScanner, mClientModeManager,
@@ -2632,7 +2612,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         assertNotNull(mSelectedNetwork);
         mWifiNetworkFactory.handleConnectionAttemptEnded(
                 WifiMetrics.ConnectionEvent.FAILURE_NONE, mSelectedNetwork, TEST_BSSID_1, WifiMetricsProto.ConnectionEvent.FAILURE_REASON_UNKNOWN);
-        verify(mClientModeManager).enableRoaming(false);
 
         // Send second request & we simulate the user selecting the request & connecting to it.
         reset(mNetworkRequestMatchCallback, mWifiScanner, mAlarmManager);
@@ -2642,7 +2621,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         assertNotNull(mSelectedNetwork);
         mWifiNetworkFactory.handleConnectionAttemptEnded(
                 WifiMetrics.ConnectionEvent.FAILURE_NONE, mSelectedNetwork, TEST_BSSID_2, WifiMetricsProto.ConnectionEvent.FAILURE_REASON_UNKNOWN);
-        verify(mClientModeManager, times(2)).enableRoaming(false);
 
         // We shouldn't explicitly disconnect, the new connection attempt will implicitly disconnect
         // from the connected network.
@@ -2664,7 +2642,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         verify(mClientModeManager, times(3)).disconnect();
         verify(mClientModeManager, times(6)).getRole();
         verify(mWifiConnectivityManager).setSpecificNetworkRequestInProgress(false);
-        verify(mClientModeManager).enableRoaming(true);
         verify(mActiveModeWarden).removeClientModeManager(any());
         verifyNoMoreInteractions(mWifiConnectivityManager, mWifiScanner, mClientModeManager,
                 mAlarmManager);
@@ -2694,8 +2671,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         mLooper.dispatchAll();
         // cancel periodic scans.
         verify(mAlarmManager).cancel(mPeriodicScanListenerArgumentCaptor.getValue());
-        // Verify we disabled fw roaming.
-        verify(mClientModeManager).enableRoaming(false);
 
         // we shouldn't disconnect/re-enable auto-join until the connected request is released.
         verify(mWifiConnectivityManager, never()).setSpecificNetworkRequestInProgress(false);
@@ -2707,7 +2682,6 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         verify(mClientModeManager, times(2)).disconnect();
         verify(mClientModeManager, times(3)).getRole();
         verify(mWifiConnectivityManager).setSpecificNetworkRequestInProgress(false);
-        verify(mClientModeManager).enableRoaming(true);
         verify(mActiveModeWarden).removeClientModeManager(any());
 
         verifyNoMoreInteractions(mWifiConnectivityManager, mWifiScanner, mClientModeManager,
