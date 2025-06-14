@@ -569,4 +569,8 @@ interface IWifiManager {
             in IPrivilegedConfiguredNetworksListener listener, in Bundle extras);
 
     void refreshMacRandomization(int netId);
+
+    void setOpenNetworkNotifierEnabled(boolean enable);
+
+    void isOpenNetworkNotifierEnabled(in IBooleanListener listener);
 }

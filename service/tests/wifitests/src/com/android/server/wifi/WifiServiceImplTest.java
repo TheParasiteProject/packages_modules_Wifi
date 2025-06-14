@@ -13650,5 +13650,48 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verify(mWifiConfigManager).refreshMacRandomization(eq(TEST_NETWORK_ID));
     }
+
+    @Test
+    public void testSetOpenNetworkNotifierEnabled() {
+        assumeTrue(Environment.isSdkNewerThanB());
+
+        // Throws SecurityException when caller doesn't have permission.
+        assertThrows(SecurityException.class,
+                () -> mWifiServiceImpl.setOpenNetworkNotifierEnabled(true));
+
+        when(mContext.checkPermission(eq(android.Manifest.permission.NETWORK_SETTINGS),
+                anyInt(), anyInt())).thenReturn(PackageManager.PERMISSION_GRANTED);
+        mWifiServiceImpl.setOpenNetworkNotifierEnabled(true);
+        mLooper.dispatchAll();
+        verify(mOpenNetworkNotifier).setSettingsEnabled(true);
+
+        mWifiServiceImpl.setOpenNetworkNotifierEnabled(false);
+        mLooper.dispatchAll();
+        verify(mOpenNetworkNotifier).setSettingsEnabled(false);
+    }
+
+    @Test
+    public void testIsOpenNetworkNotifierEnabled() throws RemoteException {
+        assumeTrue(Environment.isSdkNewerThanB());
+
+        IBooleanListener listener = mock(IBooleanListener.class);
+        InOrder inOrder = inOrder(listener);
+
+        // Throws SecurityException when caller doesn't have permission.
+        assertThrows(SecurityException.class,
+                () -> mWifiServiceImpl.isOpenNetworkNotifierEnabled(listener));
+
+        when(mContext.checkPermission(eq(android.Manifest.permission.NETWORK_SETTINGS),
+                anyInt(), anyInt())).thenReturn(PackageManager.PERMISSION_GRANTED);
+        when(mOpenNetworkNotifier.isSettingEnabled()).thenReturn(true);
+        mWifiServiceImpl.isOpenNetworkNotifierEnabled(listener);
+        mLooper.dispatchAll();
+        inOrder.verify(listener).onResult(true);
+
+        when(mOpenNetworkNotifier.isSettingEnabled()).thenReturn(false);
+        mWifiServiceImpl.isOpenNetworkNotifierEnabled(listener);
+        mLooper.dispatchAll();
+        inOrder.verify(listener).onResult(false);
+    }
 }
 
