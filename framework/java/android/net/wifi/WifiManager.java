@@ -12016,10 +12016,25 @@ public class WifiManager {
     public static final String EXTRA_P2P_PIN_REQUESTED = "android.net.wifi.extra.P2P_PIN_REQUESTED";
 
     /**
+     * Extra boolean indicating that a Password is requested for a P2P Invitation Received dialog.
+     * @hide
+     */
+    public static final String EXTRA_P2P_PASSWORD_REQUESTED =
+            "android.net.wifi.extra.P2P_PASSWORD_REQUESTED";
+
+    /**
      * Extra String indicating the PIN to be displayed for a P2P Invitation Sent/Received dialog.
      * @hide
      */
     public static final String EXTRA_P2P_DISPLAY_PIN = "android.net.wifi.extra.P2P_DISPLAY_PIN";
+
+    /**
+     * Extra String indicating the Password to be displayed for a P2P Invitation
+     * Sent/Received dialog.
+     * @hide
+     */
+    public static final String EXTRA_P2P_DISPLAY_PASSWORD =
+            "android.net.wifi.extra.P2P_DISPLAY_PASSWORD";
 
     /**
      * Extra boolean indicating ACTION_CLOSE_SYSTEM_DIALOGS should not close the Wi-Fi dialogs.

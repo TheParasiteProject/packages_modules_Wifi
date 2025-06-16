@@ -1739,9 +1739,12 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     String deviceName = getNextArgRequired();
                     String cmdOption = getNextOption();
                     String displayPin = null;
+                    String displayPassword = null;
                     while (cmdOption != null) {
                         if (cmdOption.equals("-d")) {
                             displayPin = getNextArgRequired();
+                        } else if (cmdOption.equals("-m")) {
+                            displayPassword = getNextArgRequired();
                         } else if (cmdOption.equals("-i")) {
                             String displayIdStr = getNextArgRequired();
                             try {
@@ -1765,14 +1768,16 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                         cmdOption = getNextOption();
                     }
                     mWifiDialogManager.createP2pInvitationSentDialog(deviceName, displayPin,
-                            displayId).launchDialog();
+                            displayPassword, displayId).launchDialog();
                     pw.println("Launched dialog.");
                     return 0;
                 }
                 case "launch-dialog-p2p-invitation-received": {
                     String deviceName = getNextArgRequired();
                     boolean isPinRequested = false;
+                    boolean isPasswordRequested = false;
                     String displayPin = null;
+                    String displayPassword = null;
                     String pinOption = getNextOption();
                     int displayId = Display.DEFAULT_DISPLAY;
                     boolean p2pInvRecTimeoutSpecified = false;
@@ -1780,8 +1785,12 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     while (pinOption != null) {
                         if (pinOption.equals("-p")) {
                             isPinRequested = true;
+                        } else if (pinOption.equals("-k")) {
+                            isPasswordRequested = true;
                         } else if (pinOption.equals("-d")) {
                             displayPin = getNextArgRequired();
+                        } else if (pinOption.equals("-m")) {
+                            displayPassword = getNextArgRequired();
                         } else if (pinOption.equals("-i")) {
                             String displayIdStr = getNextArgRequired();
                             try {
@@ -1825,7 +1834,9 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                             mWifiDialogManager.createP2pInvitationReceivedDialog(
                                     deviceName,
                                     isPinRequested,
+                                    isPasswordRequested,
                                     displayPin,
+                                    displayPassword,
                                     p2pInvRecTimeout,
                                     displayId,
                                     callback,
@@ -3462,18 +3473,21 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    -n - Negative Button Text");
         pw.println("    -x - Neutral Button Text");
         pw.println("    -c - Optional timeout in milliseconds");
-        pw.println("  launch-dialog-p2p-invitation-sent <device_name> [-d <pin>]"
+        pw.println("  launch-dialog-p2p-invitation-sent <device_name> [-d <pin>] [-m <password>]"
                 + " [-i <display_id>]");
         pw.println("    Launches a P2P Invitation Sent dialog.");
         pw.println("    <device_name> - Name of the device the invitation was sent to");
         pw.println("    <pin> - PIN for the invited device to input");
-        pw.println("  launch-dialog-p2p-invitation-received <device_name> [-p] [-d <pin>] "
-                + "[-i <display_id>] [-c <timeout_millis>]");
+        pw.println("    <password> - Password for the invited device to input");
+        pw.println("  launch-dialog-p2p-invitation-received <device_name> [-p] [-k] [-d <pin>] "
+                + "[-m <password>] [-i <display_id>] [-c <timeout_millis>]");
         pw.println("    Launches a P2P Invitation Received dialog and waits up to 15 seconds to"
                 + " print the response.");
         pw.println("    <device_name> - Name of the device sending the invitation");
         pw.println("    -p - Show PIN input");
+        pw.println("    -k - Show Password input");
         pw.println("    -d - Display PIN <pin>");
+        pw.println("    -m - Display Password <password>");
         pw.println("    -i - Display ID");
         pw.println("    -c - Optional timeout in milliseconds");
         pw.println("  query-interface <uid> <package_name> STA|AP|AWARE|DIRECT [-new]");
