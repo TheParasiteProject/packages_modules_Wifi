@@ -3989,7 +3989,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             mSavedPeerConfig.setVendorData(provDisc.getVendorData());
                         }
 
-                        notifyP2pProvDiscShowPinRequest(provDisc.wpsPin, device.deviceAddress);
+                        notifyP2pProvDiscShowPinRequest(provDisc.wpsPin, null,
+                                device.deviceAddress);
                         mPeers.updateStatus(device.deviceAddress, WifiP2pDevice.INVITED);
                         sendPeersChangedBroadcast();
                         smTransition(this, mUserAuthorizingNegotiationRequestState);
@@ -4007,10 +4008,9 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     }
                     case WifiP2pMonitor
                             .P2P_PROV_DISC_SHOW_PAIRING_BOOTSTRAPPING_PIN_OR_PASSPHRASE_EVENT: {
-                        if (processProvisionDiscoveryRequestForV2ConnectionOnP2pDevice(
-                                (WifiP2pProvDiscEvent) message.obj)) {
-                            notifyP2pProvDiscShowPinRequest(getPinOrPassphraseFromSavedPeerConfig(),
-                                    mSavedPeerConfig.deviceAddress);
+                        WifiP2pProvDiscEvent provDisc = (WifiP2pProvDiscEvent) message.obj;
+                        if (processProvisionDiscoveryRequestForV2ConnectionOnP2pDevice(provDisc)) {
+                            notifyP2pProvDiscShowPinOrPasswordRequestForV2Connection();
                             smTransition(this, mUserAuthorizingNegotiationRequestState);
                         }
                         break;
@@ -4780,7 +4780,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             }
                             mSavedPeerConfig.wps.pin = provDisc.wpsPin;
                             p2pConnectWithPinDisplay(mSavedPeerConfig, P2P_CONNECT_TRIGGER_OTHER);
-                            notifyInvitationSent(provDisc.wpsPin, device.deviceAddress);
+                            notifyInvitationSent(provDisc.wpsPin, null, device.deviceAddress);
                             smTransition(this, mGroupNegotiationState);
                         }
                         break;
@@ -4855,8 +4855,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                 smTransition(this, mGroupNegotiationState);
                             } else {
                                 logd("Display Pin/Passphrase " + mSavedPeerConfig);
-                                notifyInvitationSent(getPinOrPassphraseFromSavedPeerConfig(),
-                                        device.deviceAddress);
+                                notifyInvitationSentForV2Connection();
                             }
                         } else {
                             loge("Error in mapping pairingBootstrappingMethod");
@@ -5636,7 +5635,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                         mGroup.getInterface(), null);
                                 try {
                                     Integer.parseInt(pin);
-                                    notifyInvitationSent(pin, "any");
+                                    notifyInvitationSent(pin, null, "any");
                                 } catch (NumberFormatException ignore) {
                                     ret = false;
                                 }
@@ -5781,11 +5780,10 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         // According to section 3.2.3 in SPEC, only GO can handle group join.
                         // Multiple groups is not supported, ignore this discovery for GC.
                         if (mGroup.isGroupOwner()) {
+                            WifiP2pProvDiscEvent provDisc = (WifiP2pProvDiscEvent) message.obj;
                             if (processProvisionDiscoveryRequestForV2ConnectionOnGroupOwner(
-                                    (WifiP2pProvDiscEvent) message.obj)) {
-                                notifyP2pProvDiscShowPinRequest(
-                                        getPinOrPassphraseFromSavedPeerConfig(),
-                                        mSavedPeerConfig.deviceAddress);
+                                    provDisc)) {
+                                notifyP2pProvDiscShowPinOrPasswordRequestForV2Connection();
                                 mWifiNative.authorizeConnectRequestOnGroupOwner(mSavedPeerConfig,
                                         mGroup.getInterface());
                             }
@@ -6379,14 +6377,15 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             dialog.show();
         }
 
-        private void showInvitationSentDialog(@NonNull String deviceName, @Nullable String pin) {
+        private void showInvitationSentDialog(@NonNull String deviceName, @Nullable String pin,
+                @Nullable String password) {
             int displayId = mDeathDataByBinder.values().stream()
                     .filter(d -> d.mDisplayId != Display.DEFAULT_DISPLAY)
                     .findAny()
                     .map((dhd) -> dhd.mDisplayId)
                     .orElse(Display.DEFAULT_DISPLAY);
             WifiDialogManager.DialogHandle dialogHandle = mWifiInjector.getWifiDialogManager()
-                    .createP2pInvitationSentDialog(deviceName, pin, displayId);
+                    .createP2pInvitationSentDialog(deviceName, pin, password, displayId);
             if (dialogHandle == null) {
                 loge("Could not create invitation sent dialog!");
                 return;
@@ -6394,7 +6393,33 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             dialogHandle.launchDialog();
         }
 
-        private void notifyInvitationSent(String pin, String peerAddress) {
+        @SuppressLint("NewApi")
+        private void notifyInvitationSentForV2Connection() {
+            WifiP2pPairingBootstrappingConfig pairingConfig =
+                    mSavedPeerConfig.getPairingBootstrappingConfig();
+            if (pairingConfig == null) {
+                loge(getName() + " Can't show PIN/Password - Pairing config is null!");
+                return;
+            }
+            String pinOrPassword = pairingConfig.getPairingBootstrappingPassword();
+            String pinToShow = null;
+            String passwordToShow = null;
+            int pairingBootstrappingMethod = pairingConfig.getPairingBootstrappingMethod();
+            if (pairingBootstrappingMethod == WifiP2pPairingBootstrappingConfig
+                    .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PINCODE) {
+                pinToShow = pinOrPassword;
+            } else if (pairingBootstrappingMethod == WifiP2pPairingBootstrappingConfig
+                    .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PASSPHRASE) {
+                passwordToShow = pinOrPassword;
+            } else {
+                loge(getName() + " Can't show PIN/Password for bootstrapping method: "
+                        + pairingBootstrappingMethod);
+                return;
+            }
+            notifyInvitationSent(pinToShow, passwordToShow,
+                    mSavedPeerConfig.deviceAddress);
+        }
+        private void notifyInvitationSent(String pin, String password, String peerAddress) {
             ApproverEntry entry = mExternalApproverManager.get(MacAddress.fromString(peerAddress));
             if (null == entry) {
                 logd("No approver found for " + peerAddress
@@ -6402,11 +6427,14 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 entry = mExternalApproverManager.get(MacAddress.BROADCAST_ADDRESS);
             }
             if (null != entry) {
-                logd("Received invitation - Send WPS PIN event to the approver " + entry);
+                logd("Received invitation - Send WPS PIN or WFD R2 PIN/Password event"
+                        + " to the approver " + entry);
                 Bundle extras = new Bundle();
                 extras.putParcelable(WifiP2pManager.EXTRA_PARAM_KEY_PEER_ADDRESS,
                         entry.getAddress());
-                extras.putString(WifiP2pManager.EXTRA_PARAM_KEY_WPS_PIN, pin);
+                // TODO add separate callback for password
+                String pinOrPassword = TextUtils.isEmpty(password) ? pin : password;
+                extras.putString(WifiP2pManager.EXTRA_PARAM_KEY_WPS_PIN, pinOrPassword);
                 replyToMessage(entry.getMessage(), WifiP2pManager.EXTERNAL_APPROVER_PIN_GENERATED,
                         extras);
                 return;
@@ -6415,7 +6443,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             if (!SdkLevel.isAtLeastT()) {
                 showInvitationSentDialogPreT(deviceName, pin);
             } else {
-                showInvitationSentDialog(deviceName, pin);
+                showInvitationSentDialog(deviceName, pin, password);
             }
         }
 
@@ -6443,7 +6471,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             dialog.show();
         }
 
-        private void showP2pProvDiscShowPinRequestDialog(String deviceName, String pin) {
+        private void showP2pProvDiscShowPinRequestDialog(String deviceName, String pin,
+                String password) {
             int displayId = mDeathDataByBinder.values().stream()
                     .filter(d -> d.mDisplayId != Display.DEFAULT_DISPLAY)
                     .findAny()
@@ -6455,7 +6484,9 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             mWifiInjector.getWifiDialogManager().createP2pInvitationReceivedDialog(
                     deviceName,
                     false /* isPinRequested */,
+                    false /* isPasswordRequested */,
                     pin,
+                    password,
                     0,
                     displayId,
                     new WifiDialogManager.P2pInvitationReceivedDialogCallback() {
@@ -6473,7 +6504,36 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     new WifiThreadRunner(getHandler())).launchDialog();
         }
 
-        private void notifyP2pProvDiscShowPinRequest(String pin, String peerAddress) {
+        @SuppressLint("NewApi")
+        private void notifyP2pProvDiscShowPinOrPasswordRequestForV2Connection() {
+            WifiP2pPairingBootstrappingConfig pairingConfig =
+                    mSavedPeerConfig.getPairingBootstrappingConfig();
+            if (pairingConfig == null) {
+                loge(getName() + " Can't show PIN/Password display request -"
+                        + " Pairing config is null!");
+                return;
+            }
+            String pinOrPassword = pairingConfig.getPairingBootstrappingPassword();
+            String pinToShow = null;
+            String passwordToShow = null;
+            int pairingBootstrappingMethod = pairingConfig.getPairingBootstrappingMethod();
+            if (pairingBootstrappingMethod == WifiP2pPairingBootstrappingConfig
+                    .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PINCODE) {
+                pinToShow = pinOrPassword;
+            } else if (pairingBootstrappingMethod == WifiP2pPairingBootstrappingConfig
+                    .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PASSPHRASE) {
+                passwordToShow = pinOrPassword;
+            } else {
+                loge(getName() + " Can't show PIN/Password display request for"
+                        + " bootstrapping method: " + pairingBootstrappingMethod);
+                return;
+            }
+            notifyP2pProvDiscShowPinRequest(pinToShow, passwordToShow,
+                    mSavedPeerConfig.deviceAddress);
+        }
+
+        private void notifyP2pProvDiscShowPinRequest(@Nullable String pin,
+                @Nullable String password, String peerAddress) {
             ExternalApproverManager.ApproverEntry entry = mExternalApproverManager.get(
                     MacAddress.fromString(peerAddress));
             if (null == entry) {
@@ -6498,7 +6558,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             if (!SdkLevel.isAtLeastT()) {
                 showP2pProvDiscShowPinRequestDialogPreT(deviceName, pin);
             } else {
-                showP2pProvDiscShowPinRequestDialog(deviceName, pin);
+                showP2pProvDiscShowPinRequestDialog(deviceName, pin, password);
             }
         }
 
@@ -6576,7 +6636,9 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         private void showInvitationReceivedDialog() {
             String deviceName = getDeviceName(mSavedPeerConfig.deviceAddress);
             boolean isPinRequested = false;
+            boolean isPasswordRequested = false;
             String displayPin = null;
+            String displayPassword = null;
 
             int displayId = mDeathDataByBinder.values().stream()
                     .filter(d -> d.mDisplayId != Display.DEFAULT_DISPLAY)
@@ -6600,16 +6662,21 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         .getPairingBootstrappingMethod();
                 if (pairingBootstrappingMethod
                         == WifiP2pPairingBootstrappingConfig
-                        .PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PINCODE || pairingBootstrappingMethod
-                        == WifiP2pPairingBootstrappingConfig
-                        .PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PASSPHRASE) {
+                        .PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PINCODE) {
                     isPinRequested = true;
                 } else if (pairingBootstrappingMethod
                         == WifiP2pPairingBootstrappingConfig
-                        .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PINCODE || pairingBootstrappingMethod
+                        .PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PASSPHRASE) {
+                    isPasswordRequested = true;
+                } else if (pairingBootstrappingMethod
+                        == WifiP2pPairingBootstrappingConfig
+                        .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PINCODE) {
+                    displayPin = mSavedPeerConfig.getPairingBootstrappingConfig()
+                            .getPairingBootstrappingPassword();
+                } else if (pairingBootstrappingMethod
                         == WifiP2pPairingBootstrappingConfig
                         .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PASSPHRASE) {
-                    displayPin = mSavedPeerConfig.getPairingBootstrappingConfig()
+                    displayPassword = mSavedPeerConfig.getPairingBootstrappingConfig()
                             .getPairingBootstrappingPassword();
                 }
             }
@@ -6647,7 +6714,9 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     mWifiInjector.getWifiDialogManager().createP2pInvitationReceivedDialog(
                             deviceName,
                             isPinRequested,
+                            isPasswordRequested,
                             displayPin,
+                            displayPassword,
                             mContext.getResources().getInteger(
                                     R.integer.config_p2pInvitationReceivedDialogTimeoutMs),
                             displayId,
@@ -7241,7 +7310,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 if (mSavedPeerConfig.wps.setup == WpsInfo.DISPLAY) {
                     Integer.parseInt(pin);
                     mSavedPeerConfig.wps.pin = pin;
-                    notifyInvitationSent(pin, config.deviceAddress);
+                    notifyInvitationSent(pin, null, config.deviceAddress);
                 }
             } catch (NumberFormatException ignore) {
                 // do nothing if p2pConnect did not return a pin
@@ -8771,15 +8840,13 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             == message.arg1
                     && WifiP2pManager.ExternalApproverRequestListener.REQUEST_TYPE_NEGOTIATION
                             == requestType) {
-                String pinOrPassphrase = "";
-                if (WpsInfo.KEYPAD == mSavedPeerConfig.wps.setup) {
-                    pinOrPassphrase = mSavedPeerConfig.wps.pin;
-                } else if (isConfigForBootstrappingMethodDisplayPinOrPassphrase(mSavedPeerConfig)) {
-                    pinOrPassphrase = getPinOrPassphraseFromSavedPeerConfig();
-                }
                 detachExternalApproverFromPeer();
-                notifyP2pProvDiscShowPinRequest(pinOrPassphrase,
-                        mSavedPeerConfig.deviceAddress);
+                if (isConfigForV2Connection(mSavedPeerConfig)) {
+                    notifyP2pProvDiscShowPinOrPasswordRequestForV2Connection();
+                } else {
+                    notifyP2pProvDiscShowPinRequest(mSavedPeerConfig.wps.pin, null,
+                            mSavedPeerConfig.deviceAddress);
+                }
                 return true;
             }
 
@@ -8825,7 +8892,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             // the application again.
             if (WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PIN_TO_SERVICE == message.arg1) {
                 detachExternalApproverFromPeer();
-                notifyInvitationSent(mSavedPeerConfig.wps.pin,
+                notifyInvitationSent(mSavedPeerConfig.wps.pin, null,
                         mSavedPeerConfig.deviceAddress);
                 return true;
             }
@@ -8850,8 +8917,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             if (WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PIN_TO_SERVICE == message.arg1
                     && isConfigForBootstrappingMethodDisplayPinOrPassphrase(mSavedPeerConfig)) {
                 detachExternalApproverFromPeer();
-                notifyInvitationSent(getPinOrPassphraseFromSavedPeerConfig(),
-                        mSavedPeerConfig.deviceAddress);
+                notifyInvitationSentForV2Connection();
                 return true;
             }
             Log.w(TAG, "Invalid connection result: " + message.arg1
