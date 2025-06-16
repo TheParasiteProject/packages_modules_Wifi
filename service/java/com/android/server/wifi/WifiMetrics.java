@@ -744,12 +744,24 @@ public class WifiMetrics {
     }
 
     /**
-     * Sets the timestamp after roaming is complete.
+     * Updates timestamp and router capabilities metrics upon successful completion of Wi-Fi
+     * roaming.
      */
     public void onRoamComplete(String ifaceName) {
         SessionData currentSession = mCurrentConnectionSessionPerIface.get(ifaceName);
         if (currentSession != null) {
             currentSession.mLastRoamCompleteMillis = mClock.getElapsedSinceBootMillis();
+        }
+
+        synchronized (mLock) {
+            SessionData sessionData = mCurrentConnectionSessionPerIface.get(ifaceName);
+            if (sessionData != null && sessionData.mConnectionEvent != null
+                    && sessionData.mConnectionEvent.mRouterFingerPrint != null) {
+                reportRouterCapabilities(sessionData.mConnectionEvent.mRouterFingerPrint);
+            } else {
+                Log.w(TAG, "onRoamComplete: No current connection session router fingerprint for "
+                        + ifaceName);
+            }
         }
     }
 
@@ -2228,6 +2240,12 @@ public class WifiMetrics {
     public void setConnectionScanDetail(String ifaceName, ScanDetail scanDetail) {
         synchronized (mLock) {
             ConnectionEvent currentConnectionEvent = mCurrentConnectionEventPerIface.get(ifaceName);
+            if (currentConnectionEvent == null) {
+                SessionData sessionData = mCurrentConnectionSessionPerIface.get(ifaceName);
+                if (sessionData != null) {
+                    currentConnectionEvent = sessionData.mConnectionEvent;
+                }
+            }
             if (currentConnectionEvent == null || scanDetail == null) {
                 return;
             }
