@@ -2312,6 +2312,9 @@ public class WifiConnectivityManager {
                 startSingleScan(false, WIFI_WORK_SOURCE,
                         getScheduledSingleScanType(mCurrentSingleScanScheduleIndex));
 
+                mWifiMetrics.reportWifiPeriodicScan(false, false,
+                        getScheduledSingleScanType(mCurrentSingleScanScheduleIndex),
+                        getScheduledSingleScanIntervalMs(mCurrentSingleScanScheduleIndex));
                 // Note, initial partial scan may fail due to lack of channel history
                 // Hence, we verify state before changing to AWAITING_RESPONSE
                 if (mInitialScanState == INITIAL_SCAN_STATE_START) {
@@ -2321,6 +2324,10 @@ public class WifiConnectivityManager {
             } else {
                 startSingleScan(isFullBandScan, WIFI_WORK_SOURCE,
                         getScheduledSingleScanType(mCurrentSingleScanScheduleIndex));
+                mWifiMetrics.reportWifiPeriodicScan(mWifiState == WIFI_STATE_CONNECTED,
+                        isFullBandScan,
+                        getScheduledSingleScanType(mCurrentSingleScanScheduleIndex),
+                        getScheduledSingleScanIntervalMs(mCurrentSingleScanScheduleIndex));
             }
             schedulePeriodicScanTimer(
                     getScheduledSingleScanIntervalMs(mCurrentSingleScanScheduleIndex));
