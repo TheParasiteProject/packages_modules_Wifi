@@ -75,10 +75,10 @@ public class WifiAwareDiscoverySessionState {
     private boolean mIsSuspended;
 
     static class PeerInfo {
-        PeerInfo(int instanceId, byte[] mac) {
+        PeerInfo(int instanceId, byte[] mac, PeerHandle peerHandle) {
             mInstanceId = instanceId;
             mMac = mac;
-            mPeerHandle = new PeerHandle(instanceId);
+            mPeerHandle = peerHandle;
         }
 
         int mInstanceId;
@@ -740,7 +740,8 @@ public class WifiAwareDiscoverySessionState {
         }
 
         int newPeerId = sNextPeerIdToBeAllocated++;
-        PeerInfo newPeerInfo = new PeerInfo(requestorInstanceId, peerMac);
+        PeerInfo newPeerInfo = new PeerInfo(requestorInstanceId, peerMac,
+                new PeerHandle(newPeerId));
         mPeerInfoByRequestorInstanceId.put(newPeerId, newPeerInfo);
         Log.d(TAG, "New peer info: peerId=" + newPeerId + ", peerInfo=" + newPeerInfo);
 
