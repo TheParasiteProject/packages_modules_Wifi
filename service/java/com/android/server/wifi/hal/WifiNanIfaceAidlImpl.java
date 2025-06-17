@@ -536,10 +536,10 @@ public class WifiNanIfaceAidlImpl implements IWifiNanIface {
 
     @Override
     public boolean respondToNanBootstrappingRequest(short transactionId, int bootstrappingId,
-            boolean accept, byte pubSubId) {
+            boolean accept, byte pubSubId, int method) {
         String methodStr = "respondToNanBootstrappingRequest";
         NanBootstrappingResponse request = createNanBootstrappingResponse(bootstrappingId, accept,
-                pubSubId);
+                pubSubId, method);
         synchronized (mLock) {
             try {
                 if (!checkIfaceAndLogFailure(methodStr)) return false;
@@ -592,11 +592,12 @@ public class WifiNanIfaceAidlImpl implements IWifiNanIface {
     // Utilities
 
     private static NanBootstrappingResponse createNanBootstrappingResponse(int bootstrappingId,
-            boolean accept, byte pubSubId) {
+            boolean accept, byte pubSubId, int method) {
         NanBootstrappingResponse request = new NanBootstrappingResponse();
         request.acceptRequest = accept;
         request.bootstrappingInstanceId = bootstrappingId;
         request.discoverySessionId = pubSubId;
+        request.responseBootstrappingMethod = method;
         return request;
     }
 

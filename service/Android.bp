@@ -80,7 +80,7 @@ java_library {
         // Types-only package shared across the HALs
         "android.hardware.wifi.common-V2-java",
         // AIDL vendor hal implementation
-        "android.hardware.wifi-V3-java",
+        "android.hardware.wifi-V4-java",
         // HIDL vendor hal implementation
         "android.hardware.wifi-V1.0-java",
         "android.hardware.wifi-V1.1-java",

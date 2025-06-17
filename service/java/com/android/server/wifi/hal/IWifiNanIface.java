@@ -292,10 +292,11 @@ public interface IWifiNanIface {
      * @param accept          True if the proposed bootstrapping method is accepted.
      * @param pubSubId        ID of the publish/subscribe session - obtained when creating a
      *                        session.
+     * @param method          the proposed bootstrapping method
      * @return True if the request send succeed.
      */
     boolean respondToNanBootstrappingRequest(short transactionId, int bootstrappingId,
-            boolean accept, byte pubSubId);
+            boolean accept, byte pubSubId, int method);
 
     /**
      * Suspend the specified Aware session. During the suspend state, the Wi-Fi Aware device

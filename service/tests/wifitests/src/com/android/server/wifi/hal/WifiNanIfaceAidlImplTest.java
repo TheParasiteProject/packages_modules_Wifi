@@ -642,7 +642,7 @@ public class WifiNanIfaceAidlImplTest extends WifiBaseTest {
         byte pid = 34;
         ArgumentCaptor<NanBootstrappingResponse> reqCaptor = ArgumentCaptor.forClass(
                 NanBootstrappingResponse.class);
-        assertTrue(mDut.respondToNanBootstrappingRequest(tid, 1, true, pid));
+        assertTrue(mDut.respondToNanBootstrappingRequest(tid, 1, true, pid, 2));
         verify(mIWifiNanIfaceMock).respondToBootstrappingIndicationRequest(eq((char) tid),
                 reqCaptor.capture());
         NanBootstrappingResponse request = reqCaptor.getValue();
