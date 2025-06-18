@@ -2085,6 +2085,10 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             }
         }
 
+        if (mActiveModeWarden.isSoftApRestartingForCcChange(IFACE_IP_MODE_TETHERED)) {
+            mLog.err("Tethering is in the middle of restarting for CC change.").flush();
+            return false;
+        }
         if (!mTetheredSoftApTracker.setEnablingIfAllowed()) {
             mLog.err("Tethering is already active or activating.").flush();
             return false;
@@ -2186,22 +2190,32 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 mCountryCode.getCountryCode(), request), callingUid, packageName, callback);
     }
 
+    private void sendSoftApCallbackStartFailure(@Nullable ISoftApCallback callback,
+            @Nullable TetheringManager.TetheringRequest tetheringRequest) {
+        if (callback == null) return;
+        try {
+            callback.onStateChanged(new SoftApState(WIFI_AP_STATE_FAILED,
+                    SAP_START_FAILURE_GENERAL, tetheringRequest, null));
+        } catch (RemoteException e) {
+            Log.e(TAG, "ISoftApCallback.onStateChanged: remote exception -- " + e);
+        }
+    }
+
     /**
      * Internal method to start tethered hotspot. Callers of this method should have already checked
      * proper permissions beyond the NetworkStack permission.
      */
     private boolean startTetheredHotspotInternal(@NonNull SoftApModeConfiguration modeConfig,
             int callingUid, String packageName, @Nullable ISoftApCallback callback) {
+        TetheringManager.TetheringRequest tetheringRequest = modeConfig.getTetheringRequest();
+        if (mActiveModeWarden.isSoftApRestartingForCcChange(IFACE_IP_MODE_TETHERED)) {
+            mLog.err("Tethering is in the middle of restarting for CC change.").flush();
+            sendSoftApCallbackStartFailure(callback, tetheringRequest);
+            return false;
+        }
         if (!mTetheredSoftApTracker.setEnablingIfAllowed()) {
             mLog.err("Tethering is already active or activating.").flush();
-            if (callback != null) {
-                try {
-                    callback.onStateChanged(new SoftApState(WIFI_AP_STATE_FAILED,
-                            SAP_START_FAILURE_GENERAL, modeConfig.getTetheringRequest(), null));
-                } catch (RemoteException e) {
-                    Log.e(TAG, "ISoftApCallback.onStateChanged: remote exception -- " + e);
-                }
-            }
+            sendSoftApCallbackStartFailure(callback, tetheringRequest);
             return false;
         }
 
