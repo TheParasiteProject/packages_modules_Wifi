@@ -1276,6 +1276,17 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 return;
             }
 
+            // Treat an SSID change as a network removal
+            if (oldConfig != null && !TextUtils.equals(newConfig.SSID, oldConfig.SSID)) {
+                Log.i(getTag(), "SSID changed for active/target network (id=" + newConfig.networkId
+                        + "). Old: " + oldConfig.SSID + ", New: " + newConfig.SSID
+                        + ". Triggering disconnect.");
+                mFrameworkDisconnectReasonOverride =
+                        WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__DISCONNECT_NETWORK_REMOVED;
+                sendMessageAtFrontOfQueue(CMD_DISCONNECT, StaEvent.DISCONNECT_NETWORK_REMOVED);
+                return;
+            }
+
             if (newConfig.isWifi7Enabled() != oldConfig.isWifi7Enabled()) {
                 Log.w(getTag(), "Wi-Fi " + (newConfig.isWifi7Enabled() ? "enabled" : "disabled")
                         + " triggering disconnect");
