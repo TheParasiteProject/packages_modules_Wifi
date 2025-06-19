@@ -11309,6 +11309,26 @@ public class ClientModeImplTest extends WifiBaseTest {
                 eq(StaEvent.DISCONNECT_NETWORK_WIFI7_TOGGLED));
     }
 
+    /**
+     * Verify that we disconnect when the SSID changes.
+     */
+    @Test
+    public void verifyDisconnectOnSsidChange() throws Exception {
+        connect();
+
+        WifiConfiguration oldConfig = new WifiConfiguration(mConnectedNetwork);
+        mConnectedNetwork.SSID = "\"Some other SSID\"";
+
+        for (WifiConfigManager.OnNetworkUpdateListener listener : mConfigUpdateListenerCaptor
+                .getAllValues()) {
+            listener.onNetworkUpdated(mConnectedNetwork, oldConfig, false);
+        }
+        mLooper.dispatchAll();
+        verify(mWifiNative).disconnect(WIFI_IFACE_NAME);
+        verify(mWifiMetrics).logStaEvent(anyString(), eq(StaEvent.TYPE_FRAMEWORK_DISCONNECT),
+                eq(StaEvent.DISCONNECT_NETWORK_REMOVED));
+    }
+
     private void testDhcpHostnameSetting(
             boolean configEnabled,
             @WifiManager.SendDhcpHostnameRestriction int restriction,
