@@ -88,13 +88,13 @@ import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.AdditionalAnswers.returnsSecondArg;
 import static org.mockito.AdditionalMatchers.aryEq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anySet;
-import static org.mockito.ArgumentMatchers.notNull;
-import static org.mockito.ArgumentMatchers.nullable;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.notNull;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.argThat;
@@ -3829,6 +3829,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         assertFalse(mWifiServiceImpl.startSoftAp(
                 createValidWifiApConfiguration(), TEST_PACKAGE_NAME));
         mLooper.stopAutoDispatchAndIgnoreExceptions();
+        verify(mActiveModeWarden).isSoftApRestartingForCcChange(IFACE_IP_MODE_TETHERED);
 
         verifyNoMoreInteractions(mActiveModeWarden);
     }
@@ -3854,6 +3855,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
         // Start another session without a stop, that should fail.
         assertFalse(mWifiServiceImpl.startTetheredHotspot(config, TEST_PACKAGE_NAME));
+        verify(mActiveModeWarden).isSoftApRestartingForCcChange(IFACE_IP_MODE_TETHERED);
 
         verifyNoMoreInteractions(mActiveModeWarden);
     }
@@ -3883,6 +3885,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
                 TEST_PACKAGE_NAME);
         verify(mClientSoftApCallback).onStateChanged(eq(new SoftApState(WIFI_AP_STATE_FAILED,
                 SAP_START_FAILURE_GENERAL, TEST_TETHERING_REQUEST, null)));
+        verify(mActiveModeWarden).isSoftApRestartingForCcChange(IFACE_IP_MODE_TETHERED);
 
         verifyNoMoreInteractions(mActiveModeWarden);
     }
@@ -3907,6 +3910,26 @@ public class WifiServiceImplTest extends WifiBaseTest {
         int returnCode = mWifiServiceImpl.startLocalOnlyHotspot(
                 mLohsCallback, TEST_PACKAGE_NAME, TEST_FEATURE_ID, null, mExtras, false);
         assertEquals(ERROR_INCOMPATIBLE_MODE, returnCode);
+    }
+
+    /**
+     * Only start tethered hotspot if it is not currently restarting
+     */
+    @Test
+    public void testHotspotDoesNotStartWhenTetheringIsRestarting() throws Exception {
+        when(mActiveModeWarden.isSoftApRestartingForCcChange(IFACE_IP_MODE_TETHERED))
+                .thenReturn(true);
+
+        assertFalse(mWifiServiceImpl.startSoftAp(createValidWifiApConfiguration(),
+                TEST_PACKAGE_NAME));
+        assertFalse(mWifiServiceImpl.startTetheredHotspot(createValidSoftApConfiguration(),
+                TEST_PACKAGE_NAME));
+        if (SdkLevel.isAtLeastB()) {
+            mWifiServiceImpl.startTetheredHotspotRequest(TEST_TETHERING_REQUEST,
+                    mClientSoftApCallback, TEST_PACKAGE_NAME);
+            verify(mClientSoftApCallback).onStateChanged(eq(new SoftApState(WIFI_AP_STATE_FAILED,
+                    SAP_START_FAILURE_GENERAL, TEST_TETHERING_REQUEST, null)));
+        }
     }
 
     /**
