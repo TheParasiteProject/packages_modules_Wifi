@@ -2439,6 +2439,7 @@ public class ActiveModeWarden {
                                         // Assumes user toggled it on from settings before.
                                         mFacade.getSettingsWorkSource(mContext));
                                 transitionTo(mEnabledState);
+                                mWifiInjector.getSelfRecovery().onRecoveryCompleted();
                             }
                             break;
                         }
