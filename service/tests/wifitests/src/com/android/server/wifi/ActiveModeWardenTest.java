@@ -3108,6 +3108,30 @@ public class ActiveModeWardenTest extends WifiBaseTest {
     }
 
     /**
+     * Verify that if Wifi is restarted before an ActiveModeWarden exists, we can
+     * successfully re-enable Wifi and mark recovery as complete.
+     */
+    @Test
+    public void testRestartWifiStackWithNoActiveModeWarden() throws Exception {
+        when(mSettingsStore.isWifiToggleEnabled()).thenReturn(true);
+        when(mSelfRecovery.isRecoveryInProgress()).thenReturn(true);
+
+        // No ActiveModeWarden exists in the disabled state.
+        assertInDisabledState();
+        assertWifiShutDown(() -> {
+            mActiveModeWarden.recoveryRestartWifi(SelfRecovery.REASON_WIFINATIVE_FAILURE,
+                    true);
+            mLooper.dispatchAll();
+        });
+
+        mLooper.moveTimeForward(TEST_WIFI_RECOVERY_DELAY_MS);
+        mLooper.dispatchAll();
+
+        assertInEnabledState();
+        verify(mSelfRecovery).onRecoveryCompleted();
+    }
+
+    /**
      * The command to trigger a WiFi reset should trigger a wifi reset in SoftApManager through
      * the ActiveModeWarden.shutdownWifi() call when in SAP enabled mode.
      * If the shutdown isn't done fast enough to transit to disabled state it should still
