@@ -7706,4 +7706,14 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.resetWifiUnusableEvent();
         assertEquals(WifiIsUnusableEvent.TYPE_UNKNOWN, mWifiMetrics.mUnusableEventType);
     }
+
+    @Test
+    public void testWifiPeriodicScanReport() {
+        mWifiMetrics.reportWifiPeriodicScan(true, false, WifiScanner.SCAN_TYPE_LOW_LATENCY, 2000);
+
+        ExtendedMockito.verify(
+                () -> WifiStatsLog.write(WifiStatsLog.WIFI_PERIODIC_SCAN_REPORT,
+                true, false,
+                WifiStatsLog.WIFI_PERIODIC_SCAN_REPORT__SCAN_TYPE__LOW_LATENCY, 2000));
+    }
 }

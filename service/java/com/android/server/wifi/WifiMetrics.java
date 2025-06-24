@@ -5582,6 +5582,36 @@ public class WifiMetrics {
         }
     }
 
+    private int setScanTypeProto(int scanType) {
+        return switch(scanType) {
+            case WifiScanner.SCAN_TYPE_LOW_LATENCY ->
+                    WifiStatsLog.WIFI_PERIODIC_SCAN_REPORT__SCAN_TYPE__LOW_LATENCY;
+            case WifiScanner.SCAN_TYPE_LOW_POWER ->
+                    WifiStatsLog.WIFI_PERIODIC_SCAN_REPORT__SCAN_TYPE__LOW_POWER;
+            case WifiScanner.SCAN_TYPE_HIGH_ACCURACY ->
+                    WifiStatsLog.WIFI_PERIODIC_SCAN_REPORT__SCAN_TYPE__HIGH_ACCURACY;
+            default -> WifiStatsLog.WIFI_PERIODIC_SCAN_REPORT__SCAN_TYPE__UNKNOWN;
+        };
+    }
+
+    /**
+     * Call when WifiConnectivityManager triggers periodic scan.
+     * @param isWifiConnected is wifiState == WIFI_STATE_CONNECTED
+     * @param isFullBandScan is full band scan or not
+     * @param scanType @see ScanSettings#type
+     * @param scanIntervalMs the scheduled scan interval of current scanning attempt
+     */
+    public void reportWifiPeriodicScan(boolean isWifiConnected, boolean isFullBandScan,
+            int scanType, int scanIntervalMs) {
+            // Write metrics to statsd
+        WifiStatsLog.write(
+                WifiStatsLog.WIFI_PERIODIC_SCAN_REPORT,
+                isWifiConnected,
+                isFullBandScan,
+                setScanTypeProto(scanType),
+                scanIntervalMs);
+    }
+
     /**
      * Put all metrics that were being tracked separately into mWifiLogProto
      */
