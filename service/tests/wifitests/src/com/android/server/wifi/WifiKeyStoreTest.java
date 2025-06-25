@@ -18,6 +18,7 @@ package com.android.server.wifi;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.server.wifi.WifiConfigurationTestUtil.TEST_UID;
+import static com.android.server.wifi.WifiConfigurationTestUtil.TEST_USER_HANDLE;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -75,7 +76,6 @@ public class WifiKeyStoreTest extends WifiBaseTest {
     private static final String TEST_PACKAGE_NAME = "TestApp";
     private static final String KEYCHAIN_ALIAS = "kc-alias";
     private static final String KEYCHAIN_KEY_GRANT = "kc-grant";
-    public static final UserHandle TEST_USER_HANDLE = UserHandle.getUserHandleForUid(TEST_UID);
 
     /**
      * Setup the mocks and an instance of WifiConfigManager before each test.
