@@ -8223,7 +8223,9 @@ public class WifiMetrics {
                 s.isThroughputPredictorDownstreamSufficient,
                 s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected,
                 s.uwbAdapterState, s.isLowLatencyActivated, s.maxSupportedTxLinkspeed,
-                s.maxSupportedRxLinkspeed, s.voipMode, s.threadDeviceRole, s.statusDataStall
+                s.maxSupportedRxLinkspeed, s.voipMode, s.threadDeviceRole, s.statusDataStall,
+                -1, //TODO: b/427546930
+                android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_INVALID //TODO: b/427546930
         );
     }
 

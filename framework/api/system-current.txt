@@ -1398,6 +1398,8 @@ package android.net.wifi {
     method @IntRange(from=0xffffffff, to=255) public int getChannelUtilizationRatio();
     method @NonNull public android.net.wifi.WifiUsabilityStatsEntry.ContentionTimeStats getContentionTimeStats(int);
     method @NonNull public android.net.wifi.WifiUsabilityStatsEntry.ContentionTimeStats getContentionTimeStats(int, int);
+    method @FlaggedApi("com.android.wifi.flags.feed_internal_score_to_external_scorer") @IntRange(from=0, to=100) public int getInternalScore();
+    method @FlaggedApi("com.android.wifi.flags.feed_internal_score_to_external_scorer") public int getInternalScorerType();
     method @Nullable public int[] getLinkIds();
     method public int getLinkSpeedMbps();
     method public int getLinkState(int);
@@ -1453,6 +1455,9 @@ package android.net.wifi {
     field public static final int PROBE_STATUS_NO_PROBE = 1; // 0x1
     field public static final int PROBE_STATUS_SUCCESS = 2; // 0x2
     field public static final int PROBE_STATUS_UNKNOWN = 0; // 0x0
+    field @FlaggedApi("com.android.wifi.flags.feed_internal_score_to_external_scorer") public static final int SCORER_TYPE_INVALID = -1; // 0xffffffff
+    field @FlaggedApi("com.android.wifi.flags.feed_internal_score_to_external_scorer") public static final int SCORER_TYPE_ML = 1; // 0x1
+    field @FlaggedApi("com.android.wifi.flags.feed_internal_score_to_external_scorer") public static final int SCORER_TYPE_VELOCITY = 0; // 0x0
     field public static final int WIFI_BANDWIDTH_10_MHZ = 6; // 0x6
     field public static final int WIFI_BANDWIDTH_160_MHZ = 3; // 0x3
     field public static final int WIFI_BANDWIDTH_20_MHZ = 0; // 0x0

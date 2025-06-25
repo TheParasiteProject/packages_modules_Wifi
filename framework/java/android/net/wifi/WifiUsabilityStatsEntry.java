@@ -187,6 +187,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final int mThreadDeviceRole;
     /** Data stall status */
     private final int mStatusDataStall;
+    private final int mInternalScore;
+    private final int mInternalScorerType;
 
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
@@ -219,6 +221,25 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     public static final int WME_ACCESS_CATEGORY_VO = 3;
     /** Number of WME Access Categories */
     public static final int NUM_WME_ACCESS_CATEGORIES = 4;
+
+    /** @hide */
+    @IntDef(prefix = { "SCORER_TYPE_" }, value = {
+        SCORER_TYPE_INVALID,
+        SCORER_TYPE_VELOCITY,
+        SCORER_TYPE_ML
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface ScorerType {}
+
+    /** Invalid scorer */
+    @FlaggedApi(Flags.FLAG_FEED_INTERNAL_SCORE_TO_EXTERNAL_SCORER)
+    public static final int SCORER_TYPE_INVALID = -1;
+    /** Velocity based scorer which is the traditional AOSP scorer */
+    @FlaggedApi(Flags.FLAG_FEED_INTERNAL_SCORE_TO_EXTERNAL_SCORER)
+    public static final int SCORER_TYPE_VELOCITY = 0;
+    /** Machine learning scorer */
+    @FlaggedApi(Flags.FLAG_FEED_INTERNAL_SCORE_TO_EXTERNAL_SCORER)
+    public static final int SCORER_TYPE_ML = 1;
 
     /**
      * Data packet contention time statistics.
@@ -1194,7 +1215,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             int isThroughputPredictorDownstreamSufficient,
             int isThroughputPredictorUpstreamSufficient, boolean isBluetoothConnected,
             int uwbAdapterState, boolean isLowLatencyActivated, int maxSupportedTxLinkSpeed,
-            int maxSupportedRxLinkSpeed, int voipMode, int threadDeviceRole, int statusDataStall) {
+            int maxSupportedRxLinkSpeed, int voipMode, int threadDeviceRole, int statusDataStall,
+            int internalScore, int internalScorerType) {
         mTimeStampMillis = timeStampMillis;
         mRssi = rssi;
         mLinkSpeedMbps = linkSpeedMbps;
@@ -1249,6 +1271,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         mVoipMode = voipMode;
         mThreadDeviceRole = threadDeviceRole;
         mStatusDataStall = statusDataStall;
+        mInternalScore = internalScore;
+        mInternalScorerType = internalScorerType;
     }
 
     /** Implement the Parcelable interface */
@@ -1312,6 +1336,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         dest.writeInt(mVoipMode);
         dest.writeInt(mThreadDeviceRole);
         dest.writeInt(mStatusDataStall);
+        dest.writeInt(mInternalScore);
+        dest.writeInt(mInternalScorerType);
     }
 
     /** Implement the Parcelable interface */
@@ -1337,7 +1363,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     in.readInt(), in.readLong(), in.readLong(), in.readInt(), in.readInt(),
                     in.readInt(), in.readInt(), in.readInt(), in.readInt(), in.readBoolean(),
                     in.readInt(), in.readBoolean(), in.readInt(), in.readInt(), in.readInt(),
-                    in.readInt(), in.readInt()
+                    in.readInt(), in.readInt(), in.readInt(), in.readInt()
             );
         }
 
@@ -2054,6 +2080,25 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** Whether the primary registered cell of current entry is same as that of previous entry */
     public boolean isSameRegisteredCell() {
         return mIsSameRegisteredCell;
+    }
+
+    /**
+     * Get the score calculated by the internal scorer based on the usability statistics within this
+     * class. Any external scorer can then use this score as a reference for their final Wi-Fi
+     * usability decision.
+     */
+    @FlaggedApi(Flags.FLAG_FEED_INTERNAL_SCORE_TO_EXTERNAL_SCORER)
+    public @IntRange(from = 0, to = 100) int getInternalScore() {
+        return mInternalScore;
+    }
+
+    /**
+     * Get the type of the internal scorer that calculates the score returned by
+     * {@link #getInternalScore()}
+     */
+    @FlaggedApi(Flags.FLAG_FEED_INTERNAL_SCORE_TO_EXTERNAL_SCORER)
+    public @ScorerType int getInternalScorerType() {
+        return mInternalScorerType;
     }
 
     /** @hide */

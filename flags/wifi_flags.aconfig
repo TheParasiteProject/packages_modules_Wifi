@@ -393,3 +393,11 @@ flag {
     bug: "409802099"
     is_fixed_read_only: true
 }
+
+flag {
+    name: "feed_internal_score_to_external_scorer"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add new APIs to feed the internal score to external scorer for reference"
+    bug: "427546930"
+}
