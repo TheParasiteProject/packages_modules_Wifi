@@ -382,18 +382,32 @@ public class NativeUtil {
     }
 
     /**
-     * Update PMF requirement if auto-upgrade offload is supported.
+     * Determines the optimal Protected Management Frames (PMF) setting for a network configuration.
      *
-     * If SAE auto-upgrade offload is supported and this config enables
-     * both PSK and SAE, do not set PMF requirement to
-     * mandatory to allow the device to roam between PSK and SAE BSSes.
-     * wpa_supplicant will set PMF requirement to optional by default.
+     * <p>For network configuration in WPA2/WPA3 transition mode (both Personal and Enterprise),
+     * this forces PMF to be optional (returns {@code false}) to allow devices to connect/roam
+     * between WPA2 and WPA3 networks. For all other network configuration, it returns the default
+     * setting provided.
+     *
+     * @param config The Wi-Fi configuration to evaluate.
+     * @param isPmfRequiredFromSelectedSecurityParams The default PMF setting. This is returned for
+     *                                                non-transition mode network configuration.
+     * @param wifiGlobals Used to check for feature support like WPA3 SAE upgrade offload.
+     * @return {@code true} if PMF should be required, {@code false} if it should be optional.
      */
     public static boolean getOptimalPmfSettingForConfig(WifiConfiguration config,
             boolean isPmfRequiredFromSelectedSecurityParams, WifiGlobals wifiGlobals) {
         if (isPskSaeParamsMergeable(config, wifiGlobals)) {
             return false;
         }
+        if (config.isSecurityType(WifiConfiguration.SECURITY_TYPE_EAP)
+                && config.getSecurityParams(WifiConfiguration.SECURITY_TYPE_EAP).isEnabled()
+                && config.isSecurityType(WifiConfiguration.SECURITY_TYPE_EAP_WPA3_ENTERPRISE)
+                && config.getSecurityParams(WifiConfiguration.SECURITY_TYPE_EAP_WPA3_ENTERPRISE)
+                .isEnabled()) {
+            return false;
+        }
+
         return isPmfRequiredFromSelectedSecurityParams;
     }
 
