@@ -11430,4 +11430,22 @@ public class ClientModeImplTest extends WifiBaseTest {
                 eq(100 * 1000L), eq(REASON_APP_DISALLOW), eq(0));
         verify(mWifiBlocklistMonitor).updateAndGetBssidBlocklistForSsids(any());
     }
+
+    /**
+     * Verify that metrics are updated once roaming is complete.
+     */
+    @Test
+    public void verifyWifiRoamingMetricsUpdate() throws Exception {
+        connect();
+        assertEquals("L3ConnectedState", getCurrentState().getName());
+        assertEquals(TEST_LOCAL_MAC_ADDRESS.toString(), mWifiInfo.getMacAddress());
+
+        // Verify receiving a NETWORK_CONNECTION_EVENT changes the MAC in WifiInfo
+        when(mWifiNative.getMacAddress(WIFI_IFACE_NAME))
+                .thenReturn(TEST_GLOBAL_MAC_ADDRESS.toString());
+        mCmi.sendMessage(WifiMonitor.NETWORK_CONNECTION_EVENT,
+                new NetworkConnectionEventInfo(0, TEST_WIFI_SSID, TEST_BSSID_STR, false, null));
+        mLooper.dispatchAll();
+        verify(mWifiMetrics).onRoamComplete(eq(WIFI_IFACE_NAME));
+    }
 }
