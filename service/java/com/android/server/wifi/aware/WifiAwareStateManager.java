@@ -33,6 +33,7 @@ import static com.android.server.wifi.hal.WifiNanIface.NanStatusCode.NOT_SUPPORT
 import static com.android.server.wifi.hal.WifiNanIface.NanStatusCode.NO_CONNECTION;
 import static com.android.server.wifi.hal.WifiNanIface.NanStatusCode.REDUNDANT_REQUEST;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_AWARE_CAPABILITIES;
+import static com.android.server.wifi.proto.WifiStatsLog.WIFI_AWARE_CAPABILITIES__IS_PERIODIC_RANGING_SUPPORTED__TRI_STATE_FALSE;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_AWARE_HAL_API_CALLED;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_AWARE_HAL_API_CALLED__COMMAND__AWARE_API_UNKNOWN;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_AWARE_HAL_API_CALLED__COMMAND__AWARE_CONFIG_REQUEST;
@@ -4846,7 +4847,10 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
                     mCapabilities.supportedDataPathCipherSuites,
                     mCapabilities.maxNdiInterfaces,
                     mCapabilities.maxNdpSessions,
-                    mCapabilities.maxPublishes));
+                    mCapabilities.maxPublishes,
+                    mCapabilities.isPeriodicRangingSupported
+                            ? WifiStatsLog.WIFI_AWARE_CAPABILITIES__IS_PERIODIC_RANGING_SUPPORTED__TRI_STATE_TRUE
+                            : WIFI_AWARE_CAPABILITIES__IS_PERIODIC_RANGING_SUPPORTED__TRI_STATE_FALSE));
             return StatsManager.PULL_SUCCESS;
         }
     }
