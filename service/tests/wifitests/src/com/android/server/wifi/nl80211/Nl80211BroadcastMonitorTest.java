@@ -20,7 +20,12 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.validateMockitoUsage;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
@@ -63,6 +68,7 @@ public class Nl80211BroadcastMonitorTest {
     @Mock Handler mBackgroundHandler;
     @Mock Looper mBackgroundLooper;
     @Mock MessageQueue mBackgroundMessageQueue;
+    @Mock Nl80211BroadcastMonitor.Nl80211BroadcastCallback mEventCallback;
 
     @Before
     public void setUp() throws Exception {
@@ -126,5 +132,37 @@ public class Nl80211BroadcastMonitorTest {
         // Buffers with a valid length should be posted to the Wifi thread for handling.
         mDut.handlePacket(TEST_MESSAGE_BUFFER, TEST_MESSAGE_BUFFER.length);
         assertTrue(mWifiLooper.isIdle()); // packet is in the message queue
+    }
+
+    /**
+     * Verify that callbacks are only triggered when they are registered for a
+     * specific type of event.
+     */
+    @Test
+    public void testRegisterAndUnregisterCallback() {
+        for (int i = 0; i < 4; i++) {
+            // Receive several messages of the same type.
+            mDut.handlePacket(TEST_MESSAGE_BUFFER, TEST_MESSAGE_BUFFER.length);
+        }
+
+        // No callbacks should be triggered before registration.
+        mWifiLooper.dispatchNext();
+        verifyNoInteractions(mEventCallback);
+
+        // Callback should not be triggered if registered for a different event type.
+        short eventType = TEST_MESSAGE.genNlHeader.command;
+        mDut.registerBroadcastCallback((short) (eventType + 1), mEventCallback);
+        mWifiLooper.dispatchNext();
+        verifyNoInteractions(mEventCallback);
+
+        // Callback should be triggered if registered for the expected event type.
+        mDut.registerBroadcastCallback(eventType, mEventCallback);
+        mWifiLooper.dispatchNext();
+        verify(mEventCallback).onEvent(eq(eventType), any());
+
+        // Callback should not be triggered after it has been unregistered.
+        mDut.unregisterBroadcastCallback(eventType, mEventCallback);
+        mWifiLooper.dispatchNext();
+        verifyNoMoreInteractions(mEventCallback);
     }
 }
