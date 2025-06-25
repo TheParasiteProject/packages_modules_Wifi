@@ -845,6 +845,9 @@ public class WifiMetrics {
         private NetworkDetail.HSRelease mHsRelease = NetworkDetail.HSRelease.Unknown;
         private ApType6GHz mApType6GHz = ApType6GHz.AP_TYPE_6GHZ_UNKNOWN;
         public @WifiAnnotations.ChannelWidth int mChannelWidth = ScanResult.UNSPECIFIED;
+        private boolean mIsPasnSupported = false;
+        private boolean mIsSecureHeLtfSupported = false;
+        private boolean mIsRangingFrameProtectionRequired = false;
 
         public String toString() {
             StringBuilder sb = new StringBuilder();
@@ -881,6 +884,9 @@ public class WifiMetrics {
                 sb.append(", mIsEcpsPriorityAccessSupported=" + mIsEcpsPriorityAccessSupported);
                 sb.append(", mHsRelease=" + mHsRelease);
                 sb.append(", mChannelWidth" + mChannelWidth);
+                sb.append("" + mIsPasnSupported);
+                sb.append("" + mIsSecureHeLtfSupported);
+                sb.append("" + mIsRangingFrameProtectionRequired);
             }
             return sb.toString();
         }
@@ -2873,7 +2879,16 @@ public class WifiMetrics {
                 r.mIs11AzSupported, convertHsReleasetoProto(r.mHsRelease),
                 r.mRouterFingerPrintProto.isPasspointHomeProvider,
                 convertApType6GhzToProto(r.mApType6GHz), r.mIsEcpsPriorityAccessSupported,
-                convertChannelWidthToProto(r.mChannelWidth));
+                convertChannelWidthToProto(r.mChannelWidth),
+                r.mIsPasnSupported
+                        ? WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__IS_PASN_SUPPORTED__TRI_STATE_TRUE
+                        : WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__IS_PASN_SUPPORTED__TRI_STATE_FALSE,
+                r.mIsSecureHeLtfSupported
+                        ? WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__IS_SECURE_HE_LTF_SUPPORTED__TRI_STATE_TRUE
+                        : WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__IS_SECURE_HE_LTF_SUPPORTED__TRI_STATE_FALSE,
+                r.mIsRangingFrameProtectionRequired
+                        ? WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__IS_RANGING_FRAME_PROTECTION_REQUIRED__TRI_STATE_TRUE
+                        : WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__IS_RANGING_FRAME_PROTECTION_REQUIRED__TRI_STATE_FALSE);
     }
 
     /**
@@ -3079,6 +3094,8 @@ public class WifiMetrics {
         currentConnectionEvent.mRouterFingerPrint.mIsEcpsPriorityAccessSupported =
                 networkDetail.isEpcsPriorityAccessSupported();
         currentConnectionEvent.mRouterFingerPrint.mHsRelease = networkDetail.getHSRelease();
+        currentConnectionEvent.mRouterFingerPrint.mIsSecureHeLtfSupported = networkDetail.isSecureHeLtfSupported();
+        currentConnectionEvent.mRouterFingerPrint.mIsRangingFrameProtectionRequired = networkDetail.isRangingFrameProtectionRequired();
     }
 
     /**
@@ -3108,6 +3125,8 @@ public class WifiMetrics {
         }
         currentConnectionEvent.mRouterFingerPrint.mRouterFingerPrintProto.channelInfo =
                 scanResult.frequency;
+        currentConnectionEvent.mRouterFingerPrint.mIsPasnSupported =
+                scanResult.capabilities != null && scanResult.capabilities.contains("PASN");
     }
 
     void setIsLocationEnabled(boolean enabled) {
