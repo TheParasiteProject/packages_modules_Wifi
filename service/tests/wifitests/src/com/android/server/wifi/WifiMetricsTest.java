@@ -7263,6 +7263,42 @@ public class WifiMetricsTest extends WifiBaseTest {
                         eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__AP_TYPE_6GHZ__AP_TYPE_6GHZ_STANDARD_POWER),
                         eq(true), // mIsEcpsPriorityAccessSupported
                         eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_160MHZ))); // mChannelWidth
+
+        // Validate AP capabilities after roaming
+        when(networkDetail.getApType6GHz()).thenReturn(
+                InformationElementUtil.ApType6GHz.AP_TYPE_6GHZ_INDOOR);
+        mWifiMetrics.setConnectionScanDetail(TEST_IFACE_NAME, scanDetail);
+        mWifiMetrics.onRoamComplete(TEST_IFACE_NAME);
+
+        ExtendedMockito.verify(
+                () -> WifiStatsLog.write(eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED),
+                        eq(true), // mIsFrameworkInitiatedRoaming
+                        eq(TEST_CANDIDATE_FREQ),
+                        eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__BAND_MHZ__BAND_2G),
+                        eq(NETWORK_DETAIL_DTIM),
+                        eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__CONNECTED_SECURITY_MODE__SECURITY_MODE_NONE),
+                        eq(true), // hidden
+                        eq(true), // mIsIncorrectlyConfiguredAsHidden
+                        eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__STANDARD__WIFI_STANDARD_11BE),
+                        eq(false), // mIs11bSupported
+                        eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__EAP_TYPE__TYPE_EAP_TTLS),
+                        eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__EAP_INNER_METHOD__METHOD_MSCHAP_V2),
+                        eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__OCSP_TYPE__TYPE_OCSP_REQUIRE_CERT_STATUS),
+                        eq(false), // pmkCacheEnabled
+                        eq(true), // mIsMboSupported
+                        eq(true), // mIsOceSupported
+                        eq(true), // mIsFilsSupported
+                        eq(true), // mIsTwtRequired
+                        eq(true), // mIsIndividualTwtSupported
+                        eq(true), // mIsBroadcastTwtSupported
+                        eq(true), // mIsRestrictedTwtSupported
+                        eq(true), // mIs11McSupported
+                        eq(true), // mIs11AzSupported
+                        eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__PASSPOINT_RELEASE__PASSPOINT_RELEASE_UNKNOWN),
+                        eq(false), // isPasspointHomeProvider
+                        eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__AP_TYPE_6GHZ__AP_TYPE_6GHZ_STANDARD_POWER),
+                        eq(true), // mIsEcpsPriorityAccessSupported
+                        eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_160MHZ))); // mChannelWidth
     }
 
     @Test

@@ -18,10 +18,14 @@ package com.android.server.wifi;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.app.ActivityManager;
 import android.content.Context;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiMigration;
+import android.net.wifi.util.Environment;
 import android.os.Handler;
+import android.os.UserHandle;
+import android.os.UserManager;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -30,6 +34,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.wifi.util.SettingsMigrationDataHolder;
 import com.android.server.wifi.util.WifiConfigStoreEncryptionUtil;
 import com.android.server.wifi.util.XmlUtil;
+import com.android.wifi.flags.FeatureFlags;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -40,9 +45,11 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Store data for storing wifi settings. These are key (string) / value pairs that are stored in
@@ -50,6 +57,8 @@ import java.util.Objects;
  */
 public class WifiSettingsConfigStore {
     private static final String TAG = "WifiSettingsConfigStore";
+    public static final String XML_TAG_SECTION_HEADER = "Settings";
+    public static final String XML_TAG_VALUES = "Values";
 
     // List of all allowed keys.
     private static final ArrayList<Key> sKeys = new ArrayList<>();
@@ -221,16 +230,26 @@ public class WifiSettingsConfigStore {
     public static final Key<Boolean> WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON =
             new Key<>("wifi_networks_available_notification_on", true);
 
-    // List of all keys which require to backup and restore.
-    private static final List<Key> sBackupRestoreKeys = List.of(
+
+    // Set of all user-specific private setting keys, which require to backup and restore.
+    private static final Set<Key> sUserPrivateKeys = Set.of(
             WIFI_WEP_ALLOWED,
             D2D_ALLOWED_WHEN_INFRA_STA_DISABLED);
+
+    // Set of all shared setting keys. Obtained from the difference of all keys and private keys.
+    private static final Set<Key> sSharedKeys = new HashSet<>();
+    static {
+        sSharedKeys.addAll(sKeys);
+        sSharedKeys.removeAll(sUserPrivateKeys);
+    }
     /******** Wifi shared pref keys ***************/
 
     private final Context mContext;
     private final Handler mHandler;
     private final SettingsMigrationDataHolder mSettingsMigrationDataHolder;
     private final WifiConfigManager mWifiConfigManager;
+    private final FeatureFlags mFeatureFlags;
+    private final UserManager mUserManager;
 
     private final Object mLock = new Object();
     @GuardedBy("mLock")
@@ -240,7 +259,13 @@ public class WifiSettingsConfigStore {
             new HashMap<>();
     private WifiMigration.SettingsMigrationData mCachedMigrationData = null;
 
-    private boolean mHasNewDataToSerialize = false;
+    private boolean mHasNewSharedStoreDataToSerialize = false;
+    private boolean mHasNewUserStoreDataToSerialize = false;
+
+    @VisibleForTesting
+    final Map<String, Object> mSharedToPrivateMigrationDataHolder = new HashMap<>();
+    @VisibleForTesting
+    final Set<UserHandle> mUsersNeedMigration = new HashSet<>();
 
     /**
      * Interface for a settings change listener.
@@ -259,27 +284,41 @@ public class WifiSettingsConfigStore {
     public WifiSettingsConfigStore(@NonNull Context context, @NonNull Handler handler,
             @NonNull SettingsMigrationDataHolder settingsMigrationDataHolder,
             @NonNull WifiConfigManager wifiConfigManager,
-            @NonNull WifiConfigStore wifiConfigStore) {
+            @NonNull WifiConfigStore wifiConfigStore,
+            @NonNull FeatureFlags featureFlags,
+            UserManager userManager) {
         mContext = context;
         mHandler = handler;
         mSettingsMigrationDataHolder = settingsMigrationDataHolder;
         mWifiConfigManager = wifiConfigManager;
+        mFeatureFlags = featureFlags;
+        mUserManager = userManager;
 
         // Register our data store.
-        wifiConfigStore.registerStoreData(new StoreData());
+        wifiConfigStore.registerStoreData(new SharedStoreData());
+        if (mFeatureFlags.multiUserWifiEnhancement() && Environment.isSdkNewerThanB()) {
+            wifiConfigStore.registerStoreData(new UserStoreData());
+        }
     }
 
     public ArrayList<Key> getAllKeys() {
         return sKeys;
     }
 
-    public List<Key> getAllBackupRestoreKeys() {
-        return sBackupRestoreKeys;
+    public Set<Key> getAllBackupRestoreKeys() {
+        return sUserPrivateKeys;
     }
 
-    private void invokeAllListeners() {
+    /**
+     * Invokes listeners for an iterable collection of keys. For example, it can be used to invoke
+     * listeners for all keys ({@link #sKeys}), shared keys ({@link #sSharedKeys}), or user-specific
+     * private keys ({@link #sUserPrivateKeys}).
+     *
+     * @param keys An iterable collection of setting keys, of which their listeners to be invoked.
+     */
+    private void invokeListenersForKeys(Iterable<Key> keys) {
         synchronized (mLock) {
-            for (Key key : sKeys) {
+            for (Key key : keys) {
                 invokeListeners(key);
             }
         }
@@ -302,13 +341,28 @@ public class WifiSettingsConfigStore {
 
     /**
      * Trigger config store writes and invoke listeners in the main wifi service looper's handler.
+     * If {@code isUserPrivateOnly} is {@code true}, only user-specific private settings will be
+     * saved and listeners for those keys will be invoked. Otherwise, all settings (both private and
+     * shared settings) will be saved and their listeners will be invoked.
+     *
+     * @param isUserPrivateOnly Defines the scope of settings to be saved and their listeners to be
+     *                          invoked. If {@code true}, only operate on all user-specific private
+     *                          settings; otherwise all settings including both private and shared.
      */
-    private void triggerSaveToStoreAndInvokeAllListeners() {
+    private void triggerSaveToStoreAndInvokeUserPrivateOrAllListeners(boolean isUserPrivateOnly) {
         mHandler.post(() -> {
-            mHasNewDataToSerialize = true;
+            Iterable<Key> keys = sKeys;
+            if (mFeatureFlags.multiUserWifiEnhancement() && Environment.isSdkNewerThanB()) {
+                mHasNewUserStoreDataToSerialize = true;
+                if (!isUserPrivateOnly) {
+                    mHasNewSharedStoreDataToSerialize = true;
+                }
+                keys = isUserPrivateOnly ? sUserPrivateKeys : sKeys;
+            } else {
+                mHasNewSharedStoreDataToSerialize = true;
+            }
             mWifiConfigManager.saveToStore();
-
-            invokeAllListeners();
+            invokeListenersForKeys(keys);
         });
     }
 
@@ -317,7 +371,12 @@ public class WifiSettingsConfigStore {
      */
     private <T> void triggerSaveToStoreAndInvokeListeners(@NonNull Key<T> key) {
         mHandler.post(() -> {
-            mHasNewDataToSerialize = true;
+            if (mFeatureFlags.multiUserWifiEnhancement() && Environment.isSdkNewerThanB()
+                    && sUserPrivateKeys.contains(key)) {
+                mHasNewUserStoreDataToSerialize = true;
+            } else {
+                mHasNewSharedStoreDataToSerialize = true;
+            }
             mWifiConfigManager.saveToStore();
 
             invokeListeners(key);
@@ -348,7 +407,71 @@ public class WifiSettingsConfigStore {
                 mCachedMigrationData.isScanThrottleEnabled());
         mSettings.put(WIFI_VERBOSE_LOGGING_ENABLED.key,
                 mCachedMigrationData.isVerboseLoggingEnabled());
-        triggerSaveToStoreAndInvokeAllListeners();
+        triggerSaveToStoreAndInvokeUserPrivateOrAllListeners(false /* isUserPrivateOnly */);
+    }
+
+    /**
+     * Retrieves data to be migrated from shared to private store on initial DE load and saves in
+     * cache. If data is not found from DE, fall back to Settings.Global (if possible) and (if still
+     * not found) finally {@link Key#defaultValue}.
+     *
+     * @param values Settings loaded from DE.
+     */
+    private void prepareSharedToPrivateMigrationDataHolder(@Nullable Map<String, Object> values) {
+        // Retrieve data from deserialize SharedStoreData first.
+        if (values != null) {
+            for (Key key : sUserPrivateKeys) {
+                if (!values.containsKey(key.key)) continue;
+                mSharedToPrivateMigrationDataHolder.put(key.key, values.get(key.key));
+            }
+        }
+
+        // If data is not retrieved from SharedStoreData, fall back to Settings.Global (if possible)
+        // then Key.defaultValue for each key under migration.
+
+        // TODO(b/395195047): migrate keys from Settings.Global.
+        // At this point, not a single key to be migrated has its Settings.Global counterpart. We
+        // will implement the migration from Settings.Global in the coming CL (http://ag/33607355).
+
+        // Keys with no Settings.Global counterpart or already migrated from there will fall back to
+        // Key.defaultValue when not retrieved from SharedStoreData.
+        final List<Key> keysForMigrationFromDefaultValue = List.of(
+                WIFI_WEP_ALLOWED /* no Settings.Global */,
+                D2D_ALLOWED_WHEN_INFRA_STA_DISABLED /* no Settings.Global */
+        );
+        for (Key key : keysForMigrationFromDefaultValue) {
+            if (!mSharedToPrivateMigrationDataHolder.containsKey(key.key)) {
+                mSharedToPrivateMigrationDataHolder.put(key.key, key.defaultValue);
+            }
+
+        }
+    }
+
+    /**
+     * Performs a one-off migration from shared to private store. Only performed once for each user
+     * if the CE settings store is empty. Migration data is assumed to be retrieved with
+     * {@link #prepareSharedToPrivateMigrationDataHolder(Map)} on initial DE load.
+     */
+    private void migrateFromSharedToPrivateIfNeeded() {
+        UserHandle foregroundUser = UserHandle.of(ActivityManager.getCurrentUser());
+        synchronized (mLock) {
+            if (mUsersNeedMigration.contains(foregroundUser)) {
+                Log.i(TAG, "Migrating data from shared to private store for user id: "
+                        + foregroundUser.getIdentifier());
+                for (Key key : sUserPrivateKeys) {
+                    mSettings.put(key.key, mSharedToPrivateMigrationDataHolder.getOrDefault(key.key,
+                            key.defaultValue));
+                }
+            } else {
+                // Don't migrate for new users, but still explicitly reset values to defaultValue so
+                // that the corresponding controllers can maintain their state properly on user
+                // switch.
+                for (Key key : sUserPrivateKeys) {
+                    mSettings.put(key.key, key.defaultValue);
+                }
+            }
+            triggerSaveToStoreAndInvokeUserPrivateOrAllListeners(true /* isUserPrivateOnly */);
+        }
     }
 
     /**
@@ -412,6 +535,32 @@ public class WifiSettingsConfigStore {
     }
 
     /**
+     * Parse out the wifi settings from the input xml stream.
+     */
+    public static Map<String, Object> deserializeSettingsData(
+            XmlPullParser in, int outerTagDepth)
+            throws XmlPullParserException, IOException {
+        Map<String, Object> values = null;
+        while (!XmlUtil.isNextSectionEnd(in, outerTagDepth)) {
+            String[] valueName = new String[1];
+            Object value = XmlUtil.readCurrentValue(in, valueName);
+            if (TextUtils.isEmpty(valueName[0])) {
+                throw new XmlPullParserException("Missing value name");
+            }
+            switch (valueName[0]) {
+                case XML_TAG_VALUES:
+                    values = (Map) value;
+                    break;
+                default:
+                    Log.w(TAG, "Ignoring unknown tag under " + XML_TAG_SECTION_HEADER + ": "
+                            + valueName[0]);
+                    break;
+            }
+        }
+        return values;
+    }
+
+    /**
      * Dump output for debugging.
      */
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
@@ -423,24 +572,33 @@ public class WifiSettingsConfigStore {
             pw.print("=");
             pw.println(entry.getValue());
         }
-        if (mCachedMigrationData == null) return;
-        pw.println("Migration data:");
-        pw.print(WIFI_P2P_DEVICE_NAME.key);
-        pw.print("=");
-        pw.println(mCachedMigrationData.getP2pDeviceName());
-        pw.print(WIFI_P2P_PENDING_FACTORY_RESET.key);
-        pw.print("=");
-        pw.println(mCachedMigrationData.isP2pFactoryResetPending());
-        pw.print(WIFI_SCAN_ALWAYS_AVAILABLE.key);
-        pw.print("=");
-        pw.println(mCachedMigrationData.isScanAlwaysAvailable());
-        pw.print(WIFI_SCAN_THROTTLE_ENABLED.key);
-        pw.print("=");
-        pw.println(mCachedMigrationData.isScanThrottleEnabled());
-        pw.print(WIFI_VERBOSE_LOGGING_ENABLED.key);
-        pw.print("=");
-        pw.println(mCachedMigrationData.isVerboseLoggingEnabled());
-        pw.println();
+        if (mCachedMigrationData != null) {
+            pw.println("Migration data:");
+            pw.print(WIFI_P2P_DEVICE_NAME.key);
+            pw.print("=");
+            pw.println(mCachedMigrationData.getP2pDeviceName());
+            pw.print(WIFI_P2P_PENDING_FACTORY_RESET.key);
+            pw.print("=");
+            pw.println(mCachedMigrationData.isP2pFactoryResetPending());
+            pw.print(WIFI_SCAN_ALWAYS_AVAILABLE.key);
+            pw.print("=");
+            pw.println(mCachedMigrationData.isScanAlwaysAvailable());
+            pw.print(WIFI_SCAN_THROTTLE_ENABLED.key);
+            pw.print("=");
+            pw.println(mCachedMigrationData.isScanThrottleEnabled());
+            pw.print(WIFI_VERBOSE_LOGGING_ENABLED.key);
+            pw.print("=");
+            pw.println(mCachedMigrationData.isVerboseLoggingEnabled());
+            pw.println();
+        }
+        if (mFeatureFlags.multiUserWifiEnhancement() && Environment.isSdkNewerThanB()) {
+            pw.println("Migration data for shared to private settings migration:");
+            for (Key key : sUserPrivateKeys) {
+                pw.print(key.key);
+                pw.print("=");
+                pw.println(mSharedToPrivateMigrationDataHolder.get(key.key));
+            }
+        }
     }
 
     /**
@@ -490,18 +648,24 @@ public class WifiSettingsConfigStore {
     }
 
     /**
-     * Store data for persisting the settings data to config store.
+     * Store data for persisting the settings data to shared config store.
      */
-    public class StoreData implements WifiConfigStore.StoreData {
-        public static final String XML_TAG_SECTION_HEADER = "Settings";
-        public static final String XML_TAG_VALUES = "Values";
-
+    public class SharedStoreData implements WifiConfigStore.StoreData {
         @Override
         public void serializeData(XmlSerializer out,
                 @Nullable WifiConfigStoreEncryptionUtil encryptionUtil)
                 throws XmlPullParserException, IOException {
             synchronized (mLock) {
-                XmlUtil.writeNextValue(out, XML_TAG_VALUES, mSettings);
+                if (mFeatureFlags.multiUserWifiEnhancement() && Environment.isSdkNewerThanB()) {
+                    // Only serialize shared settings.
+                    Map<String, Object> sharedSettings = new HashMap<>(mSettings);
+                    for (Key key : sUserPrivateKeys) {
+                        sharedSettings.remove(key.key);
+                    }
+                    XmlUtil.writeNextValue(out, XML_TAG_VALUES, sharedSettings);
+                } else {
+                    XmlUtil.writeNextValue(out, XML_TAG_VALUES, mSettings);
+                }
             }
         }
 
@@ -520,48 +684,38 @@ public class WifiSettingsConfigStore {
             if (values != null) {
                 synchronized (mLock) {
                     mSettings.putAll(values);
-                    // Invoke all the registered listeners.
-                    invokeAllListeners();
-                }
-            }
-        }
+                    if (mFeatureFlags.multiUserWifiEnhancement() && Environment.isSdkNewerThanB()) {
+                        // Invoke registered listeners for shared setting keys.
+                        invokeListenersForKeys(sSharedKeys);
+                    } else {
+                        // Invoke all the registered listeners.
+                        invokeListenersForKeys(sKeys);
+                    }
 
-        /**
-         * Parse out the wifi settings from the input xml stream.
-         */
-        public static Map<String, Object> deserializeSettingsData(
-                XmlPullParser in, int outerTagDepth)
-                throws XmlPullParserException, IOException {
-            Map<String, Object> values = null;
-            while (!XmlUtil.isNextSectionEnd(in, outerTagDepth)) {
-                String[] valueName = new String[1];
-                Object value = XmlUtil.readCurrentValue(in, valueName);
-                if (TextUtils.isEmpty(valueName[0])) {
-                    throw new XmlPullParserException("Missing value name");
-                }
-                switch (valueName[0]) {
-                    case XML_TAG_VALUES:
-                        values = (Map) value;
-                        break;
-                    default:
-                        Log.w(TAG, "Ignoring unknown tag under " + XML_TAG_SECTION_HEADER + ": "
-                                + valueName[0]);
-                        break;
                 }
             }
-            return values;
+            if (mFeatureFlags.multiUserWifiEnhancement() && Environment.isSdkNewerThanB()
+                    && mUsersNeedMigration.isEmpty()) {
+                mUsersNeedMigration.addAll(mUserManager.getUserHandles(/* excludeDying= */ true));
+                prepareSharedToPrivateMigrationDataHolder(values);
+            }
         }
 
         @Override
         public void resetData() {
             synchronized (mLock) {
                 mSettings.clear();
+                if (mFeatureFlags.multiUserWifiEnhancement() && Environment.isSdkNewerThanB()) {
+                    mUsersNeedMigration.clear();
+                    mSharedToPrivateMigrationDataHolder.clear();
+                    mHasNewSharedStoreDataToSerialize = false;
+                }
             }
         }
 
         @Override
         public boolean hasNewDataToSerialize() {
-            return mHasNewDataToSerialize;
+            return mHasNewSharedStoreDataToSerialize;
         }
 
         @Override
@@ -573,6 +727,83 @@ public class WifiSettingsConfigStore {
         public @WifiConfigStore.StoreFileId int getStoreFileId() {
             // Shared general store.
             return WifiConfigStore.STORE_FILE_SHARED_GENERAL;
+        }
+    }
+
+    /**
+     * Store data for persisting the settings data to private user-specific config store.
+     */
+    public class UserStoreData implements WifiConfigStore.StoreData {
+        @Override
+        public void serializeData(XmlSerializer out,
+                @Nullable WifiConfigStoreEncryptionUtil encryptionUtil)
+                throws XmlPullParserException, IOException {
+            synchronized (mLock) {
+                // Only serialize user-specific settings.
+                Map<String, Object> userSettings = new HashMap<>();
+                for (Key key : sUserPrivateKeys) {
+                    if (mSettings.containsKey(key.key)) {
+                        userSettings.put(key.key, mSettings.get(key.key));
+                    }
+                }
+                XmlUtil.writeNextValue(out, XML_TAG_VALUES, userSettings);
+            }
+        }
+
+        @Override
+        public void deserializeData(XmlPullParser in, int outerTagDepth,
+                @WifiConfigStore.Version int version,
+                @Nullable WifiConfigStoreEncryptionUtil encryptionUtil)
+                throws XmlPullParserException, IOException {
+            if (in == null) {
+                migrateFromSharedToPrivateIfNeeded();
+                return;
+            }
+            Map<String, Object> values = deserializeSettingsData(in, outerTagDepth);
+            synchronized (mLock) {
+                if (values != null) {
+                    mSettings.putAll(values);
+                }
+                // On user-switch, explicitly reset all private keys that are not loaded from CE to
+                // default values and invoke listeners, so that the corresponding values in their
+                // controllers can be updated (rather than using the stale value from last user).
+                for (Key key : sUserPrivateKeys) {
+                    if (values != null && values.containsKey(key.key)) continue;
+                    mSettings.put(key.key, key.defaultValue);
+                }
+                // Invoke the registered listeners for private settings.
+                invokeListenersForKeys(sUserPrivateKeys);
+            }
+        }
+
+        @Override
+        public void resetData() {
+            synchronized (mLock) {
+                // It is worth noting that removing keys won't update the setting values in their
+                // corresponding controllers. Explicitly put a new value and invoke the listener are
+                // required, which are conducted in UserStoreData#deserializeData or
+                // migrateFromSharedToPrivateIfNeeded.
+                for (Key key : sUserPrivateKeys) {
+                    mSettings.remove(key.key);
+                }
+                mHasNewUserStoreDataToSerialize = false;
+            }
+        }
+
+        @Override
+        public boolean hasNewDataToSerialize() {
+            return mHasNewUserStoreDataToSerialize;
+        }
+
+        @Override
+        public String getName() {
+            return XML_TAG_SECTION_HEADER;
+        }
+
+        @Override
+        public @WifiConfigStore.StoreFileId int getStoreFileId() {
+            // User-specific store.
+            return WifiConfigStore.STORE_FILE_USER_GENERAL;
         }
     }
 }
