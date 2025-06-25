@@ -6492,7 +6492,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                 eq((int) wifiDisconnectTimeMs1 / 1000),
                 eq((int) (wifiDisconnectTimeMs1 - connectionEndTimeMs) / 1000),
                 eq(WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY),
-                anyInt(), anyInt(), anyInt(), anyInt(), anyInt()));
+                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt()));
 
         // disconnect for TEST_IFACE_NAME2 at 5000
         long wifiDisconnectTimeMs2 = 5000;
@@ -6510,7 +6510,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                 eq((int) wifiDisconnectTimeMs2 / 1000),
                 eq((int) (wifiDisconnectTimeMs2 - connectionEndTimeMs) / 1000),
                 eq(WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_LOCAL_ONLY),
-                anyInt(), anyInt(), anyInt(), anyInt(), anyInt()));
+                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt()));
     }
 
     @Test
@@ -6538,9 +6538,15 @@ public class WifiMetricsTest extends WifiBaseTest {
                 linkSpeed, 0);
         ExtendedMockito.verify(() -> WifiStatsLog.write(
                 eq(WifiStatsLog.WIFI_DISCONNECT_REPORTED),
-                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(),
-                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt()),
+                        anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(),
+                        anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(),
+                        anyInt(), anyInt()),
                 times(0));
+
+        // trigger firmware alert, but this should not replace the explicitly reported disconnect
+        // reason
+        int firmwareAlertErrorCode = 1;
+        mWifiMetrics.logFirmwareAlert(TEST_IFACE_NAME, firmwareAlertErrorCode);
 
         // Disconnect on the connected interface triggers logging
         mWifiMetrics.reportNetworkDisconnect(TEST_IFACE_NAME, reason, TEST_CANDIDATE_LEVEL,
@@ -6556,7 +6562,46 @@ public class WifiMetricsTest extends WifiBaseTest {
                 eq((int) wifiDisconnectTimeMs / 1000),
                 eq((int) (wifiDisconnectTimeMs - connectionEndTimeMs) / 1000),
                 eq(WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY),
-                anyInt(), anyInt(), anyInt(), anyInt(), anyInt()));
+                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), eq(0)));
+    }
+
+    @Test
+    public void testWifiDisconnectAtomEmittedOnDisconnectFromSuccessfulSessionWithFirmwareAlert() {
+        mWifiMetrics.startConnectionEvent(TEST_IFACE_NAME, createComplexWifiConfig(),
+                "RED", WifiMetricsProto.ConnectionEvent.ROAM_ENTERPRISE, false,
+                WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY, TEST_UID);
+
+        long connectionEndTimeMs = 1000;
+        when(mClock.getElapsedSinceBootMillis()).thenReturn(connectionEndTimeMs);
+        mWifiMetrics.endConnectionEvent(TEST_IFACE_NAME,
+                WifiMetrics.ConnectionEvent.FAILURE_NONE,
+                WifiMetricsProto.ConnectionEvent.HLF_NONE,
+                WifiMetricsProto.ConnectionEvent.AUTH_FAILURE_NONE, TEST_CANDIDATE_FREQ,
+                TEST_CONNECTION_FAILURE_STATUS_CODE);
+
+        long wifiDisconnectTimeMs = 2000;
+        when(mClock.getElapsedSinceBootMillis()).thenReturn(wifiDisconnectTimeMs);
+        int linkSpeed = 100;
+
+        // trigger firmware alert
+        int firmwareAlertErrorCode = 1;
+        mWifiMetrics.logFirmwareAlert(TEST_IFACE_NAME, firmwareAlertErrorCode);
+
+        // Disconnect on the connected interface triggers logging
+        mWifiMetrics.reportNetworkDisconnect(TEST_IFACE_NAME, -1, TEST_CANDIDATE_LEVEL,
+                linkSpeed, 0);
+        ExtendedMockito.verify(() -> WifiStatsLog.write(
+                eq(WifiStatsLog.WIFI_DISCONNECT_REPORTED),
+                eq((int) (wifiDisconnectTimeMs - connectionEndTimeMs) / 1000),
+                eq(WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__DISCONNECT_FIRMWARE_ALERT),
+                eq(WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__BAND__BAND_2G),
+                eq(WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__AUTH_TYPE__AUTH_TYPE_WPA2_PSK),
+                eq(TEST_CANDIDATE_LEVEL),
+                eq(linkSpeed),
+                eq((int) wifiDisconnectTimeMs / 1000),
+                eq((int) (wifiDisconnectTimeMs - connectionEndTimeMs) / 1000),
+                eq(WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY),
+                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), eq(firmwareAlertErrorCode)));
     }
 
     @Test
@@ -6583,8 +6628,9 @@ public class WifiMetricsTest extends WifiBaseTest {
 
         ExtendedMockito.verify(() -> WifiStatsLog.write(
                 eq(WifiStatsLog.WIFI_DISCONNECT_REPORTED),
-                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(),
-                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt()),
+                        anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(),
+                        anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(),
+                        anyInt()),
                 times(0));
     }
 
@@ -6594,8 +6640,9 @@ public class WifiMetricsTest extends WifiBaseTest {
 
         ExtendedMockito.verify(() -> WifiStatsLog.write(
                 eq(WifiStatsLog.WIFI_DISCONNECT_REPORTED),
-                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(),
-                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt()),
+                        anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(),
+                        anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(),
+                        anyInt()),
                 times(0));
     }
 

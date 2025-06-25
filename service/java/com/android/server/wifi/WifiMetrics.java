@@ -218,6 +218,8 @@ public class WifiMetrics {
     public static final int MIN_LINK_SPEED_MBPS = 0;
     /** Maximum time period between ScanResult and RSSI poll to generate rssi delta datapoint */
     public static final long TIMEOUT_RSSI_DELTA_MILLIS =  3000;
+    // Time period to attribute a disconnect to firmware alert
+    public static final long FIRMWARE_ALERT_DISCONNECT_MILLIS = 1000;
     private static final int MIN_WIFI_SCORE = 0;
     private static final int MAX_WIFI_SCORE = ConnectedScore.WIFI_MAX_SCORE;
     private static final int MIN_WIFI_USABILITY_SCORE = 0; // inclusive
@@ -302,6 +304,8 @@ public class WifiMetrics {
     private WifiScoreCard mWifiScoreCard;
     private Map<String, String> mLastBssidPerIfaceMap = new ArrayMap<>();
     private Map<String, Integer> mLastFrequencyPerIfaceMap = new ArrayMap<>();
+    // Map from ifaceName -> <firmware alert timestamp since boot millis, firmware alert reason>
+    private Map<String, Pair<Long, Integer>> mLastFirmwareAlertPerIfaceMap = new ArrayMap<>();
     private int mSeqNumInsideFramework = 0;
     private int mLastWifiUsabilityScore = -1;
     private int mLastWifiUsabilityScoreNoReset = -1;
@@ -2884,6 +2888,20 @@ public class WifiMetrics {
                         - currentSession.mLastRoamCompleteMillis) / 1000;
                 int timeSinceLastRssiUpdateSeconds = (int) (mClock.getElapsedSinceBootMillis()
                         - lastRssiUpdateMillis) / 1000;
+                int firmwareAlertReason = 0;
+                if (disconnectReason <= 0) {
+                    // some chips will report a firmware alert, and then trigger disconnect with
+                    // an unknown disconnect reason. Replace with the disconnect reason with
+                    // firmware alert in this case.
+                    Pair<Long, Integer> timestampAndReason =
+                            mLastFirmwareAlertPerIfaceMap.get(ifaceName);
+                    if (timestampAndReason != null
+                            && currentSession.mSessionEndTimeMillis - timestampAndReason.first
+                            < FIRMWARE_ALERT_DISCONNECT_MILLIS) {
+                        disconnectReason = WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__DISCONNECT_FIRMWARE_ALERT;
+                        firmwareAlertReason = timestampAndReason.second;
+                    }
+                }
                 currentSession.mDisconnectReason = disconnectReason;
 
                 WifiStatsLog.write(WifiStatsLog.WIFI_DISCONNECT_REPORTED,
@@ -2900,7 +2918,8 @@ public class WifiMetrics {
                         toMetricPhase2Method(currentSession.mConnectionEvent.mPhase2Method),
                         currentSession.mConnectionEvent.mPasspointRoamingType,
                         currentSession.mConnectionEvent.mCarrierId,
-                        currentSession.mConnectionEvent.mUid);
+                        currentSession.mConnectionEvent.mUid,
+                        firmwareAlertReason);
                 /* Log validation never succeed */
                 WifiValidationInfo validationInfo = currentSession.mValidationInfo;
                 if (validationInfo != null && validationInfo.mValidationCount > 0) {
@@ -4519,6 +4538,8 @@ public class WifiMetrics {
         logWifiIsUnusableEvent(ifaceName, WifiIsUnusableEvent.TYPE_FIRMWARE_ALERT, errorCode);
         logAsynchronousEvent(ifaceName,
                 WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_FIRMWARE_ALERT, errorCode);
+        mLastFirmwareAlertPerIfaceMap.put(ifaceName, new Pair<>(
+                mClock.getElapsedSinceBootMillis(), errorCode));
     }
 
     public static final String PROTO_DUMP_ARG = "wifiMetricsProto";
