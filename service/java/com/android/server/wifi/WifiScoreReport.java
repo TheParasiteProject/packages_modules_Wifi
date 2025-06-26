@@ -113,7 +113,6 @@ public class WifiScoreReport {
     private long mLastScoreBreachLowTimeMillis = INVALID_WALL_CLOCK_MILLIS;
     private long mLastScoreBreachHighTimeMillis = INVALID_WALL_CLOCK_MILLIS;
 
-    private final ConnectedScore mAggressiveConnectedScore;
     private VelocityBasedConnectedScore mVelocityBasedConnectedScore;
     private final WifiSettingsStore mWifiSettingsStore;
     private int mSessionIdNoReset = INVALID_SESSION_ID;
@@ -595,7 +594,6 @@ public class WifiScoreReport {
         mScoringParams = scoringParams;
         mClock = clock;
         mAdaptiveConnectivityEnabledSettingObserver = adaptiveConnectivityEnabledSettingObserver;
-        mAggressiveConnectedScore = new AggressiveConnectedScore(scoringParams, clock);
         mVelocityBasedConnectedScore = new VelocityBasedConnectedScore(scoringParams, clock);
         mWifiMetrics = wifiMetrics;
         mWifiInfo = wifiInfo;
@@ -636,7 +634,6 @@ public class WifiScoreReport {
                 WifiMetrics.WifiUsabilityState.UNKNOWN);
         mLastKnownNudCheckScore = isPrimary() ? ConnectedScore.WIFI_TRANSITION_SCORE
                 : ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE;
-        mAggressiveConnectedScore.reset();
         if (mVelocityBasedConnectedScore != null) {
             mVelocityBasedConnectedScore.reset();
         }
@@ -783,9 +780,7 @@ public class WifiScoreReport {
     private void updateWifiMetrics(long now, int s2) {
         int netId = getCurrentNetId();
 
-        mAggressiveConnectedScore.updateUsingWifiInfo(mWifiInfo, now);
-        int s1 = ((AggressiveConnectedScore) mAggressiveConnectedScore).generateScore();
-        logLinkMetrics(now, netId, s1, s2, mLegacyIntScore);
+        logLinkMetrics(now, netId, s2, mLegacyIntScore);
 
         if (mLegacyIntScore != mWifiInfo.getScore()) {
             if (mVerboseLoggingEnabled) {
@@ -887,7 +882,7 @@ public class WifiScoreReport {
     /**
      * Data logging for dumpsys
      */
-    private void logLinkMetrics(long now, int netId, int s1, int s2, int score) {
+    private void logLinkMetrics(long now, int netId, int s2, int score) {
         if (now < FIRST_REASONABLE_WALL_CLOCK) return;
         double filteredRssi = -1;
         double rssiThreshold = -1;
@@ -919,7 +914,6 @@ public class WifiScoreReport {
         stats.add(StringUtil.doubleToString(mWifiInfo.getSuccessfulRxPacketsPerSecond(), 2));
         stats.add(Integer.toString(mNudYes));
         stats.add(Integer.toString(mNudCount));
-        stats.add(Integer.toString(s1));
         stats.add(Integer.toString(s2));
         stats.add(Integer.toString(score));
         // MLO stats
@@ -993,7 +987,7 @@ public class WifiScoreReport {
         pw.println(
                 "time,session,netid,rssi,filtered_rssi,rssi_threshold,freq,txLinkSpeed,"
                     + "rxLinkSpeed,txTput,rxTput,bcnCnt,tx_good,tx_retry,tx_bad,rx_pps,nudrq,nuds,"
-                    + "s1,s2,score,{linkId,linkRssi,linkFreq,txLinkSpeed,rxLinkSpeed,linkBcnCnt,"
+                    + "s2,score,{linkId,linkRssi,linkFreq,txLinkSpeed,rxLinkSpeed,linkBcnCnt,"
                     + "linkTxGood,linkTxRetry,linkTxBad,linkRxGood,linkMloState,linkUsageState}");
         for (String line : history) {
             pw.println(line);
@@ -1294,7 +1288,6 @@ public class WifiScoreReport {
     /** Called when the owner {@link ConcreteClientModeManager}'s role changes. */
     public void onRoleChanged(@Nullable ClientRole role) {
         mCurrentRole = role;
-        if (mAggressiveConnectedScore != null) mAggressiveConnectedScore.onRoleChanged(role);
         if (mVelocityBasedConnectedScore != null) mVelocityBasedConnectedScore.onRoleChanged(role);
         sendNetworkScore();
     }
