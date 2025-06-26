@@ -359,6 +359,8 @@
           <item type="bool" name="config_wifiVoipDetectionEnabled" />
           <item type="bool" name="config_wifiUsdPublisherSupported" />
           <item type="bool" name="config_wifiMainlineSupplicantEnabled" />
+          <item type="integer" name="config_internalScorerType" />
+          <item type="bool" name="config_prioritizeExternalScorer" />
 
           <!-- Params from config.xml that can be overlayed -->
 
