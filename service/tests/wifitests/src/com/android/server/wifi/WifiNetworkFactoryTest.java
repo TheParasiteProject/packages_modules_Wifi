@@ -3004,7 +3004,7 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         // simulate scan results coming in and verify we auto connect to the network
         when(mNetworkRequestMatchCallback.asBinder()).thenReturn(mAppBinder);
         mWifiNetworkFactory.addCallback(mNetworkRequestMatchCallback);
-        verifyPeriodicScans(false, 0, PERIODIC_SCAN_INTERVAL_MS);
+        verifyPeriodicScans(bypassActivated, 0, PERIODIC_SCAN_INTERVAL_MS);
         ArgumentCaptor<List<ScanResult>> matchedScanResultsCaptor =
                 ArgumentCaptor.forClass(List.class);
         // Verify the match callback is not triggered since the UI is not started.

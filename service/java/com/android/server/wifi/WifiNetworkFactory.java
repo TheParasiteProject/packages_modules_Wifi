@@ -287,9 +287,16 @@ public class WifiNetworkFactory extends NetworkFactory {
                 Log.v(TAG, "Received " + scanResults.length + " scan results");
             }
             handleScanResults(scanResults);
-            if (!mSkipUserDialogue && mActiveMatchedScanResults != null) {
-                sendNetworkRequestMatchCallbacksForActiveRequest(
-                        mActiveMatchedScanResults.values());
+            if (mActiveMatchedScanResults != null) {
+                if (mSkipUserDialogue) {
+                    if (!mActiveMatchedScanResults.isEmpty()) {
+                        // Already find result, device will start connection
+                        return;
+                    }
+                } else {
+                    sendNetworkRequestMatchCallbacksForActiveRequest(
+                            mActiveMatchedScanResults.values());
+                }
             }
             scheduleNextPeriodicScan();
         }
