@@ -1688,6 +1688,17 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
     }
 
     /**
+     * Mock enter provision discovery state for V2 connection.
+     */
+    private void mockEnterProvisionDiscoveryStateForV2Connection(
+            @WifiP2pPairingBootstrappingConfig.PairingBootstrappingMethod int method,
+            @Nullable String pairingPinOrPassphrase, boolean authorize)
+            throws Exception {
+        createTestP2pV2PeerConfig(method, pairingPinOrPassphrase, authorize);
+        mockEnterProvisionDiscoveryState(mTestWifiP2pV2PeerConfig);
+    }
+
+    /**
      * Mock enter Group created state.
      */
     private void mockEnterGroupCreatedState() throws Exception {
@@ -7307,6 +7318,97 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         }
     }
 
+    private void verifyExternalApproverConnectionRequestMessageOnResponder(MacAddress addr,
+            int wpsType, int pdEventId,  @WifiP2pPairingBootstrappingConfig
+                    .PairingBootstrappingMethod int expectedBootstrappingMethod)
+            throws Exception {
+        Binder binder = new Binder();
+
+        when(mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(anyInt()))
+                .thenReturn(true);
+        when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
+                .thenReturn(true);
+
+        forceP2pEnabled(mClient1);
+        mockPeersList();
+
+        verifyAddExternalApprover(binder, true, true, addr);
+
+        if (wpsType != WpsInfo.INVALID) {
+            mockEnterUserAuthorizingNegotiationRequestState(wpsType);
+        } else if (pdEventId != 0) {
+            mockProvisioningDiscoveryEventForV2Connection(pdEventId);
+        } else {
+            fail("wpsType and pdEventId cannot both be INVALID.");
+            return;
+        }
+
+        // There are 2 replies:
+        // * EXTERNAL_APPROVER_ATTACH
+        // * EXTERNAL_APPROVER_CONNECTION_REQUESTED
+        ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
+        verify(mClientHandler, times(2)).sendMessage(messageCaptor.capture());
+        List<Message> messages = messageCaptor.getAllValues();
+        assertEquals(WifiP2pManager.EXTERNAL_APPROVER_CONNECTION_REQUESTED, messages.get(1).what);
+        Bundle bundle = (Bundle) messages.get(1).obj;
+        WifiP2pConfig config = bundle.getParcelable(WifiP2pManager.EXTRA_PARAM_KEY_CONFIG);
+        assertNotNull(config);
+        if (wpsType != WpsInfo.INVALID) {
+            assertEquals(wpsType, config.wps.setup);
+        } else {
+            assertNotNull(config.getPairingBootstrappingConfig());
+            assertEquals(expectedBootstrappingMethod, config.getPairingBootstrappingConfig()
+                    .getPairingBootstrappingMethod());
+        }
+    }
+
+    private void verifyExternalApproverConnectionRequestMessageOnInitiator(Binder binder,
+            MacAddress addr,
+            int pdEventId,
+            @WifiP2pPairingBootstrappingConfig.PairingBootstrappingMethod int method,
+            @Nullable String pairingPinOrPassphrase, int expectedMessage,
+            int expectedCredentialType)
+            throws Exception {
+        when(mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(anyInt()))
+                .thenReturn(true);
+        when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
+                .thenReturn(true);
+
+        forceP2pEnabled(mClient1);
+        mockPeersList();
+
+        verifyAddExternalApprover(binder, true, true, addr);
+
+        mockEnterProvisionDiscoveryStateForV2Connection(method, pairingPinOrPassphrase, false);
+        // Send a provision discovery response event with comeback = true
+        WifiP2pProvDiscEvent pdEvent = createWifiP2pProvDiscEventForV2Connection(pdEventId, true);
+        sendSimpleMsg(null,
+                convertPdEventIdToWifiP2pMonitorEventForV2Connection(pdEventId),
+                pdEvent);
+
+        // There are 3 replies:
+        // * EXTERNAL_APPROVER_ATTACH
+        // * CONNECT_SUCCEEDED
+        // * EXTERNAL_APPROVER_CONNECTION_REQUESTED
+        ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
+        verify(mClientHandler, times(3)).sendMessage(messageCaptor.capture());
+        List<Message> messages = messageCaptor.getAllValues();
+        assertEquals(expectedMessage, messages.get(2).what);
+        Bundle bundle = (Bundle) messages.get(2).obj;
+        if (WifiP2pManager.EXTERNAL_APPROVER_CONNECTION_REQUESTED == expectedMessage) {
+            WifiP2pConfig config = bundle.getParcelable(WifiP2pManager.EXTRA_PARAM_KEY_CONFIG);
+            assertNotNull(config);
+            assertNotNull(config.getPairingBootstrappingConfig());
+            assertEquals(method, config.getPairingBootstrappingConfig()
+                    .getPairingBootstrappingMethod());
+        } else if (WifiP2pManager.EXTERNAL_APPROVER_PIN_OR_PASSWORD_GENERATED == expectedMessage) {
+            assertEquals(expectedCredentialType,
+                    bundle.getInt(WifiP2pManager.EXTRA_PARAM_KEY_CREDENTIAL_TYPE));
+            assertFalse(TextUtils.isEmpty(bundle.getString(
+                    WifiP2pManager.EXTRA_PARAM_KEY_PIN_OR_PASSWORD)));
+        }
+    }
+
     /**
      * Verify sunny scenario for setConnectionRequestResult.
      */
@@ -8457,9 +8559,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
 
         forceP2pEnabled(mClient1);
 
-        createTestP2pV2PeerConfig(WifiP2pPairingBootstrappingConfig
+        mockEnterProvisionDiscoveryStateForV2Connection(WifiP2pPairingBootstrappingConfig
                 .PAIRING_BOOTSTRAPPING_METHOD_OPPORTUNISTIC, "", false);
-        mockEnterProvisionDiscoveryState(mTestWifiP2pV2PeerConfig);
 
         // Send a provision discovery response event with comeback = true
         WifiP2pProvDiscEvent pdEvent = createWifiP2pProvDiscEventForV2Connection(
@@ -8506,10 +8607,9 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         // create a config without passing the pairing pincode.
         // Framework is expected to generate a random pincode on receiving the provision discovery
         // response.
-        createTestP2pV2PeerConfig(WifiP2pPairingBootstrappingConfig
+        mockEnterProvisionDiscoveryStateForV2Connection(WifiP2pPairingBootstrappingConfig
                 .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PINCODE, "",
                 false);
-        mockEnterProvisionDiscoveryState(mTestWifiP2pV2PeerConfig);
 
         // Send a provision discovery response event with comeback = true
         WifiP2pProvDiscEvent pdEvent = createWifiP2pProvDiscEventForV2Connection(
@@ -8564,10 +8664,9 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         // create a config without passing the pairing passphrase
         // Framework is expected to generate a random passphrase on receiving the provision
         // discovery response.
-        createTestP2pV2PeerConfig(WifiP2pPairingBootstrappingConfig
+        mockEnterProvisionDiscoveryStateForV2Connection(WifiP2pPairingBootstrappingConfig
                 .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PASSPHRASE, "",
                 false);
-        mockEnterProvisionDiscoveryState(mTestWifiP2pV2PeerConfig);
 
         // Send a provision discovery response event with comeback = true
         WifiP2pProvDiscEvent pdEvent = createWifiP2pProvDiscEventForV2Connection(
@@ -8621,10 +8720,9 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         forceP2pEnabled(mClient1);
 
         // create a config
-        createTestP2pV2PeerConfig(WifiP2pPairingBootstrappingConfig
+        mockEnterProvisionDiscoveryStateForV2Connection(WifiP2pPairingBootstrappingConfig
                 .PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PINCODE, "",
                 false);
-        mockEnterProvisionDiscoveryState(mTestWifiP2pV2PeerConfig);
 
         // Send a provision discovery response event with comeback = true
         WifiP2pProvDiscEvent pdEvent = createWifiP2pProvDiscEventForV2Connection(
@@ -8670,10 +8768,9 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         forceP2pEnabled(mClient1);
 
         // create a config
-        createTestP2pV2PeerConfig(WifiP2pPairingBootstrappingConfig
+        mockEnterProvisionDiscoveryStateForV2Connection(WifiP2pPairingBootstrappingConfig
                         .PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PASSPHRASE, "",
                 false);
-        mockEnterProvisionDiscoveryState(mTestWifiP2pV2PeerConfig);
 
         // Send a provision discovery response event with comeback = true
         WifiP2pProvDiscEvent pdEvent = createWifiP2pProvDiscEventForV2Connection(
@@ -9441,10 +9538,9 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         verifyAddExternalApprover(binder, true, true,
                 MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress));
 
-        createTestP2pV2PeerConfig(WifiP2pPairingBootstrappingConfig
+        mockEnterProvisionDiscoveryStateForV2Connection(WifiP2pPairingBootstrappingConfig
                         .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PINCODE, "",
                 false);
-        mockEnterProvisionDiscoveryState(mTestWifiP2pV2PeerConfig);
 
         WifiP2pProvDiscEvent pdEvent = createWifiP2pProvDiscEventForV2Connection(
                 WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_SHOW_PIN, true);
@@ -9475,10 +9571,9 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         verifyAddExternalApprover(binder, true, true,
                 MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress));
 
-        createTestP2pV2PeerConfig(WifiP2pPairingBootstrappingConfig
+        mockEnterProvisionDiscoveryStateForV2Connection(WifiP2pPairingBootstrappingConfig
                         .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PINCODE, "",
                 false);
-        mockEnterProvisionDiscoveryState(mTestWifiP2pV2PeerConfig);
 
         WifiP2pProvDiscEvent pdEvent = createWifiP2pProvDiscEventForV2Connection(
                 WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_SHOW_PIN, true);
@@ -9534,5 +9629,221 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         verify(mWifiDialogManager, never()).createP2pInvitationSentDialog(
                 any(), any(), any(),
                 eq(Display.DEFAULT_DISPLAY));
+    }
+
+    /**
+     * Test setConnectionRequestResult on initiating device with response as "defer show password"
+     * to service for pairing bootstrapping method: Display passphrase.
+     */
+    @Test
+    public void testDeferShowPasswordToFrameworkOnInitiatorSuccess()
+            throws Exception {
+        assumeTrue(Environment.isSdkNewerThanB());
+        Binder binder = new Binder();
+        when(mFeatureFlags.externalApproverSupportForWfdr2PasswordBasedBootstrapping())
+                .thenReturn(true);
+
+        verifyExternalApproverConnectionRequestMessageOnInitiator(binder,
+                MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress),
+                WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_SHOW_PASSPHRASE,
+                WifiP2pPairingBootstrappingConfig.PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PASSPHRASE,
+                null, WifiP2pManager.EXTERNAL_APPROVER_PIN_OR_PASSWORD_GENERATED,
+                WifiP2pManager.CREDENTIAL_TYPE_PASSWORD);
+
+        /*
+         * If the app defers showing the password to the `WifiP2pService`, the service is expected
+         * to display a dialog with the sent invitation and the required password.
+         */
+        sendSetConnectionRequestResultMsg(mClientMessenger,
+                MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress),
+                WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PASSWORD_TO_SERVICE, binder);
+        verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
+        verify(mWifiDialogManager).createP2pInvitationSentDialog(
+                any(), eq(null), any(),
+                eq(Display.DEFAULT_DISPLAY));
+    }
+
+    /**
+     * Verifies that setConnectionRequestResult on an initiating device correctly handles a
+     * "defer show PIN" response. This ensures the "Display Passphrase" pairing method
+     * works and maintains backward compatibility with older applications.
+     */
+    @Test
+    public void testDeferShowPinToFrameworkOnInitiatorSuccessWorksForPasswordBootstrapping()
+            throws Exception {
+        assumeTrue(Environment.isSdkNewerThanB());
+        when(mFeatureFlags.externalApproverSupportForWfdr2PasswordBasedBootstrapping())
+                .thenReturn(true);
+        Binder binder = new Binder();
+
+        verifyExternalApproverConnectionRequestMessageOnInitiator(binder,
+                MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress),
+                WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_SHOW_PASSPHRASE,
+                WifiP2pPairingBootstrappingConfig.PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PASSPHRASE,
+                null, WifiP2pManager.EXTERNAL_APPROVER_PIN_OR_PASSWORD_GENERATED,
+                WifiP2pManager.CREDENTIAL_TYPE_PASSWORD);
+
+        /*
+         * If the app defers showing the password to the `WifiP2pService`, the service is expected
+         * to display a dialog with the sent invitation and the required password.
+         */
+        sendSetConnectionRequestResultMsg(mClientMessenger,
+                MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress),
+                WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PIN_TO_SERVICE, binder);
+        verify(mWifiNative, never()).p2pConnect(any(), anyBoolean());
+        verify(mWifiDialogManager).createP2pInvitationSentDialog(
+                any(), eq(null), any(),
+                eq(Display.DEFAULT_DISPLAY));
+    }
+
+    /**
+     * Test connection request message to external approver for pairing.
+     * Pairing bootstrapping method: Display pin code on responder device.
+     */
+    @Test
+    public void testExternalApproverConnectionRequestMessageShowPinV2ConnectionOnResponder()
+            throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        verifyExternalApproverConnectionRequestMessageOnResponder(
+                MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress),
+                WpsInfo.INVALID,
+                WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_SHOW_PIN,
+                WifiP2pPairingBootstrappingConfig.PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PINCODE);
+    }
+
+    /**
+     * Test connection request message to external approver for pairing.
+     * Pairing bootstrapping method: Display passphrase on responder device.
+     */
+    @Test
+    public void testExternalApproverConnectionRequestMessageShowPasswordV2ConnectionOnResponder()
+            throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        verifyExternalApproverConnectionRequestMessageOnResponder(
+                MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress),
+                WpsInfo.INVALID,
+                WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_SHOW_PASSPHRASE,
+                WifiP2pPairingBootstrappingConfig.PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PASSPHRASE);
+    }
+
+    /**
+     * Test connection request message to external approver for pairing.
+     * Pairing bootstrapping method: Keypad pin code on responder device.
+     */
+    @Test
+    public void testExternalApproverConnectionRequestMessageEnterPinV2ConnectionOnResponder()
+            throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        verifyExternalApproverConnectionRequestMessageOnResponder(
+                MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress),
+                WpsInfo.INVALID,
+                WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_ENTER_PIN,
+                WifiP2pPairingBootstrappingConfig.PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PINCODE);
+    }
+
+    /**
+     * Test connection request message to external approver for pairing.
+     * Pairing bootstrapping method: Keypad passphrase on responder device.
+     */
+    @Test
+    public void testExternalApproverConnectionRequestMessageEnterPasswordV2ConnectionOnResponder()
+            throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        verifyExternalApproverConnectionRequestMessageOnResponder(
+                MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress),
+                WpsInfo.INVALID,
+                WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_ENTER_PASSPHRASE,
+                WifiP2pPairingBootstrappingConfig.PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PASSPHRASE);
+    }
+
+    /**
+     * Test connection request message to external approver for pairing.
+     * Pairing bootstrapping method: Keypad pin code on initiator device.
+     */
+    @Test
+    public void testExternalApproverConnectionRequestMessageEnterPinV2ConnectionOnInitiator()
+            throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        Binder binder = new Binder();
+        verifyExternalApproverConnectionRequestMessageOnInitiator(binder,
+                MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress),
+                WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_ENTER_PIN,
+                WifiP2pPairingBootstrappingConfig.PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PINCODE,
+                null, WifiP2pManager.EXTERNAL_APPROVER_CONNECTION_REQUESTED, 0);
+    }
+
+    /**
+     * Test connection request message to external approver for pairing.
+     * Pairing bootstrapping method: Keypad passphrase on initiator device.
+     */
+    @Test
+    public void testExternalApproverConnectionRequestMessageEnterPasswordV2ConnectionOnInitiator()
+            throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        Binder binder = new Binder();
+        verifyExternalApproverConnectionRequestMessageOnInitiator(binder,
+                MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress),
+                WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_ENTER_PASSPHRASE,
+                WifiP2pPairingBootstrappingConfig.PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PASSPHRASE,
+                null, WifiP2pManager.EXTERNAL_APPROVER_CONNECTION_REQUESTED, 0);
+    }
+
+    /**
+     * Test PIN generated message to external approver for pairing.
+     * Pairing bootstrapping method: Display pin code on initiator device.
+     */
+    @Test
+    public void testExternalApproverShowPinMessageV2ConnectionOnInitiator()
+            throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        Binder binder = new Binder();
+        verifyExternalApproverConnectionRequestMessageOnInitiator(binder,
+                MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress),
+                WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_SHOW_PIN,
+                WifiP2pPairingBootstrappingConfig.PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PINCODE,
+                "12345678", WifiP2pManager.EXTERNAL_APPROVER_PIN_OR_PASSWORD_GENERATED,
+                WifiP2pManager.CREDENTIAL_TYPE_PIN);
+    }
+
+    /**
+     * Test password generated message to external approver built on SDK level newer than B.
+     * Pairing bootstrapping method: Display passphrase on initiator device.
+     */
+    @Test
+    public void testExternalApproverShowPasswordMessageV2ConnectionOnInitiatorOnSdkLevelNewerThanB()
+            throws Exception {
+        assumeTrue(Environment.isSdkNewerThanB());
+        Binder binder = new Binder();
+        when(mFeatureFlags.externalApproverSupportForWfdr2PasswordBasedBootstrapping())
+                .thenReturn(true);
+        when(mWifiPermissionsUtil.isTargetSdkLessThan(anyString(), eq(37),
+                anyInt())).thenReturn(false);
+        verifyExternalApproverConnectionRequestMessageOnInitiator(binder,
+                MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress),
+                WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_SHOW_PASSPHRASE,
+                WifiP2pPairingBootstrappingConfig.PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PASSPHRASE,
+                "password", WifiP2pManager.EXTERNAL_APPROVER_PIN_OR_PASSWORD_GENERATED,
+                WifiP2pManager.CREDENTIAL_TYPE_PASSWORD);
+    }
+
+    /**
+     * Test PIN generated message to external approver built on SDK level older than B.
+     * Pairing bootstrapping method: Display passphrase on initiator device.
+     */
+    @Test
+    public void testExternalApproverShowPasswordMessageV2ConnectionOnInitiatorOnSdkLevelLessThanB()
+            throws Exception {
+        assumeTrue(Environment.isSdkNewerThanB());
+        Binder binder = new Binder();
+        when(mFeatureFlags.externalApproverSupportForWfdr2PasswordBasedBootstrapping())
+                .thenReturn(true);
+        when(mWifiPermissionsUtil.isTargetSdkLessThan(anyString(), eq(37),
+                anyInt())).thenReturn(true);
+        verifyExternalApproverConnectionRequestMessageOnInitiator(binder,
+                MacAddress.fromString(mTestWifiP2pV2Device.deviceAddress),
+                WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_SHOW_PASSPHRASE,
+                WifiP2pPairingBootstrappingConfig.PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PASSPHRASE,
+                "password", WifiP2pManager.EXTERNAL_APPROVER_PIN_OR_PASSWORD_GENERATED,
+                WifiP2pManager.CREDENTIAL_TYPE_PIN);
     }
 }

@@ -6419,7 +6419,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             notifyInvitationSent(pinToShow, passwordToShow,
                     mSavedPeerConfig.deviceAddress);
         }
-        private void notifyInvitationSent(String pin, String password, String peerAddress) {
+        private void notifyInvitationSent(@Nullable String pin,
+                @Nullable String password, String peerAddress) {
             ApproverEntry entry = mExternalApproverManager.get(MacAddress.fromString(peerAddress));
             if (null == entry) {
                 logd("No approver found for " + peerAddress
@@ -6432,11 +6433,21 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 Bundle extras = new Bundle();
                 extras.putParcelable(WifiP2pManager.EXTRA_PARAM_KEY_PEER_ADDRESS,
                         entry.getAddress());
-                // TODO add separate callback for password
-                String pinOrPassword = TextUtils.isEmpty(password) ? pin : password;
-                extras.putString(WifiP2pManager.EXTRA_PARAM_KEY_WPS_PIN, pinOrPassword);
-                replyToMessage(entry.getMessage(), WifiP2pManager.EXTERNAL_APPROVER_PIN_GENERATED,
-                        extras);
+                String pinOrPassword;
+                int credentialType = WifiP2pManager.CREDENTIAL_TYPE_PIN;
+                if (TextUtils.isEmpty(password)) {
+                    pinOrPassword = pin;
+                } else {
+                    pinOrPassword = password;
+                    if (Flags.externalApproverSupportForWfdr2PasswordBasedBootstrapping()
+                            && checkExternalApproverCallerTargetSdkNewerThanB(entry.getMessage())) {
+                        credentialType = WifiP2pManager.CREDENTIAL_TYPE_PASSWORD;
+                    }
+                }
+                extras.putInt(WifiP2pManager.EXTRA_PARAM_KEY_CREDENTIAL_TYPE, credentialType);
+                extras.putString(WifiP2pManager.EXTRA_PARAM_KEY_PIN_OR_PASSWORD, pinOrPassword);
+                replyToMessage(entry.getMessage(),
+                        WifiP2pManager.EXTERNAL_APPROVER_PIN_OR_PASSWORD_GENERATED, extras);
                 return;
             }
             String deviceName = getDeviceName(peerAddress);
@@ -8730,6 +8741,15 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             return true;
         }
 
+        private boolean checkExternalApproverCallerTargetSdkNewerThanB(Message message) {
+            String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
+            if (TextUtils.isEmpty(packageName)) {
+                return false;
+            }
+            int uid = message.sendingUid;
+            return !mWifiPermissionsUtil.isTargetSdkLessThan(packageName, 37, uid);
+        }
+
         private boolean checkExternalApproverCaller(Message message,
                 IBinder binder, MacAddress devAddr, String cmd) {
             Bundle extras = message.getData()
@@ -8836,8 +8856,11 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 detachExternalApproverFromPeer();
                 notifyInvitationReceived(requestType);
                 return true;
-            } else if (WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PIN_TO_SERVICE
+            } else if ((WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PIN_TO_SERVICE
                             == message.arg1
+                    || (Flags.externalApproverSupportForWfdr2PasswordBasedBootstrapping()
+                    && WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PASSWORD_TO_SERVICE
+                    == message.arg1))
                     && WifiP2pManager.ExternalApproverRequestListener.REQUEST_TYPE_NEGOTIATION
                             == requestType) {
                 detachExternalApproverFromPeer();
@@ -8860,15 +8883,14 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 } else {
                     Bundle extras = message.getData().getBundle(
                             WifiP2pManager.EXTRA_PARAM_KEY_BUNDLE);
-                    // TODO Define an Extra for transporting pairing bootstrapping PIN/Passphrase
-                    String pin = extras.getString(
-                            WifiP2pManager.EXTRA_PARAM_KEY_WPS_PIN);
-                    if (!TextUtils.isEmpty(pin)) {
+                    String pinOrPassword = extras.getString(
+                            WifiP2pManager.EXTRA_PARAM_KEY_PIN_OR_PASSWORD);
+                    if (!TextUtils.isEmpty(pinOrPassword)) {
                         if (isConfigForBootstrappingMethodKeypadPinOrPassphrase(mSavedPeerConfig)) {
                             mSavedPeerConfig.getPairingBootstrappingConfig()
-                                    .setPairingBootstrappingPassword(pin);
+                                    .setPairingBootstrappingPassword(pinOrPassword);
                         } else {
-                            mSavedPeerConfig.wps.pin = pin;
+                            mSavedPeerConfig.wps.pin = pinOrPassword;
                         }
                     }
                     sendMessage(PEER_CONNECTION_USER_ACCEPT);
@@ -8914,7 +8936,11 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     + " result= " + message.arg1);
             // For deferring result, the approver should be removed first to avoid notifying
             // the application again.
-            if (WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PIN_TO_SERVICE == message.arg1
+            if ((WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PIN_TO_SERVICE
+                    == message.arg1
+                    || (Flags.externalApproverSupportForWfdr2PasswordBasedBootstrapping()
+                    && WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PASSWORD_TO_SERVICE
+                    == message.arg1))
                     && isConfigForBootstrappingMethodDisplayPinOrPassphrase(mSavedPeerConfig)) {
                 detachExternalApproverFromPeer();
                 notifyInvitationSentForV2Connection();
