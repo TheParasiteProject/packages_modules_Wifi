@@ -69,6 +69,7 @@ import com.android.server.wifi.hotspot2.PasspointManager;
 import com.android.server.wifi.proto.WifiStatsLog;
 import com.android.server.wifi.scanner.WifiScannerInternal;
 import com.android.server.wifi.util.WifiPermissionsUtil;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import java.io.FileDescriptor;
@@ -2630,6 +2631,10 @@ public class WifiConnectivityManager {
             } else {
                 mWifiMetrics.enterDeviceMobilityState(newState);
             }
+        }
+        if (mScreenOn && newState == WifiManager.DEVICE_MOBILITY_STATE_STATIONARY
+                && Flags.scanOptimizationWithMobilityChange()) {
+            startConnectivityScan(false);
         }
     }
 

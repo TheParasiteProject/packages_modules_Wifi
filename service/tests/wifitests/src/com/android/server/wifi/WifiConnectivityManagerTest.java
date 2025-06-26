@@ -106,6 +106,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto;
 import com.android.server.wifi.scanner.WifiScannerInternal;
 import com.android.server.wifi.util.LruConnectionTracker;
 import com.android.server.wifi.util.WifiPermissionsUtil;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import org.junit.After;
@@ -212,6 +213,7 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
                 .strictness(Strictness.LENIENT)
                 .mockStatic(WifiInjector.class, withSettings().lenient())
                 .mockStatic(WifiStatsLog.class)
+                .mockStatic(Flags.class)
                 .startMocking();
         WifiInjector wifiInjector = mock(WifiInjector.class);
         when(wifiInjector.getActiveModeWarden()).thenReturn(mActiveModeWarden);
@@ -2270,6 +2272,25 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
 
         verify(mWifiScanner).startScan((ScanSettings) argThat(new WifiPartialScanSettingMatcher()),
                 any());
+    }
+
+    @Test
+    public void testStationaryChangeTriggerScan() {
+        when(Flags.scanOptimizationWithMobilityChange()).thenReturn(true);
+        when(mClock.getElapsedSinceBootMillis()).thenReturn(0L);
+        mLooper.dispatchAll();
+        setScreenState(true);
+        mWifiConnectivityManager.handleConnectionStateChanged(mPrimaryClientModeManager,
+                WifiConnectivityManager.WIFI_STATE_DISCONNECTED);
+        mLooper.dispatchAll();
+        reset(mWifiScanner); // Reset to ignore scans triggered during setup
+
+        when(mClock.getElapsedSinceBootMillis()).thenReturn(25000 + 1L);
+        mWifiConnectivityManager.setDeviceMobilityState(
+                WifiManager.DEVICE_MOBILITY_STATE_STATIONARY);
+        mLooper.dispatchAll();
+
+        verify(mWifiScanner).startScan(any(WifiScanner.ScanSettings.class), any());
     }
 
     private class WifiPartialScanSettingMatcher implements ArgumentMatcher<ScanSettings> {
