@@ -24,6 +24,7 @@ import static com.android.server.wifi.nl80211.NetlinkConstants.NL80211_MULTICAST
 import static com.android.server.wifi.nl80211.NetlinkConstants.NL80211_MULTICAST_GROUP_SCAN;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -32,16 +33,20 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.validateMockitoUsage;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
 import android.net.util.SocketUtils;
 import android.net.wifi.SynchronousExecutor;
-import android.os.HandlerThread;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.MessageQueue;
 import android.os.test.TestLooper;
 import android.system.Os;
 
 import com.android.dx.mockito.inline.extended.ExtendedMockito;
+import com.android.modules.utils.BackgroundThread;
 import com.android.net.module.util.netlink.NetlinkUtils;
 import com.android.net.module.util.netlink.StructNlAttr;
 
@@ -69,11 +74,15 @@ public class Nl80211ProxyTest {
 
     private Nl80211Proxy mDut;
     private MockitoSession mSession;
-    private TestLooper mLooper;
+    private TestLooper mWifiLooper;
+    private Handler mWifiHandler;
 
     @Mock FileDescriptor mFileDescriptor;
     @Mock Nl80211Proxy.NetlinkResponseListener mResponseListener;
-    @Mock HandlerThread mAsyncHandlerThread;
+    @Mock Handler mBackgroundHandler;
+    @Mock Looper mBackgroundLooper;
+    @Mock MessageQueue mBackgroundMessageQueue;
+    @Mock Nl80211BroadcastMonitor.Nl80211BroadcastCallback mBroadcastCallback;
 
     @Captor ArgumentCaptor<List<GenericNetlinkMsg>> mMessageListCaptor;
 
@@ -82,16 +91,23 @@ public class Nl80211ProxyTest {
         MockitoAnnotations.initMocks(this);
         mSession = ExtendedMockito.mockitoSession()
                 .strictness(Strictness.LENIENT)
+                .mockStatic(BackgroundThread.class, withSettings().lenient())
                 .mockStatic(NetlinkUtils.class, withSettings().lenient())
                 .mockStatic(Os.class)
                 .mockStatic(SocketUtils.class)
                 .startMocking();
         when(NetlinkUtils.netlinkSocketForProto(anyInt())).thenReturn(mFileDescriptor);
 
-        mLooper = new TestLooper();
-        when(mAsyncHandlerThread.getLooper()).thenReturn(mLooper.getLooper());
+        // Use a test looper to dispatch events in the tests.
+        mWifiLooper = new TestLooper();
+        mWifiHandler = new Handler(mWifiLooper.getLooper());
 
-        mDut = new Nl80211Proxy(mAsyncHandlerThread);
+        // Mock the background thread to avoid running the broadcast monitor.
+        when(BackgroundThread.getHandler()).thenReturn(mBackgroundHandler);
+        when(mBackgroundHandler.getLooper()).thenReturn(mBackgroundLooper);
+        when(mBackgroundLooper.getQueue()).thenReturn(mBackgroundMessageQueue);
+
+        mDut = new Nl80211Proxy(mWifiHandler);
         initializeDut();
     }
 
@@ -122,6 +138,23 @@ public class Nl80211ProxyTest {
         responseMessage.pack(responseMsgBuffer);
         responseMsgBuffer.position(0); // reset to the beginning of the buffer
         when(NetlinkUtils.recvMessage(any(), anyInt(), anyLong())).thenReturn(responseMsgBuffer);
+    }
+
+    /**
+     * Test that the initialization logic is only run once, even if the initialize
+     * method is called several times.
+     */
+    @Test
+    public void testRepeatedInitialization() {
+        // Verify that the broadcast monitor was started on the
+        // background thread during the first initialization.
+        verify(mBackgroundHandler).post(any());
+        verify(mBackgroundHandler).getLooper();
+
+        // Rerunning initialize should not result in starting
+        // a new broadcast monitor on the background thread.
+        assertTrue(mDut.initialize());
+        verifyNoMoreInteractions(mBackgroundHandler);
     }
 
     /**
@@ -158,7 +191,7 @@ public class Nl80211ProxyTest {
         // Send and receive messages on the async handler
         GenericNetlinkMsg response = Nl80211TestUtils.createTestMessage();
         setResponseMessage(response);
-        mLooper.dispatchAll();
+        mWifiLooper.dispatchAll();
 
         verify(mResponseListener).onResponse(mMessageListCaptor.capture());
         assertTrue(response.equals(mMessageListCaptor.getValue().get(0)));
@@ -170,7 +203,7 @@ public class Nl80211ProxyTest {
     @Test
     public void testCreateNl80211Request() throws Exception {
         // Expect failure if the Nl80211Proxy has not been initialized
-        mDut = new Nl80211Proxy(mAsyncHandlerThread);
+        mDut = new Nl80211Proxy(mWifiHandler);
         assertNull(mDut.createNl80211Request(Nl80211TestUtils.TEST_COMMAND));
 
         // Expect that the message can be created after initialization,
@@ -193,5 +226,24 @@ public class Nl80211ProxyTest {
         assertTrue(parsedMulticastGroups.containsKey(NL80211_MULTICAST_GROUP_SCAN));
         assertTrue(parsedMulticastGroups.containsKey(NL80211_MULTICAST_GROUP_REG));
         assertTrue(parsedMulticastGroups.containsKey(NL80211_MULTICAST_GROUP_MLME));
+    }
+
+    /**
+     * Test that a broadcast callback can be successfully registered and unregistered
+     * after this instance has been initialized;
+     */
+    @Test
+    public void testRegisterAndUnregisterBroadcastCallback() throws Exception {
+        short eventType = 123;
+        mDut = new Nl80211Proxy(mWifiHandler);
+
+        // Expect failure before initialization
+        assertFalse(mDut.registerBroadcastCallback(eventType, mBroadcastCallback));
+        assertFalse(mDut.unregisterBroadcastCallback(eventType, mBroadcastCallback));
+
+        // Registration should succeed after initialization
+        initializeDut();
+        assertTrue(mDut.registerBroadcastCallback(eventType, mBroadcastCallback));
+        assertTrue(mDut.unregisterBroadcastCallback(eventType, mBroadcastCallback));
     }
 }
