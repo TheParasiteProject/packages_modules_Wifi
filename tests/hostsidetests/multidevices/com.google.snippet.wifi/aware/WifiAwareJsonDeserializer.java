@@ -28,6 +28,7 @@ import android.net.wifi.aware.SubscribeConfig;
 import android.net.wifi.aware.WifiAwareDataPathSecurityConfig;
 import android.net.wifi.aware.WifiAwareNetworkSpecifier;
 import android.net.wifi.rtt.RangingRequest;
+import android.os.PatternMatcher;
 import android.util.Base64;
 
 import androidx.annotation.NonNull;
@@ -89,6 +90,11 @@ public class WifiAwareJsonDeserializer {
     private static final String PSK = "psk";
     private static final String REMOVE_CAPABILITY = "remove_capability";
     private static final String SSID = "ssid";
+    private static final String SSID_PATTERN = "ssid_pattern";
+    private static final String PATTERN = "pattern";
+    private static final String PATTERN_TYPE = "pattern_type";
+    private static final String BSSID_PATTERN = "bssid_pattern";
+    private static final String BSSID_MASK = "bssid_mask";
     //WifiAwareDataPathSecurityConfig specific
     private static final String CIPHER_SUITE = "cipher_suite";
     private static final String SECURITY_CONFIG_PMK = "pmk";
@@ -316,13 +322,30 @@ public class WifiAwareJsonDeserializer {
             if (jsonObject.has(NETWORK_SPECIFIER)) {
                 JSONObject specifierJson = jsonObject.getJSONObject(NETWORK_SPECIFIER);
                 WifiNetworkSpecifier.Builder wifiSpecBuilder = new WifiNetworkSpecifier.Builder();
-                if (specifierJson.has(SSID)) {
+                if (specifierJson.has(SSID_PATTERN) && specifierJson.has(SSID)) {
+                    throw new JSONException("cannot specify both SSID and SSID_PATTERN.");
+                } else if (specifierJson.has(SSID_PATTERN)) {
+                    JSONObject ssidPattern = specifierJson.getJSONObject(SSID_PATTERN);
+                    String pattern = ssidPattern.getString(PATTERN);
+                    int patternType = ssidPattern.getInt(PATTERN_TYPE);
+                    wifiSpecBuilder.setSsidPattern(new PatternMatcher(
+                                pattern, patternType));
+                } else if (specifierJson.has(SSID)) {
                     wifiSpecBuilder.setSsid(specifierJson.getString(SSID));
                 }
-                if (specifierJson.has(BSSID)) {
+                if (specifierJson.has(BSSID_PATTERN) && specifierJson.has(BSSID)) {
+                    throw new JSONException("cannot specify both BSSID and BSSID_PATTERN.");
+                } else if (specifierJson.has(BSSID_PATTERN)) {
+                    JSONObject bssidPattern = specifierJson.getJSONObject(BSSID_PATTERN);
+                    String bssidString = bssidPattern.getString(BSSID);
+                    String bssidMaskString = bssidPattern.getString(BSSID_MASK);
+                    MacAddress bssid = MacAddress.fromString(bssidString);
+                    MacAddress bssidMask = MacAddress.fromString(bssidMaskString);
+                    wifiSpecBuilder.setBssidPattern(bssid, bssidMask);
+                } else if (specifierJson.has(BSSID)) {
                     try {
-                        wifiSpecBuilder.setBssid(
-                                MacAddress.fromString(specifierJson.getString(BSSID)));
+                        wifiSpecBuilder.setBssid(MacAddress.fromString(
+                                specifierJson.getString(BSSID)));
                     } catch (IllegalArgumentException e) {
                         throw new JSONException("Error parsing BSSID: " + e.getMessage());
                     }

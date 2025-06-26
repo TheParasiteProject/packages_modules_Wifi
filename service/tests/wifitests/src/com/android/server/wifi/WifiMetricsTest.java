@@ -7296,7 +7296,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                         eq(true), // mIs11AzSupported
                         eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__PASSPOINT_RELEASE__PASSPOINT_RELEASE_UNKNOWN),
                         eq(false), // isPasspointHomeProvider
-                        eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__AP_TYPE_6GHZ__AP_TYPE_6GHZ_STANDARD_POWER),
+                        eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__AP_TYPE_6GHZ__AP_TYPE_6GHZ_INDOOR),
                         eq(true), // mIsEcpsPriorityAccessSupported
                         eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_160MHZ))); // mChannelWidth
     }
