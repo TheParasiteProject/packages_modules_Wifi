@@ -1001,6 +1001,13 @@ public class WifiAwareDataPathStateManager {
                 return false;
             }
 
+            if (getNumOfNdps() >= mMgr.getCapabilities().getMaxNdpSessions()) {
+                Log.w(TAG, "WifiAwareNetworkFactory.acceptRequest: request=" + request
+                        + "no more NDP available");
+                releaseRequestAsUnfulfillableByAnyFactory(request);
+                return false;
+            }
+
             mNetworkRequestsCache.put(networkSpecifier, nnri);
             mAwareMetrics.recordNdpRequestType(networkSpecifier.type);
 

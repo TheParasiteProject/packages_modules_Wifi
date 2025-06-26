@@ -284,6 +284,15 @@ flag {
 }
 
 flag {
+    name: "allow_override_max_ndp_session"
+    is_exported: true
+    namespace: "wifi"
+    description: "Allow override the NDP session number to avoid interrupt critical connection"
+    bug: "375552150"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "wifi_lock_activated_by_p2p_or_aware"
     namespace: "wifi"
     description: "Allow some apps to activate a WifiLock if a P2P or Aware connection is active"

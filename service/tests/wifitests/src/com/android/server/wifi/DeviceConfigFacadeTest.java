@@ -232,7 +232,6 @@ public class DeviceConfigFacadeTest extends WifiBaseTest {
                 mDeviceConfigFacade.getBandwidthEstimatorLargeTimeConstantSec());
         assertEquals(false, mDeviceConfigFacade.isInterfaceFailureBugreportEnabled());
         assertEquals(false, mDeviceConfigFacade.isP2pFailureBugreportEnabled());
-        assertEquals(true, mDeviceConfigFacade.isAwareSuspensionEnabled());
         assertEquals(true, mDeviceConfigFacade.isHighPerfLockDeprecated());
         assertEquals(true, mDeviceConfigFacade.isOobPseudonymEnabled());
         assertEquals(DeviceConfigFacade.DEFAULT_DRY_RUN_SCORER_PKG_NAME,
@@ -457,7 +456,6 @@ public class DeviceConfigFacadeTest extends WifiBaseTest {
         assertEquals(30, mDeviceConfigFacade.getBandwidthEstimatorLargeTimeConstantSec());
         assertEquals(true, mDeviceConfigFacade.isInterfaceFailureBugreportEnabled());
         assertEquals(true, mDeviceConfigFacade.isP2pFailureBugreportEnabled());
-        assertEquals(true, mDeviceConfigFacade.isAwareSuspensionEnabled());
         assertEquals(true, mDeviceConfigFacade.isHighPerfLockDeprecated());
         assertEquals(true, mDeviceConfigFacade.isOobPseudonymEnabled());
         assertEquals(DeviceConfigFacade.DEFAULT_DRY_RUN_SCORER_PKG_NAME,
