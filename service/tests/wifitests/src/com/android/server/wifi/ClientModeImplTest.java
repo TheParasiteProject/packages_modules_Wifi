@@ -8145,6 +8145,10 @@ public class ClientModeImplTest extends WifiBaseTest {
         verify(mWifiMetrics).logStaEvent(eq(WIFI_IFACE_NAME),
                 eq(StaEvent.TYPE_FRAMEWORK_DISCONNECT),
                 eq(StaEvent.DISCONNECT_CONNECT_WATCHDOG_TIMER));
+        if (SdkLevel.isAtLeastS()) {
+            verify(mWifiConfigManager).setRecentFailureAssociationStatus(anyInt(),
+                    eq(WifiConfiguration.RECENT_FAILURE_NETWORK_NOT_FOUND));
+        }
     }
 
     @Test
