@@ -169,6 +169,7 @@ import android.net.wifi.IOnWifiDriverCountryCodeChangedListener;
 import android.net.wifi.IOnWifiUsabilityStatsListener;
 import android.net.wifi.IPnoScanResultsCallback;
 import android.net.wifi.IPrivilegedConfiguredNetworksListener;
+import android.net.wifi.IRestrictAutoJoinToSubIdCallback;
 import android.net.wifi.IScanResultsCallback;
 import android.net.wifi.ISoftApCallback;
 import android.net.wifi.IStringListener;
@@ -250,6 +251,7 @@ import com.android.internal.os.PowerProfile;
 import com.android.modules.utils.ParceledListSlice;
 import com.android.modules.utils.StringParceledListSlice;
 import com.android.modules.utils.build.SdkLevel;
+import com.android.server.wifi.WifiConfigManager.OnRestrictAutoJoinToSubIdCallback;
 import com.android.server.wifi.WifiServiceImpl.LocalOnlyRequestorCallback;
 import com.android.server.wifi.WifiServiceImpl.SoftApCallbackInternal;
 import com.android.server.wifi.WifiServiceImpl.ThreadStateListener;
@@ -456,6 +458,8 @@ public class WifiServiceImplTest extends WifiBaseTest {
     @Mock ILocalOnlyHotspotCallback mLohsCallback;
     @Mock ICoexCallback mCoexCallback;
     @Mock IWifiStateChangedListener mWifiStateChangedListener;
+    @Mock IRestrictAutoJoinToSubIdCallback mRestrictAutoJoinToSubIdCallbackProxy;
+    @Mock OnRestrictAutoJoinToSubIdCallback mOnRestrictAutoJoinToSubIdCallback;
     @Mock IScanResultsCallback mScanResultsCallback;
     @Mock ISuggestionConnectionStatusListener mSuggestionConnectionStatusListener;
     @Mock ILocalOnlyConnectionStatusListener mLocalOnlyConnectionStatusListener;
@@ -815,6 +819,13 @@ public class WifiServiceImplTest extends WifiBaseTest {
         verify(mActiveModeWarden, atLeastOnce()).registerLohsCallback(
                 lohsCallbackCaptor.capture());
         mLohsApCallback = lohsCallbackCaptor.getValue();
+        ArgumentCaptor<OnRestrictAutoJoinToSubIdCallback>
+                onRestrictAutoJoinToSubIdCallbackCaptor =
+                ArgumentCaptor.forClass(OnRestrictAutoJoinToSubIdCallback.class);
+        verify(mWifiConfigManager, atLeastOnce()).setRestrictAutoJoinToSubIdCallback(
+                onRestrictAutoJoinToSubIdCallbackCaptor.capture());
+        mOnRestrictAutoJoinToSubIdCallback =
+                onRestrictAutoJoinToSubIdCallbackCaptor.getValue();
         mLooper.dispatchAll();
         return wifiServiceImpl;
     }
@@ -9515,6 +9526,73 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mWifiServiceImpl.stopRestrictingAutoJoinToSubscriptionId();
         mLooper.dispatchAll();
         verify(mWifiConfigManager).stopRestrictingAutoJoinToSubscriptionId();
+    }
+
+    /**
+     * Test add and remove AutoJoinRestrictionSubIdChangedListener will register it and unregister
+     * it updates to the restriction sub id.
+     */
+    @Test
+    public void testAddRemoveRestrictAutoJoinToSubIdCallback() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
+        when(mContext.checkPermission(eq(android.Manifest.permission.NETWORK_SETTINGS),
+                anyInt(), anyInt())).thenReturn(PackageManager.PERMISSION_GRANTED);
+        when(mWifiConfigManager.getAutoJoinRestrictionSubId())
+                .thenReturn(SubscriptionManager.INVALID_SUBSCRIPTION_ID);
+        when(mRestrictAutoJoinToSubIdCallbackProxy.asBinder()).thenReturn(mAppBinder);
+        mWifiServiceImpl.addRestrictAutoJoinToSubIdCallback(
+                mRestrictAutoJoinToSubIdCallbackProxy);
+        mLooper.dispatchAll();
+
+        // Verify initial value
+        verify(mRestrictAutoJoinToSubIdCallbackProxy).onRestrictionStopped();
+
+        // Verify changed value
+        mOnRestrictAutoJoinToSubIdCallback.onRestrictionStarted(TEST_SUB_ID);
+        verify(mRestrictAutoJoinToSubIdCallbackProxy).onRestrictionStarted(TEST_SUB_ID);
+
+        mWifiServiceImpl.removeRestrictAutoJoinToSubIdCallback(
+                mRestrictAutoJoinToSubIdCallbackProxy);
+        mLooper.dispatchAll();
+
+        // Verify no value sent after removing listener
+        mOnRestrictAutoJoinToSubIdCallback.onRestrictionStopped();
+        verify(mRestrictAutoJoinToSubIdCallbackProxy, times(1))
+                .onRestrictionStopped();
+    }
+
+    /**
+     * Verify that a call to addAutoJoinRestrictionSubIdChangedListener throws a SecurityException
+     * if the caller does not have NETWORK_SETTINGS or NETWORK_SETUP_WIZARD permission.
+     */
+    @Test
+    public void testAddRestrictAutoJoinToSubIdCallbackMissingPermissions() {
+        assumeTrue(SdkLevel.isAtLeastS());
+        when(mContext.checkPermission(eq(android.Manifest.permission.NETWORK_SETTINGS),
+                anyInt(), anyInt())).thenReturn(PackageManager.PERMISSION_DENIED);
+        when(mContext.checkPermission(eq(Manifest.permission.NETWORK_SETUP_WIZARD),
+                anyInt(), anyInt())).thenReturn(PackageManager.PERMISSION_DENIED);
+        assertThrows(SecurityException.class,
+                () -> mWifiServiceImpl.addRestrictAutoJoinToSubIdCallback(
+                        mRestrictAutoJoinToSubIdCallbackProxy));
+    }
+
+    /**
+     * Verify that a call to removeRestrictAutoJoinToSubIdCallback throws a
+     * SecurityException if the caller does not have NETWORK_SETTINGS or NETWORK_SETUP_WIZARD
+     * permission.
+     */
+    @Test
+    public void testRemoveRestrictAutoJoinToSubIdCallbackMissingPermissions() {
+        assumeTrue(SdkLevel.isAtLeastS());
+        when(mContext.checkPermission(eq(android.Manifest.permission.NETWORK_SETTINGS),
+                anyInt(), anyInt())).thenReturn(PackageManager.PERMISSION_DENIED);
+        when(mContext.checkPermission(eq(Manifest.permission.NETWORK_SETUP_WIZARD),
+                anyInt(), anyInt())).thenReturn(PackageManager.PERMISSION_DENIED);
+
+        assertThrows(SecurityException.class,
+                () -> mWifiServiceImpl.removeRestrictAutoJoinToSubIdCallback(
+                        mRestrictAutoJoinToSubIdCallbackProxy));
     }
 
     @Test(expected = SecurityException.class)

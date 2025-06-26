@@ -41,6 +41,7 @@ import android.net.wifi.IOnWifiDriverCountryCodeChangedListener;
 import android.net.wifi.IOnWifiUsabilityStatsListener;
 import android.net.wifi.IPnoScanResultsCallback;
 import android.net.wifi.IPrivilegedConfiguredNetworksListener;
+import android.net.wifi.IRestrictAutoJoinToSubIdCallback;
 import android.net.wifi.IScanResultsCallback;
 import android.net.wifi.ISoftApCallback;
 import android.net.wifi.IStringListener;
@@ -432,6 +433,10 @@ interface IWifiManager {
     void startRestrictingAutoJoinToSubscriptionId(int subId);
 
     void stopRestrictingAutoJoinToSubscriptionId();
+
+    void addRestrictAutoJoinToSubIdCallback(in IRestrictAutoJoinToSubIdCallback callback);
+
+    void removeRestrictAutoJoinToSubIdCallback(in IRestrictAutoJoinToSubIdCallback callback);
 
     void setCarrierNetworkOffloadEnabled(int subscriptionId, boolean merged, boolean enabled);
 

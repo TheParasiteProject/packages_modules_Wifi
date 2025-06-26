@@ -212,6 +212,25 @@ public class WifiConfigManager {
         default void onSecurityParamsUpdate(@NonNull WifiConfiguration oldConfig,
                 List<SecurityParams> securityParams) { }
     }
+
+    /**
+     * Interface for other modules to listen to autojoin restriction changes.
+     */
+    public interface OnRestrictAutoJoinToSubIdCallback {
+        /**
+         * Called when the Wi-Fi auto-join restriction to a subscription ID starts.
+         *
+         * @param subscriptionId the subscriptionId of carrier-merged networks that auto-join is
+         * restricted to.
+         */
+        void onRestrictionStarted(int subscriptionId);
+
+        /**
+         * Called when the Wi-Fi auto-join restriction to a subscription ID stops.
+         */
+        void onRestrictionStopped();
+    }
+
     /**
      * Max size of scan details to cache in {@link #mScanDetailCaches}.
      */
@@ -355,6 +374,7 @@ public class WifiConfigManager {
      * Store the network update listeners.
      */
     private final Set<OnNetworkUpdateListener> mListeners;
+    private OnRestrictAutoJoinToSubIdCallback mOnRestrictAutoJoinToSubIdCallback;
 
     private final FrameworkFacade mFrameworkFacade;
     private final DeviceConfigFacade mDeviceConfigFacade;
@@ -471,9 +491,25 @@ public class WifiConfigManager {
         mScanDetailCaches = new HashMap<>(16, 0.75f);
         mUserTemporarilyDisabledList =
                 new MissingCounterTimerLockList<>(SCAN_RESULT_MISSING_COUNT_THRESHOLD, mClock);
-        mNonCarrierMergedNetworksStatusTracker = new NonCarrierMergedNetworksStatusTracker(mClock);
         mRandomizedMacAddressMapping = new HashMap<>();
         mListeners = new ArraySet<>();
+        mNonCarrierMergedNetworksStatusTracker = new NonCarrierMergedNetworksStatusTracker(mClock);
+        mNonCarrierMergedNetworksStatusTracker.setListener(
+                new NonCarrierMergedNetworksStatusTracker.Callback() {
+                    @Override
+                    public void onRestrictionStarted(int subscriptionId) {
+                        if (mOnRestrictAutoJoinToSubIdCallback != null) {
+                            mOnRestrictAutoJoinToSubIdCallback.onRestrictionStarted(subscriptionId);
+                        }
+                    }
+
+                    @Override
+                    public void onRestrictionStopped() {
+                        if (mOnRestrictAutoJoinToSubIdCallback != null) {
+                            mOnRestrictAutoJoinToSubIdCallback.onRestrictionStopped();
+                        }
+                    }
+                });
 
         // Register store data for network list and deleted ephemeral SSIDs.
         mNetworkListSharedStoreData = networkListSharedStoreData;
@@ -3340,6 +3376,22 @@ public class WifiConfigManager {
     }
 
     /**
+     * Gets the current subscription ID set by startRestrictingAutoJoinToSubscriptionId that
+     * autojoin is restricted to. This is only valid if isAutoJoinRestrictedToSubId() is true.
+     */
+    public int getAutoJoinRestrictionSubId() {
+        return mNonCarrierMergedNetworksStatusTracker.getRestrictionSubId();
+    }
+
+    /**
+     * Returns true if auto-join is currently restricted to carrier networks set by
+     * startRestrictingAutoJoinToSubscriptionId.
+     */
+    public boolean isAutoJoinRestrictedToSubId() {
+        return mNonCarrierMergedNetworksStatusTracker.isRestrictionActive();
+    }
+
+    /**
      * Update the user temporarily disabled network list with networks in range.
      * @param networks networks in range in String format, FQDN or SSID. And caller must ensure
      *                 that the SSID passed thru this API matched the WifiConfiguration.SSID rules,
@@ -4052,6 +4104,14 @@ public class WifiConfigManager {
             return;
         }
         mListeners.remove(listener);
+    }
+
+    /**
+     * Add the autojoin restriction changed callback
+     */
+    public void setRestrictAutoJoinToSubIdCallback(
+            @Nullable OnRestrictAutoJoinToSubIdCallback callback) {
+        mOnRestrictAutoJoinToSubIdCallback = callback;
     }
 
     /**

@@ -126,6 +126,7 @@ import android.net.wifi.IOnWifiDriverCountryCodeChangedListener;
 import android.net.wifi.IOnWifiUsabilityStatsListener;
 import android.net.wifi.IPnoScanResultsCallback;
 import android.net.wifi.IPrivilegedConfiguredNetworksListener;
+import android.net.wifi.IRestrictAutoJoinToSubIdCallback;
 import android.net.wifi.IScanResultsCallback;
 import android.net.wifi.ISoftApCallback;
 import android.net.wifi.IStringListener;
@@ -365,6 +366,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
     private boolean mVerboseLoggingEnabled = false;
     private final RemoteCallbackList<IWifiVerboseLoggingStatusChangedListener>
             mRegisteredWifiLoggingStatusListeners = new RemoteCallbackList<>();
+
+    private final RemoteCallbackList<IRestrictAutoJoinToSubIdCallback>
+            mRestrictAutoJoinToSubIdCallbacks = new RemoteCallbackList<>();
 
     private final FrameworkFacade mFrameworkFacade;
 
@@ -766,6 +770,38 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         mWifiThreadRunner = mWifiInjector.getWifiThreadRunner();
         mWifiHandlerThread = mWifiInjector.getWifiHandlerThread();
         mWifiConfigManager = mWifiInjector.getWifiConfigManager();
+        mWifiConfigManager.setRestrictAutoJoinToSubIdCallback(
+                new WifiConfigManager.OnRestrictAutoJoinToSubIdCallback() {
+                    @Override
+                    public void onRestrictionStarted(int subscriptionId) {
+                        int itemCount = mRestrictAutoJoinToSubIdCallbacks.beginBroadcast();
+                        for (int i = 0; i < itemCount; i++) {
+                            try {
+                                mRestrictAutoJoinToSubIdCallbacks.getBroadcastItem(i)
+                                        .onRestrictionStarted(subscriptionId);
+                            } catch (RemoteException e) {
+                                Log.e(TAG, "IRestrictAutoJoinToSubIdCallback.onRestrictionStarted:"
+                                        + " remote exception -- " + e);
+                            }
+                        }
+                        mRestrictAutoJoinToSubIdCallbacks.finishBroadcast();
+                    }
+
+                    @Override
+                    public void onRestrictionStopped() {
+                        int itemCount = mRestrictAutoJoinToSubIdCallbacks.beginBroadcast();
+                        for (int i = 0; i < itemCount; i++) {
+                            try {
+                                mRestrictAutoJoinToSubIdCallbacks.getBroadcastItem(i)
+                                        .onRestrictionStopped();
+                            } catch (RemoteException e) {
+                                Log.e(TAG, "IRestrictAutoJoinToSubIdCallback.onRestrictionStopped:"
+                                        + " remote exception -- " + e);
+                            }
+                        }
+                        mRestrictAutoJoinToSubIdCallbacks.finishBroadcast();
+                    }
+                });
         mHalDeviceManager = mWifiInjector.getHalDeviceManager();
         mWifiBlocklistMonitor = mWifiInjector.getWifiBlocklistMonitor();
         mPasspointManager = mWifiInjector.getPasspointManager();
@@ -4759,6 +4795,68 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         mWifiThreadRunner.post(() ->
                 mWifiConfigManager.stopRestrictingAutoJoinToSubscriptionId(),
                 TAG + "#stopRestrictingAutoJoinToSubscriptionId");
+    }
+
+    /**
+     * See {@link WifiManager#addRestrictAutoJoinToSubIdCallback(Executor,
+     * WifiManager.RestrictAutoJoinToSubIdCallback)}
+     */
+    public void addRestrictAutoJoinToSubIdCallback(
+            @NonNull IRestrictAutoJoinToSubIdCallback callback) {
+        if (!isSettingsOrSuw(Binder.getCallingPid(), Binder.getCallingUid())) {
+            throw new SecurityException(TAG + ": Permission denied");
+        }
+        if (!SdkLevel.isAtLeastS()) {
+            throw new UnsupportedOperationException();
+        }
+        Objects.requireNonNull(callback);
+        if (mVerboseLoggingEnabled) {
+            mLog.info("addAutoJoinRestrictionSubIdChangedListener uid=%")
+                    .c(Binder.getCallingUid()).flush();
+        }
+        mWifiThreadRunner.post(() -> {
+            mRestrictAutoJoinToSubIdCallbacks.register(callback);
+            // Send the initial value
+            if (mWifiConfigManager.isAutoJoinRestrictedToSubId()) {
+                try {
+                    callback.onRestrictionStarted(
+                            mWifiConfigManager.getAutoJoinRestrictionSubId());
+                } catch (RemoteException e) {
+                    Log.e(TAG, "addRestrictAutoJoinToSubIdCallback: remote exception -- "
+                            + e);
+                }
+            } else {
+                try {
+                    callback.onRestrictionStopped();
+                } catch (RemoteException e) {
+                    Log.e(TAG, "addRestrictAutoJoinToSubIdCallback: remote exception -- "
+                            + e);
+                }
+            }
+        });
+    }
+
+    /**
+     * See {@link WifiManager#removeRestrictAutoJoinToSubIdCallback(
+     *WifiManager.RestrictAutoJoinToSubIdCallback)}
+     */
+    public void removeRestrictAutoJoinToSubIdCallback(
+            @NonNull IRestrictAutoJoinToSubIdCallback callback) {
+        if (!isSettingsOrSuw(Binder.getCallingPid(), Binder.getCallingUid())) {
+            throw new SecurityException(TAG + ": Permission denied");
+        }
+        if (!SdkLevel.isAtLeastS()) {
+            throw new UnsupportedOperationException();
+        }
+        enforceAccessPermission();
+        Objects.requireNonNull(callback);
+        if (mVerboseLoggingEnabled) {
+            mLog.info("removeAutoJoinRestrictionSubIdChangedListener uid=%")
+                    .c(Binder.getCallingUid()).flush();
+        }
+        mWifiThreadRunner.post(() -> {
+            mRestrictAutoJoinToSubIdCallbacks.unregister(callback);
+        });
     }
 
     /**

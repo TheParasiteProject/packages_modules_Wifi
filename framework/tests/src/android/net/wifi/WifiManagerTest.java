@@ -227,6 +227,8 @@ public class WifiManagerTest {
     private ScanResultsCallback mScanResultsCallback;
     private CoexCallback mCoexCallback;
     private WifiManager.WifiStateChangedListener mWifiStateChangedListener;
+    private WifiManager.RestrictAutoJoinToSubIdCallback
+            mRestrictAutoJoinToSubIdCallback;
     private SubsystemRestartTrackingCallback mRestartCallback;
     private int mRestartCallbackMethodRun = 0; // 1: restarting, 2: restarted
     private WifiActivityEnergyInfo mWifiActivityEnergyInfo;
@@ -327,6 +329,17 @@ public class WifiManagerTest {
             }
         };
         mWifiStateChangedListener = () -> mRunnable.run();
+        mRestrictAutoJoinToSubIdCallback = new WifiManager.RestrictAutoJoinToSubIdCallback() {
+            @Override
+            public void onRestrictionStarted(int subscriptionId) {
+                mRunnable.run();
+            }
+
+            @Override
+            public void onRestrictionStopped() {
+                mRunnable.run();
+            }
+        };
         if (SdkLevel.isAtLeastS()) {
             mCoexCallback = new CoexCallback() {
                 @Override
@@ -2533,6 +2546,42 @@ public class WifiManagerTest {
         assumeTrue(SdkLevel.isAtLeastS());
         mWifiManager.stopRestrictingAutoJoinToSubscriptionId();
         verify(mWifiService).stopRestrictingAutoJoinToSubscriptionId();
+    }
+
+    /**
+     * Verify client provided callback is being called to the right callback.
+     */
+    @Test
+    public void testAddRestrictAutoJoinToSubIdCallbackAndReceiveEvent() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
+        assertThrows(NullPointerException.class,
+                () -> mWifiManager.addRestrictAutoJoinToSubIdCallback(mExecutor, null));
+        assertThrows(NullPointerException.class,
+                () -> mWifiManager.addRestrictAutoJoinToSubIdCallback(
+                        null, mRestrictAutoJoinToSubIdCallback));
+
+
+        ArgumentCaptor<IRestrictAutoJoinToSubIdCallback.Stub> callbackCaptor =
+                ArgumentCaptor.forClass(IRestrictAutoJoinToSubIdCallback.Stub.class);
+        mWifiManager.addRestrictAutoJoinToSubIdCallback(new SynchronousExecutor(),
+                mRestrictAutoJoinToSubIdCallback);
+        verify(mWifiService).addRestrictAutoJoinToSubIdCallback(callbackCaptor.capture());
+        callbackCaptor.getValue().onRestrictionStarted(1);
+        verify(mRunnable).run();
+    }
+
+    /**
+     * Verify client removeRestrictAutoJoinToSubIdCallback.
+     */
+    @Test
+    public void testRemoveUnknownRestrictAutoJoinToSubIdCallback() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
+        assertThrows(NullPointerException.class,
+                () -> mWifiManager.removeRestrictAutoJoinToSubIdCallback(null));
+
+        mWifiManager.removeRestrictAutoJoinToSubIdCallback(
+                mRestrictAutoJoinToSubIdCallback);
+        verify(mWifiService, never()).removeRestrictAutoJoinToSubIdCallback(any());
     }
 
     /**
