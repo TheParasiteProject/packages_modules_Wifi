@@ -401,3 +401,12 @@ flag {
     description: "Add new APIs to feed the internal score to external scorer for reference"
     bug: "427546930"
 }
+
+flag {
+    name: "restrict_autojoin_callback_api"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add new callback API to listen on restrict autojoin to subscription ID state"
+    bug: "201143076"
+    is_fixed_read_only: true
+}
