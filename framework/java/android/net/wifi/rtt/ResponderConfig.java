@@ -312,9 +312,12 @@ public final class ResponderConfig implements Parcelable {
      *                        MHz).
      * @param preamble        The preamble used by the Responder, specified using
      *                        {@link PreambleType}.
+     * @deprecated            Use {@link Builder#build()} instead
      * @hide
      */
+    @Deprecated
     @SystemApi
+    @FlaggedApi(Flags.FLAG_IMPROVE_RANGING_API)
     public ResponderConfig(@NonNull MacAddress macAddress, @ResponderType int responderType,
             boolean supports80211mc, @ChannelWidth int channelWidth, int frequency, int centerFreq0,
             int centerFreq1, @PreambleType int preamble) {
@@ -357,9 +360,12 @@ public final class ResponderConfig implements Parcelable {
      *                        MHz).
      * @param preamble        The preamble used by the Responder, specified using
      *                        {@link PreambleType}.
+     * @deprecated            Use {@link Builder#build()} instead
      * @hide
      */
+    @Deprecated
     @SystemApi
+    @FlaggedApi(Flags.FLAG_IMPROVE_RANGING_API)
     public ResponderConfig(@NonNull PeerHandle peerHandle, @ResponderType int responderType,
             boolean supports80211mc, @ChannelWidth int channelWidth, int frequency, int centerFreq0,
             int centerFreq1, @PreambleType int preamble) {
@@ -402,8 +408,10 @@ public final class ResponderConfig implements Parcelable {
      * @param preamble        The preamble used by the Responder, specified using
      *                        {@link PreambleType}.
      *
+     * @deprecated            Use {@link Builder#build()} instead
      * @hide
      */
+    @Deprecated
     public ResponderConfig(@NonNull MacAddress macAddress, @NonNull PeerHandle peerHandle,
             @ResponderType int responderType, boolean supports80211mc,
             @ChannelWidth int channelWidth, int frequency, int centerFreq0, int centerFreq1,
