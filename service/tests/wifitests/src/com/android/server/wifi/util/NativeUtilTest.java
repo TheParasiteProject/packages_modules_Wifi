@@ -263,6 +263,18 @@ public class NativeUtilTest extends WifiBaseTest {
     }
 
     /**
+     * Test that PMF is disabled for a WPA2/WPA3 Enterprise transition mode network
+     * configuration even when the default value is enabled.
+     */
+    @Test
+    public void testPmfIsDisableWhenPmfEnabledForWpa2Wpa3EnterpriseNetwork() throws Exception {
+        WifiGlobals globals = mock(WifiGlobals.class);
+        assertFalse(NativeUtil.getOptimalPmfSettingForConfig(
+                WifiConfigurationTestUtil.createWpa2Wpa3EnterpriseNetwork(),
+                true, globals));
+    }
+
+    /**
      * Test pairwise & group cihpers are merged when SAE auto-upgrade offload is supported.
      */
     @Test
