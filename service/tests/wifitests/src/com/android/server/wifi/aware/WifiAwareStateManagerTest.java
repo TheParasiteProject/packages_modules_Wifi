@@ -4665,7 +4665,8 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         mMockLooper.dispatchAll();
         mMockLooper.dispatchAll();
         inOrder.verify(mMockNative).respondToBootstrappingRequest(transactionId.capture(),
-                eq(bootstrappingId), eq(true), eq(publishId));
+                eq(bootstrappingId), eq(true), eq(publishId),
+                eq(AwarePairingConfig.PAIRING_BOOTSTRAPPING_QR_SCAN));
         mDut.onRespondToBootstrappingIndicationResponseSuccess(transactionId.getValue());
         mMockLooper.dispatchAll();
         verify(mockSessionCallback).onBootstrappingVerificationConfirmed(peerIdCaptor.capture(),

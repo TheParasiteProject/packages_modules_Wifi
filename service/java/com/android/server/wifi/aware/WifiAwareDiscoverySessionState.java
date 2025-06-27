@@ -572,7 +572,7 @@ public class WifiAwareDiscoverySessionState {
         }
 
         boolean success = mWifiAwareNativeApi.respondToBootstrappingRequest(transactionId,
-                bootstrappingId, accept, mPubSubId);
+                bootstrappingId, accept, mPubSubId, method);
         return success;
     }
 

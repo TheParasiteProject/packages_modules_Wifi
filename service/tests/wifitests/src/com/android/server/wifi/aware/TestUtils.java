@@ -140,7 +140,7 @@ public class TestUtils {
         }
 
         public boolean respondToBootstrappingRequest(short transactionId, int bootstrappingId,
-                boolean accept, byte pubSubId) {
+                boolean accept, byte pubSubId, int method) {
             addTransactionId(transactionId);
             return true;
         }

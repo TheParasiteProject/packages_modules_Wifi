@@ -265,7 +265,7 @@ public class WifiNanIfaceHidlImpl implements IWifiNanIface {
 
     @Override
     public boolean respondToNanBootstrappingRequest(short transactionId, int bootstrappingId,
-            boolean accept, byte pubSubId) {
+            boolean accept, byte pubSubId, int method) {
         return false;
     }
 
