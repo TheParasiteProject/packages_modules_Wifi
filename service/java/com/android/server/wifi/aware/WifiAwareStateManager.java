@@ -33,6 +33,7 @@ import static com.android.server.wifi.hal.WifiNanIface.NanStatusCode.NOT_SUPPORT
 import static com.android.server.wifi.hal.WifiNanIface.NanStatusCode.NO_CONNECTION;
 import static com.android.server.wifi.hal.WifiNanIface.NanStatusCode.REDUNDANT_REQUEST;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_AWARE_CAPABILITIES;
+import static com.android.server.wifi.proto.WifiStatsLog.WIFI_AWARE_CAPABILITIES__IS_PERIODIC_RANGING_SUPPORTED__TRI_STATE_FALSE;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_AWARE_HAL_API_CALLED;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_AWARE_HAL_API_CALLED__COMMAND__AWARE_API_UNKNOWN;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_AWARE_HAL_API_CALLED__COMMAND__AWARE_CONFIG_REQUEST;
@@ -376,7 +377,6 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
     private WifiAwareMetrics mAwareMetrics;
     private WifiPermissionsUtil mWifiPermissionsUtil;
     private volatile Capabilities mCapabilities;
-    private volatile Characteristics mCharacteristics = null;
     private WifiAwareStateMachine mSm;
     public WifiAwareDataPathStateManager mDataPathMgr;
     private PowerManager mPowerManager;
@@ -415,6 +415,7 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
     private WifiAwarePullAtomCallback mWifiAwarePullAtomCallback = null;
 
     private long mStartTime;
+    private int mMaxNdpSessionLimit = 0;
 
     private static class PairingInfo {
         public final int mClientId;
@@ -855,7 +856,7 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
             return null;
         }
         Pair<Integer, Integer> numOfDiscoverySessions = getNumOfDiscoverySessions();
-        int numOfAvailableNdps = mCapabilities.maxNdpSessions - mDataPathMgr.getNumOfNdps();
+        int numOfAvailableNdps = mCapabilities.getMaxNdpSessions() - mDataPathMgr.getNumOfNdps();
         int numOfAvailablePublishSessions =
                 mCapabilities.maxPublishes - numOfDiscoverySessions.first;
         int numOfAvailableSubscribeSessions =
@@ -894,12 +895,11 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
      * Get the public characteristics derived from the capabilities. Use lazy initialization.
      */
     public Characteristics getCharacteristics() {
-        if (mCharacteristics == null && mCapabilities != null) {
-            mCharacteristics = mCapabilities.toPublicCharacteristics(
-                    mWifiInjector.getDeviceConfigFacade());
+        if (mCapabilities != null) {
+            return mCapabilities.toPublicCharacteristics();
         }
 
-        return mCharacteristics;
+        return null;
     }
 
     /**
@@ -1066,9 +1066,14 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
      * @see WifiAwareManager#setAwareParams(AwareParams)
      */
     public void setAwareParams(AwareParams parameters) {
+
         mHandler.post(() -> {
             mWifiAwareNativeApi.setAwareParams(parameters);
             reconfigure();
+            mMaxNdpSessionLimit = parameters == null ? 0 : parameters.getNdpSessionLimit();
+            if (mCapabilities != null) {
+                mCapabilities.ndpSessionLimit = mMaxNdpSessionLimit;
+            }
         });
     }
 
@@ -4819,7 +4824,7 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
         }
 
         mCapabilities = capabilities;
-        mCharacteristics = null;
+        mCapabilities.ndpSessionLimit = mMaxNdpSessionLimit;
         if (mWifiAwarePullAtomCallback != null) {
             //Should only register this callback once
             return;
@@ -4842,7 +4847,10 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
                     mCapabilities.supportedDataPathCipherSuites,
                     mCapabilities.maxNdiInterfaces,
                     mCapabilities.maxNdpSessions,
-                    mCapabilities.maxPublishes));
+                    mCapabilities.maxPublishes,
+                    mCapabilities.isPeriodicRangingSupported
+                            ? WifiStatsLog.WIFI_AWARE_CAPABILITIES__IS_PERIODIC_RANGING_SUPPORTED__TRI_STATE_TRUE
+                            : WIFI_AWARE_CAPABILITIES__IS_PERIODIC_RANGING_SUPPORTED__TRI_STATE_FALSE));
             return StatsManager.PULL_SUCCESS;
         }
     }

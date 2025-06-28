@@ -212,7 +212,6 @@ public class DeviceConfigFacade {
     private boolean mInterfaceFailureBugreportEnabled;
     private boolean mP2pFailureBugreportEnabled;
     private boolean mApmEnhancementEnabled;
-    private boolean mAwareSuspensionEnabled;
     private boolean mHighPerfLockDeprecated;
     private Optional<Boolean> mOobPseudonymEnabled = Optional.empty();
     private Consumer<Boolean> mOobPseudonymFeatureFlagChangedListener = null;
@@ -402,8 +401,6 @@ public class DeviceConfigFacade {
                 "p2p_failure_bugreport_enabled", false);
         mApmEnhancementEnabled = DeviceConfig.getBoolean(NAMESPACE,
                 "apm_enhancement_enabled", false);
-        mAwareSuspensionEnabled = DeviceConfig.getBoolean(NAMESPACE,
-                "aware_suspension_enabled", true);
         mHighPerfLockDeprecated = DeviceConfig.getBoolean(NAMESPACE,
                 "high_perf_lock_deprecated", true);
         boolean oobPseudonymEnabled = DeviceConfig.getBoolean(NAMESPACE,
@@ -882,13 +879,6 @@ public class DeviceConfigFacade {
         // reads the value set by Bluetooth device config for APM enhancement feature flag
         return Settings.Global.getInt(
                 mContext.getContentResolver(), "apm_enhancement_enabled", 0) == 1;
-    }
-
-    /**
-     * Gets the feature flag for Aware suspension
-     */
-    public boolean isAwareSuspensionEnabled() {
-        return mAwareSuspensionEnabled;
     }
 
     /**

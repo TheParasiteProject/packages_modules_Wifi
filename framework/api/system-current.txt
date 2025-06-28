@@ -1398,6 +1398,8 @@ package android.net.wifi {
     method @IntRange(from=0xffffffff, to=255) public int getChannelUtilizationRatio();
     method @NonNull public android.net.wifi.WifiUsabilityStatsEntry.ContentionTimeStats getContentionTimeStats(int);
     method @NonNull public android.net.wifi.WifiUsabilityStatsEntry.ContentionTimeStats getContentionTimeStats(int, int);
+    method @FlaggedApi("com.android.wifi.flags.feed_internal_score_to_external_scorer") @IntRange(from=0, to=100) public int getInternalScore();
+    method @FlaggedApi("com.android.wifi.flags.feed_internal_score_to_external_scorer") public int getInternalScorerType();
     method @Nullable public int[] getLinkIds();
     method public int getLinkSpeedMbps();
     method public int getLinkState(int);
@@ -1453,6 +1455,9 @@ package android.net.wifi {
     field public static final int PROBE_STATUS_NO_PROBE = 1; // 0x1
     field public static final int PROBE_STATUS_SUCCESS = 2; // 0x2
     field public static final int PROBE_STATUS_UNKNOWN = 0; // 0x0
+    field @FlaggedApi("com.android.wifi.flags.feed_internal_score_to_external_scorer") public static final int SCORER_TYPE_INVALID = -1; // 0xffffffff
+    field @FlaggedApi("com.android.wifi.flags.feed_internal_score_to_external_scorer") public static final int SCORER_TYPE_ML = 1; // 0x1
+    field @FlaggedApi("com.android.wifi.flags.feed_internal_score_to_external_scorer") public static final int SCORER_TYPE_VELOCITY = 0; // 0x0
     field public static final int WIFI_BANDWIDTH_10_MHZ = 6; // 0x6
     field public static final int WIFI_BANDWIDTH_160_MHZ = 3; // 0x3
     field public static final int WIFI_BANDWIDTH_20_MHZ = 0; // 0x0
@@ -1535,6 +1540,7 @@ package android.net.wifi.aware {
     method public int getDiscoveryWindowWakeInterval24Ghz();
     method public int getDiscoveryWindowWakeInterval5Ghz();
     method public int getMacRandomizationIntervalSeconds();
+    method @FlaggedApi("com.android.wifi.flags.allow_override_max_ndp_session") public int getNdpSessionLimit();
     method public int getNumSpatialStreamsInDiscovery();
     method public boolean isDwEarlyTerminationEnabled();
     method public void setDiscoveryBeaconIntervalMillis(@IntRange(from=1) int);
@@ -1542,9 +1548,11 @@ package android.net.wifi.aware {
     method public void setDiscoveryWindowWakeInterval5Ghz(@IntRange(from=0, to=5) int);
     method public void setDwEarlyTerminationEnabled(boolean);
     method public void setMacRandomizationIntervalSeconds(@IntRange(from=1, to=1800) int);
+    method @FlaggedApi("com.android.wifi.flags.allow_override_max_ndp_session") public void setNdpSessionLimit(@IntRange(from=android.net.wifi.aware.AwareParams.NDP_SESSION_LIMIT_UNSET) int);
     method public void setNumSpatialStreamsInDiscovery(@IntRange(from=1) int);
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.aware.AwareParams> CREATOR;
+    field @FlaggedApi("com.android.wifi.flags.allow_override_max_ndp_session") public static final int NDP_SESSION_LIMIT_UNSET = 0; // 0x0
     field public static final int UNSET_PARAMETER = -1; // 0xffffffff
   }
 

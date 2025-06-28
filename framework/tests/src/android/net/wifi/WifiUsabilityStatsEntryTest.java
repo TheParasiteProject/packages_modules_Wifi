@@ -16,6 +16,8 @@
 
 package android.net.wifi;
 
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_ML;
+
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
@@ -46,6 +48,7 @@ import java.util.NoSuchElementException;
  */
 @SmallTest
 public class WifiUsabilityStatsEntryTest {
+    private static final int TEST_INTERNAL_SCORE = 50;
 
     /**
      * Setup before tests.
@@ -116,7 +119,7 @@ public class WifiUsabilityStatsEntryTest {
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 32, contentionTimeStats, rateStats, radioStats, 100, true,
                 true, true, 23, 24, 25, true, linkStats, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-                false, 36, false, 37, 38, 39, 40, 41);
+                false, 36, false, 37, 38, 39, 40, 41, TEST_INTERNAL_SCORE, SCORER_TYPE_ML);
         assertEquals(32, usabilityStatsEntry.getTimeSliceDutyCycleInPercent());
 
         WifiUsabilityStatsEntry usabilityStatsEntryWithInvalidDutyCycleValue =
@@ -124,7 +127,7 @@ public class WifiUsabilityStatsEntryTest {
                         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
                         21, 22, -1, contentionTimeStats, rateStats, radioStats, 101, true, true,
                         true, 23, 24, 25, true, linkStats, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-                        true, 36, true, 37, 38, 39, 40, 41);
+                        true, 36, true, 37, 38, 39, 40, 41, TEST_INTERNAL_SCORE, SCORER_TYPE_ML);
         try {
             usabilityStatsEntryWithInvalidDutyCycleValue.getTimeSliceDutyCycleInPercent();
             fail();
@@ -182,7 +185,7 @@ public class WifiUsabilityStatsEntryTest {
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 50, contentionTimeStats, rateStats, radioStats, 102, true,
                 true, true, 23, 24, 25, true, linkStats, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-                true, 36, false, 37, 38, 39, 40, 41
+                true, 36, false, 37, 38, 39, 40, 41, TEST_INTERNAL_SCORE, SCORER_TYPE_ML
         );
     }
 
@@ -657,6 +660,8 @@ public class WifiUsabilityStatsEntryTest {
                 actual.isThroughputPredictorUpstreamSufficient());
         assertEquals(expected.isBluetoothConnected(), actual.isBluetoothConnected());
         assertEquals(expected.getStatusDataStall(), actual.getStatusDataStall());
+        assertEquals(expected.getInternalScore(), actual.getInternalScore());
+        assertEquals(expected.getInternalScorerType(), actual.getInternalScorerType());
     }
 
     /**
@@ -674,7 +679,8 @@ public class WifiUsabilityStatsEntryTest {
         WifiUsabilityStatsEntry usabilityStatsEntry = new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 32, null, null, null, 100, true, true, true, 23, 24, 25, true, linkStats, 26, 27,
-                28, 29, 30, 31, 32, 33, 34, 35, true, 36, true, 37, 38, 39, 40, 41);
+                28, 29, 30, 31, 32, 33, 34, 35, true, 36, true, 37, 38, 39, 40, 41,
+                TEST_INTERNAL_SCORE, SCORER_TYPE_ML);
 
         assertThrows("linkId is invalid - " + MloLink.INVALID_MLO_LINK_ID,
                 NoSuchElementException.class,

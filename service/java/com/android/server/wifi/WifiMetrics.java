@@ -218,6 +218,8 @@ public class WifiMetrics {
     public static final int MIN_LINK_SPEED_MBPS = 0;
     /** Maximum time period between ScanResult and RSSI poll to generate rssi delta datapoint */
     public static final long TIMEOUT_RSSI_DELTA_MILLIS =  3000;
+    // Time period to attribute a disconnect to firmware alert
+    public static final long FIRMWARE_ALERT_DISCONNECT_MILLIS = 1000;
     private static final int MIN_WIFI_SCORE = 0;
     private static final int MAX_WIFI_SCORE = ConnectedScore.WIFI_MAX_SCORE;
     private static final int MIN_WIFI_USABILITY_SCORE = 0; // inclusive
@@ -302,6 +304,8 @@ public class WifiMetrics {
     private WifiScoreCard mWifiScoreCard;
     private Map<String, String> mLastBssidPerIfaceMap = new ArrayMap<>();
     private Map<String, Integer> mLastFrequencyPerIfaceMap = new ArrayMap<>();
+    // Map from ifaceName -> <firmware alert timestamp since boot millis, firmware alert reason>
+    private Map<String, Pair<Long, Integer>> mLastFirmwareAlertPerIfaceMap = new ArrayMap<>();
     private int mSeqNumInsideFramework = 0;
     private int mLastWifiUsabilityScore = -1;
     private int mLastWifiUsabilityScoreNoReset = -1;
@@ -845,6 +849,9 @@ public class WifiMetrics {
         private NetworkDetail.HSRelease mHsRelease = NetworkDetail.HSRelease.Unknown;
         private ApType6GHz mApType6GHz = ApType6GHz.AP_TYPE_6GHZ_UNKNOWN;
         public @WifiAnnotations.ChannelWidth int mChannelWidth = ScanResult.UNSPECIFIED;
+        private boolean mIsPasnSupported = false;
+        private boolean mIsSecureHeLtfSupported = false;
+        private boolean mIsRangingFrameProtectionRequired = false;
 
         public String toString() {
             StringBuilder sb = new StringBuilder();
@@ -881,6 +888,9 @@ public class WifiMetrics {
                 sb.append(", mIsEcpsPriorityAccessSupported=" + mIsEcpsPriorityAccessSupported);
                 sb.append(", mHsRelease=" + mHsRelease);
                 sb.append(", mChannelWidth" + mChannelWidth);
+                sb.append("" + mIsPasnSupported);
+                sb.append("" + mIsSecureHeLtfSupported);
+                sb.append("" + mIsRangingFrameProtectionRequired);
             }
             return sb.toString();
         }
@@ -2873,7 +2883,16 @@ public class WifiMetrics {
                 r.mIs11AzSupported, convertHsReleasetoProto(r.mHsRelease),
                 r.mRouterFingerPrintProto.isPasspointHomeProvider,
                 convertApType6GhzToProto(r.mApType6GHz), r.mIsEcpsPriorityAccessSupported,
-                convertChannelWidthToProto(r.mChannelWidth));
+                convertChannelWidthToProto(r.mChannelWidth),
+                r.mIsPasnSupported
+                        ? WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__IS_PASN_SUPPORTED__TRI_STATE_TRUE
+                        : WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__IS_PASN_SUPPORTED__TRI_STATE_FALSE,
+                r.mIsSecureHeLtfSupported
+                        ? WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__IS_SECURE_HE_LTF_SUPPORTED__TRI_STATE_TRUE
+                        : WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__IS_SECURE_HE_LTF_SUPPORTED__TRI_STATE_FALSE,
+                r.mIsRangingFrameProtectionRequired
+                        ? WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__IS_RANGING_FRAME_PROTECTION_REQUIRED__TRI_STATE_TRUE
+                        : WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__IS_RANGING_FRAME_PROTECTION_REQUIRED__TRI_STATE_FALSE);
     }
 
     /**
@@ -2902,6 +2921,20 @@ public class WifiMetrics {
                         - currentSession.mLastRoamCompleteMillis) / 1000;
                 int timeSinceLastRssiUpdateSeconds = (int) (mClock.getElapsedSinceBootMillis()
                         - lastRssiUpdateMillis) / 1000;
+                int firmwareAlertReason = 0;
+                if (disconnectReason <= 0) {
+                    // some chips will report a firmware alert, and then trigger disconnect with
+                    // an unknown disconnect reason. Replace with the disconnect reason with
+                    // firmware alert in this case.
+                    Pair<Long, Integer> timestampAndReason =
+                            mLastFirmwareAlertPerIfaceMap.get(ifaceName);
+                    if (timestampAndReason != null
+                            && currentSession.mSessionEndTimeMillis - timestampAndReason.first
+                            < FIRMWARE_ALERT_DISCONNECT_MILLIS) {
+                        disconnectReason = WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__DISCONNECT_FIRMWARE_ALERT;
+                        firmwareAlertReason = timestampAndReason.second;
+                    }
+                }
                 currentSession.mDisconnectReason = disconnectReason;
 
                 WifiStatsLog.write(WifiStatsLog.WIFI_DISCONNECT_REPORTED,
@@ -2918,7 +2951,8 @@ public class WifiMetrics {
                         toMetricPhase2Method(currentSession.mConnectionEvent.mPhase2Method),
                         currentSession.mConnectionEvent.mPasspointRoamingType,
                         currentSession.mConnectionEvent.mCarrierId,
-                        currentSession.mConnectionEvent.mUid);
+                        currentSession.mConnectionEvent.mUid,
+                        firmwareAlertReason);
                 /* Log validation never succeed */
                 WifiValidationInfo validationInfo = currentSession.mValidationInfo;
                 if (validationInfo != null && validationInfo.mValidationCount > 0) {
@@ -3079,6 +3113,8 @@ public class WifiMetrics {
         currentConnectionEvent.mRouterFingerPrint.mIsEcpsPriorityAccessSupported =
                 networkDetail.isEpcsPriorityAccessSupported();
         currentConnectionEvent.mRouterFingerPrint.mHsRelease = networkDetail.getHSRelease();
+        currentConnectionEvent.mRouterFingerPrint.mIsSecureHeLtfSupported = networkDetail.isSecureHeLtfSupported();
+        currentConnectionEvent.mRouterFingerPrint.mIsRangingFrameProtectionRequired = networkDetail.isRangingFrameProtectionRequired();
     }
 
     /**
@@ -3108,6 +3144,8 @@ public class WifiMetrics {
         }
         currentConnectionEvent.mRouterFingerPrint.mRouterFingerPrintProto.channelInfo =
                 scanResult.frequency;
+        currentConnectionEvent.mRouterFingerPrint.mIsPasnSupported =
+                scanResult.capabilities != null && scanResult.capabilities.contains("PASN");
     }
 
     void setIsLocationEnabled(boolean enabled) {
@@ -4537,6 +4575,8 @@ public class WifiMetrics {
         logWifiIsUnusableEvent(ifaceName, WifiIsUnusableEvent.TYPE_FIRMWARE_ALERT, errorCode);
         logAsynchronousEvent(ifaceName,
                 WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_FIRMWARE_ALERT, errorCode);
+        mLastFirmwareAlertPerIfaceMap.put(ifaceName, new Pair<>(
+                mClock.getElapsedSinceBootMillis(), errorCode));
     }
 
     public static final String PROTO_DUMP_ARG = "wifiMetricsProto";
@@ -8183,7 +8223,9 @@ public class WifiMetrics {
                 s.isThroughputPredictorDownstreamSufficient,
                 s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected,
                 s.uwbAdapterState, s.isLowLatencyActivated, s.maxSupportedTxLinkspeed,
-                s.maxSupportedRxLinkspeed, s.voipMode, s.threadDeviceRole, s.statusDataStall
+                s.maxSupportedRxLinkspeed, s.voipMode, s.threadDeviceRole, s.statusDataStall,
+                -1, //TODO: b/427546930
+                android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_INVALID //TODO: b/427546930
         );
     }
 

@@ -74,6 +74,7 @@ import android.net.wifi.WifiAvailableChannel;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.aware.AwarePairingConfig;
+import android.net.wifi.aware.AwareParams;
 import android.net.wifi.aware.AwareResources;
 import android.net.wifi.aware.ConfigRequest;
 import android.net.wifi.aware.IWifiAwareDiscoverySessionCallback;
@@ -309,11 +310,17 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         installMocksInStateManager(mDut, mMockAwareDataPathStatemanager);
 
         ArgumentCaptor<Short> transactionId = ArgumentCaptor.forClass(Short.class);
+        AwareParams awareParams = new AwareParams();
+        awareParams.setNdpSessionLimit(1);
+        mDut.setAwareParams(awareParams);
+        mMockLooper.dispatchAll();
+        verify(mMockNative).setAwareParams(any());
         mDut.tryToGetAwareCapability();
         mMockLooper.dispatchAll();
         verify(mMockNative).getCapabilities(transactionId.capture());
         mDut.onCapabilitiesUpdateResponse(transactionId.getValue(), getCapabilities());
         mMockLooper.dispatchAll();
+        assertEquals(1, mDut.getCharacteristics().getNumberOfSupportedDataPaths());
         when(mMockAwareDataPathStatemanager.getNumOfNdps()).thenReturn(1);
         verify(mStatsManager).setPullAtomCallback(eq(WIFI_AWARE_CAPABILITIES), isNull(), any(),
                 mPullAtomCallbackArgumentCaptor.capture());
@@ -5755,7 +5762,7 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         cap.maxServiceSpecificInfoLen = 255;
         cap.maxExtendedServiceSpecificInfoLen = 255;
         cap.maxNdiInterfaces = 1;
-        cap.maxNdpSessions = 1;
+        cap.maxNdpSessions = 8;
         cap.maxAppInfoLen = 255;
         cap.maxQueuedTransmitMessages = 6;
         cap.isInstantCommunicationModeSupported = true;
@@ -5927,6 +5934,15 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         mMockLooper.dispatchAll();
         inOrder.verify(mMockNativeManager).releaseAware();
         verifyNoMoreInteractions(mockCallback1, mockCallback2, mMockNative);
+    }
+
+    @Test
+    public void testSetOverrideNdpNum() {
+        AwareParams awareParams = new AwareParams();
+        awareParams.setNdpSessionLimit(2);
+        mDut.setAwareParams(awareParams);
+        mMockLooper.dispatchAll();
+        assertEquals(2, mDut.getCharacteristics().getNumberOfSupportedDataPaths());
     }
 
     @Test
