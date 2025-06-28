@@ -836,10 +836,11 @@ public class WifiAwareNativeApi implements WifiAwareShellCommand.DelegatedShellC
      * @param accept          True is proposed method is accepte
      * @param pubSubId        ID of the publish/subscribe session - obtained when creating a
      *                        session.
+     * @param method          proposed bootstrapping method
      * @return True if the request send success
      */
     public boolean respondToBootstrappingRequest(short transactionId, int bootstrappingId,
-            boolean accept, byte pubSubId) {
+            boolean accept, byte pubSubId, int method) {
         if (mVerboseLoggingEnabled) {
             Log.v(TAG, "respondToBootstrappingRequest: transactionId=" + transactionId);
         }
@@ -852,7 +853,7 @@ public class WifiAwareNativeApi implements WifiAwareShellCommand.DelegatedShellC
         }
 
         return iface.respondToBootstrappingRequest(transactionId, bootstrappingId, accept,
-                pubSubId);
+                pubSubId, method);
     }
 
     /**

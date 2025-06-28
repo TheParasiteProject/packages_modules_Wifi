@@ -524,13 +524,13 @@ public class WifiNanIface implements WifiHal.WifiInterface {
                         method, cookie, pubSubId, isComeBack));
     }
     /**
-     * {@link IWifiNanIface#respondToNanBootstrappingRequest(short, int, boolean, byte)}
+     * {@link IWifiNanIface#respondToNanBootstrappingRequest(short, int, boolean, byte, int)}
      */
     public boolean respondToBootstrappingRequest(short transactionId, int bootstrappingId,
-            boolean accept, byte pubSubId) {
+            boolean accept, byte pubSubId, int method) {
         return validateAndCall("initiateBootstrapping", false,
                 () -> mWifiNanIface.respondToNanBootstrappingRequest(transactionId, bootstrappingId,
-                        accept, pubSubId));
+                        accept, pubSubId, method));
     }
 
     /**

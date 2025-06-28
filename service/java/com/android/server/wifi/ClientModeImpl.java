@@ -6479,6 +6479,11 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                                 WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__CONNECTING_WATCHDOG_TIMER;
                         sendMessageAtFrontOfQueue(CMD_DISCONNECT,
                                 StaEvent.DISCONNECT_CONNECT_WATCHDOG_TIMER);
+                        if (SdkLevel.isAtLeastS() && mTargetWifiConfiguration != null) {
+                            mWifiConfigManager.setRecentFailureAssociationStatus(
+                                    mTargetWifiConfiguration.networkId,
+                                    WifiConfiguration.RECENT_FAILURE_NETWORK_NOT_FOUND);
+                        }
                     }
                     break;
                 }
