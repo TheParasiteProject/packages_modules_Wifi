@@ -51,6 +51,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.modules.utils.build.SdkLevel;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import java.util.ArrayList;
@@ -143,7 +144,17 @@ public class WifiDialogManager {
         if (SdkLevel.isAtLeastT()) {
             flags = Context.RECEIVER_EXPORTED;
         }
-        mContext.registerReceiver(mBroadcastReceiver, intentFilter, flags);
+        if (Flags.monitorIntentForAllUsers()) {
+            if (SdkLevel.isAtLeastT()) {
+                mContext.registerReceiverForAllUsers(mBroadcastReceiver, intentFilter,
+                        null, wifiThreadRunner.getHandler(), flags);
+            } else {
+                mContext.registerReceiverForAllUsers(mBroadcastReceiver, intentFilter,
+                        null, wifiThreadRunner.getHandler());
+            }
+        } else {
+            mContext.registerReceiver(mBroadcastReceiver, intentFilter, flags);
+        }
         wifiInjector.getWifiDeviceStateChangeManager()
                 .registerStateChangeCallback(
                         new WifiDeviceStateChangeManager.StateChangeCallback() {

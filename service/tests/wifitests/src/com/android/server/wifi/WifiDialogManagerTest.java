@@ -39,6 +39,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.net.wifi.WifiContext;
 import android.net.wifi.WifiManager;
@@ -53,10 +54,12 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.test.filters.SmallTest;
 
+import com.android.dx.mockito.inline.extended.ExtendedMockito;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.WifiDialogManager.DialogHandle;
 import com.android.server.wifi.WifiDialogManager.P2pInvitationReceivedDialogCallback;
 import com.android.server.wifi.WifiDialogManager.SimpleDialogCallback;
+import com.android.wifi.flags.Flags;
 
 import org.junit.Assume;
 import org.junit.Before;
@@ -65,6 +68,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.MockitoSession;
+import org.mockito.quality.Strictness;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -1024,8 +1029,6 @@ public class WifiDialogManagerTest extends WifiBaseTest {
      */
     @Test
     public void testP2pInvitationSentDialog_launchAndDismiss_dismissesDialog() {
-
-
         // Launch and dismiss dialog.
         DialogHandle dialogHandle = mDialogManager.createP2pInvitationSentDialog(
                 TEST_DEVICE_NAME, "1234", null, Display.DEFAULT_DISPLAY);
@@ -1050,4 +1053,23 @@ public class WifiDialogManagerTest extends WifiBaseTest {
         dismissDialogSynchronous(dialogHandle, mWifiThreadRunner);
         verifyStartActivityAsUser(4, mWifiContext);
     }
+
+    @Test
+    public void testUsingRegisterReceiverForAllUsersWhenFlagEnabled() throws Exception {
+        MockitoSession session = ExtendedMockito.mockitoSession().strictness(Strictness.LENIENT)
+                .mockStatic(Flags.class).startMocking();
+        when(Flags.monitorIntentForAllUsers()).thenReturn(true);
+        mDialogManager = new WifiDialogManager(mWifiContext, mWifiThreadRunner, mFrameworkFacade,
+                mWifiInjector);
+        if (SdkLevel.isAtLeastT()) {
+            verify(mWifiContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                    any(IntentFilter.class),
+                    eq(null), any(), eq(Context.RECEIVER_EXPORTED));
+        } else {
+            verify(mWifiContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                    any(IntentFilter.class), eq(null), any());
+        }
+        session.finishMocking();
+    }
 }
+
