@@ -12725,7 +12725,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verify(mContext).registerReceiver(mBroadcastReceiverCaptor.capture(),
                 argThat((IntentFilter filter) ->
-                        filter.hasAction(ACTION_SHUTDOWN)));
+                        filter.hasAction(ACTION_SHUTDOWN)), eq(null), eq(null));
         Intent intent = new Intent(ACTION_SHUTDOWN);
         mBroadcastReceiverCaptor.getValue().onReceive(mContext, intent);
         mLooper.dispatchAll();
@@ -13793,6 +13793,68 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mWifiServiceImpl.isOpenNetworkNotifierEnabled(listener);
         mLooper.dispatchAll();
         inOrder.verify(listener).onResult(false);
+    }
+
+    @Test
+    public void testUsingRegisterReceiverForAllUsersWhenFlagEnabled() throws Exception {
+        when(mFeatureFlags.monitorIntentForAllUsers()).thenReturn(true);
+        reset(mContext);
+        when(mContext.getSystemService(TelephonyManager.class)).thenReturn(mTelephonyManager);
+        mWifiServiceImpl.checkAndStartWifi();
+        mWifiServiceImpl.handleBootCompleted();
+        mLooper.dispatchAll();
+        verify(mContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                argThat(filter -> filter.hasAction(
+                        TelephonyManager.ACTION_SIM_CARD_STATE_CHANGED)),
+                eq(null), any());
+        verify(mContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                argThat(filter -> filter.hasAction(
+                        TelephonyManager.ACTION_SIM_APPLICATION_STATE_CHANGED)),
+                eq(null), any());
+        verify(mContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                argThat(filter -> filter.hasAction(
+                        TelephonyManager.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED)),
+                eq(null), any());
+        verify(mContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                argThat(filter -> filter.hasAction(
+                        TelephonyManager.ACTION_NETWORK_COUNTRY_CHANGED)),
+                eq(null), any());
+        verify(mContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                argThat(filter -> filter.hasAction(
+                        Intent.ACTION_LOCALE_CHANGED)),
+                eq(null), any());
+        if (SdkLevel.isAtLeastT()) {
+            verify(mContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                    argThat(filter -> filter.hasAction(
+                            UserManager.ACTION_USER_RESTRICTIONS_CHANGED)),
+                    eq(null), any());
+        }
+        verify(mContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                argThat(filter -> filter.hasAction(Intent.ACTION_PACKAGE_FULLY_REMOVED)
+                        && filter.hasAction(Intent.ACTION_PACKAGE_CHANGED)
+                        && filter.hasAction(Intent.ACTION_PACKAGE_REMOVED)),
+                eq(null), any());
+        verify(mContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                argThat(filter -> filter.hasAction(
+                        CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED)),
+                eq(null), any());
+        verify(mContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                argThat(filter -> filter.hasAction(Intent.ACTION_USER_REMOVED)
+                        && filter.hasAction(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED)
+                        && filter.hasAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+                        && filter.hasAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)),
+                eq(null), any());
+        // Only Shutdown should run in caller thread.
+        verify(mContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                argThat(filter -> filter.hasAction(Intent.ACTION_SHUTDOWN)),
+                eq(null), eq(null));
+        verify(mContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                argThat(filter -> filter.hasAction(
+                        LocationManager.MODE_CHANGED_ACTION)),
+                eq(null), any());
+        verify(mContext, never()).registerReceiver(any(BroadcastReceiver.class),
+                any(IntentFilter.class),
+                any(), any());
     }
 }
 
