@@ -117,6 +117,7 @@ import static org.mockito.Mockito.validateMockitoUsage;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import android.Manifest;
 import android.app.ActivityManager;
@@ -13855,6 +13856,50 @@ public class WifiServiceImplTest extends WifiBaseTest {
         verify(mContext, never()).registerReceiver(any(BroadcastReceiver.class),
                 any(IntentFilter.class),
                 any(), any());
+    }
+
+    @Test
+    public void testChangePermissionWithUserCheck() {
+        assumeTrue(Environment.isSdkNewerThanB());
+        when(mFeatureFlags.multiUserWifiEnhancement()).thenReturn(true);
+        when(mWifiPermissionsUtil.isTargetSdkLessThan(any(), eq(37), anyInt()))
+                .thenReturn(false);
+        MockitoSession mockSession = mockitoSession()
+                .mockStatic(UserHandle.class, withSettings().lenient())
+                .startMocking();
+        UserHandle mockCurrentUser = mock(UserHandle.class);
+        UserHandle mockUserHandle = mock(UserHandle.class);
+        when(mockCurrentUser.getIdentifier()).thenReturn(TEST_USER_HANDLE);
+        when(UserHandle.getUserId(anyInt())).thenReturn(TEST_USER_HANDLE);
+        when(mWifiPermissionsWrapper.getCurrentUser()).thenReturn(TEST_USER_HANDLE);
+        when(UserHandle.of(eq(OTHER_TEST_UID))).thenReturn(mockUserHandle);
+        when(UserHandle.of(eq(TEST_USER_HANDLE))).thenReturn(mockCurrentUser);
+
+        when(mContext.checkPermission(eq(android.Manifest.permission.NETWORK_SETTINGS),
+                anyInt(), anyInt())).thenReturn(PackageManager.PERMISSION_GRANTED);
+        doReturn(AppOpsManager.MODE_ALLOWED).when(mAppOpsManager)
+                .noteOp(AppOpsManager.OPSTR_CHANGE_WIFI_STATE, Process.myUid(), TEST_PACKAGE_NAME);
+
+        doAnswer(new AnswerWithArguments() {
+            public void answer(NetworkUpdateResult result, ActionListenerWrapper callback,
+                    int callingUid, String packageName, String attributionTag) {
+                callback.sendSuccess(); // return success
+            }
+        }).when(mConnectHelper).connectToNetwork(
+                eq(new NetworkUpdateResult(TEST_NETWORK_ID)), any(), anyInt(), any(), any());
+        mLooper.startAutoDispatch();
+        try {
+            assertTrue(mWifiServiceImpl.enableNetwork(TEST_NETWORK_ID, true, TEST_PACKAGE_NAME));
+            when(mWifiPermissionsWrapper.getCurrentUser()).thenReturn(OTHER_TEST_UID);
+            mWifiServiceImpl.enableNetwork(TEST_NETWORK_ID, true, TEST_PACKAGE_NAME);
+            fail();
+        } catch (SecurityException e) {
+        } finally {
+            mLooper.stopAutoDispatch();
+            if (mockSession != null) {
+                mockSession.finishMocking();
+            }
+        }
     }
 }
 
