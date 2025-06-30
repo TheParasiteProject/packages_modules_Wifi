@@ -23,6 +23,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -162,5 +164,16 @@ public class WifiDeviceStateChangeManagerTest extends WifiBaseTest {
         mWifiDeviceStateChangeManager.unregisterStateChangeCallback(mStateChangeCallback);
         apmCallbackCaptor.getValue().onAdvancedProtectionChanged(true);
         verify(mStateChangeCallback, never()).onAdvancedProtectionModeStateChanged(anyBoolean());
+    }
+
+    @Test
+    public void testUsingRegisterReceiverForAllUsersWhenFlagEnabled() throws Exception {
+        when(mFeatureFlags.monitorIntentForAllUsers()).thenReturn(true);
+        mWifiDeviceStateChangeManager.handleBootCompleted();
+        verify(mContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                argThat(filter -> filter.hasAction(Intent.ACTION_SCREEN_ON)
+                        && filter.hasAction(Intent.ACTION_SCREEN_OFF)),
+                eq(null), any(Handler.class));
+        verify(mContext, never()).registerReceiver(any(), any());
     }
 }

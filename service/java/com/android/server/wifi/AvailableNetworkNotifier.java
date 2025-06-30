@@ -218,9 +218,13 @@ public class AvailableNetworkNotifier {
         filter.addAction(ACTION_CONNECT_TO_NETWORK);
         filter.addAction(ACTION_PICK_WIFI_NETWORK);
         filter.addAction(ACTION_PICK_WIFI_NETWORK_AFTER_CONNECT_FAILURE);
-        mContext.registerReceiver(
-                mBroadcastReceiver, filter, null /* broadcastPermission */, mHandler);
-
+        if (mFeatureFlags.monitorIntentForAllUsers()) {
+            mContext.registerReceiverForAllUsers(
+                    mBroadcastReceiver, filter, null /* broadcastPermission */, mHandler);
+        } else {
+            mContext.registerReceiver(
+                    mBroadcastReceiver, filter, null /* broadcastPermission */, mHandler);
+        }
         if (mFeatureFlags.multiUserWifiEnhancement() && Environment.isSdkNewerThanB()) {
             mWifiSettingsConfigStore.registerChangeListener(mToggleSettingsKey, (key, value) -> {
                 if (mSettingEnabled != value) {
