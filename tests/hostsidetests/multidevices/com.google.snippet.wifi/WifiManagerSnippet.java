@@ -19,6 +19,7 @@ package com.google.snippet.wifi;
 import static android.net.wifi.DeauthenticationReasonCode.REASON_UNKNOWN;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.joining;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -28,6 +29,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.NetworkInfo.DetailedState;
 import android.net.wifi.ScanResult;
+import android.net.wifi.SoftApCapability;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.SoftApInfo;
 import android.net.wifi.SupplicantState;
@@ -37,6 +39,7 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.WifiScanner.ScanData;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
@@ -68,6 +71,9 @@ import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 
 
 /**
@@ -78,6 +84,7 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
     private static final String TAG = "WifiManagerSnippet";
     private static final long POLLING_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(10);
     private static final int CONNECT_TIMEOUT_IN_SEC = 90;
+    private static final int TOGGLE_STATE_TIMEOUT_IN_SEC = 30;
 
     private final Context mContext;
     private final WifiManager mWifiManager;
@@ -92,6 +99,9 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
      */
     private static class SnippetSoftApCallback implements WifiManager.SoftApCallback {
         private final String mCallbackId;
+        private int mConnectedClientsCount = 0;
+        private final List<SoftApInfo> mAllSoftApInfoList = new ArrayList<>();
+        private final List<Integer> mStateList = new ArrayList<>();
 
         SnippetSoftApCallback(String callbackId) {
             mCallbackId = callbackId;
@@ -102,7 +112,8 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
                 @NonNull List<WifiClient> clients) {
             Log.d(TAG, "onConnectedClientsChanged, info=" + info + ", clients=" + clients);
             SnippetEvent event = new SnippetEvent(mCallbackId, "onConnectedClientsChanged");
-            event.getData().putInt("connectedClientsCount", clients.size());
+            mConnectedClientsCount = clients.size();
+            event.getData().putInt("connectedClientsCount", mConnectedClientsCount);
             String macAddress = null;
             if (!clients.isEmpty()) {
                 // In our Mobly test cases, there is only ever one other device.
@@ -131,6 +142,116 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
             event.getData().putInt("clientDisconnectReason", disconnectReason);
             EventCache.getInstance().postEvent(event);
         }
+
+        @Override
+        public void onStateChanged(int state, int failureReason) {
+            SnippetEvent event = new SnippetEvent(mCallbackId, "onStateChanged");
+            Log.d(TAG,
+                    "SoftApCallback - onStateChanged, state "
+                    + state + ", failureReason " + failureReason);
+            mStateList.add(state);
+            Bundle msg = new Bundle();
+            msg.putInt("State", state);
+            msg.putInt("FailureReason", failureReason);
+            event.getData().putBundle("onStateChanged", msg);
+            EventCache.getInstance().postEvent(event);
+        }
+
+        @Override
+        public void onInfoChanged(List<SoftApInfo> softApInfoList) {
+            SnippetEvent event = new SnippetEvent(mCallbackId, "onInfoChanged");
+            String softApInfoString = softApInfoList.stream().map(
+                    SoftApInfo::toString).collect(joining(", "));
+            Pattern frequencyPattern = Pattern.compile("frequency=\\s*(\\d+)");
+            Pattern bandwidthPattern = Pattern.compile("bandwidth=\\s*(\\d+)");
+            Pattern macAddressPattern = Pattern.compile("mMldAddress\\s*=\\s*([0-9a-fA-F:]{17})");
+            Matcher frequencyMatcher = frequencyPattern.matcher(softApInfoString);
+            Matcher bandwidthMatcher = bandwidthPattern.matcher(softApInfoString);
+            Matcher macAddresshMatcher = macAddressPattern.matcher(softApInfoString);
+            int frequency = 0;
+            int bandwidth = 0;
+            String macAddress = null;
+            if (frequencyMatcher.find()) {
+                frequency = Integer.parseInt(frequencyMatcher.group(1));
+            }
+            if (bandwidthMatcher.find()) {
+                bandwidth = Integer.parseInt(bandwidthMatcher.group(1));
+            }
+            if (macAddresshMatcher.find()) {
+                macAddress = macAddresshMatcher.group(1);
+            }
+            this.mAllSoftApInfoList.clear();
+            this.mAllSoftApInfoList.addAll(softApInfoList);
+
+            Log.d(TAG,
+                    "SoftApCallback - onInfoChanged, size "
+                    + this.mAllSoftApInfoList.size()
+                    + ", info "
+                    + softApInfoList.stream().map(SoftApInfo::toString).collect(joining(", ")));
+            event.getData().putInt("frequency", frequency);
+            event.getData().putInt("bandwidth", bandwidth);
+            event.getData().putString("clientMacAddress", macAddress);
+            event.getData().putInt("connectedClientsCount", this.mAllSoftApInfoList.size());
+            EventCache.getInstance().postEvent(event);
+        }
+
+        @Override
+        public void onCapabilityChanged(SoftApCapability softApCapability) {
+            SnippetEvent event = new SnippetEvent(mCallbackId, "OnCapabilityChanged");
+            event.getData().putBoolean("clientForceDisconnectSupported",
+                    softApCapability.areFeaturesSupported(
+                        softApCapability.SOFTAP_FEATURE_CLIENT_FORCE_DISCONNECT));
+            Log.d(TAG,
+                    "SoftApCallback - onCapabilityChanged, softApCapability " + softApCapability);
+            event.getData().putInt("MaximumSupportedClientNumber",
+                    softApCapability.getMaxSupportedClients());
+            event.getData().putIntArray("SupportedChannelListIn24g",
+                    softApCapability.getSupportedChannelList(SoftApConfiguration.BAND_2GHZ));
+            event.getData().putIntArray("SupportedChannelListIn5g",
+                    softApCapability.getSupportedChannelList(SoftApConfiguration.BAND_5GHZ));
+            event.getData().putIntArray("SupportedChannelListIn6g",
+                    softApCapability.getSupportedChannelList(SoftApConfiguration.BAND_6GHZ));
+            event.getData().putIntArray("SupportedChannelListIn60g",
+                    softApCapability.getSupportedChannelList(SoftApConfiguration.BAND_60GHZ));
+            EventCache.getInstance().postEvent(event);
+        }
+
+        @Override
+        public void onBlockedClientConnecting(WifiClient client, int blockedReason) {
+            SnippetEvent event = new SnippetEvent(mCallbackId, "OnBlockedClientConnecting");
+
+            Log.d(TAG,
+                    "SoftApCallback - onBlockedClientConnecting, client "
+                    + client
+                    + ", blockedReason "
+                    + blockedReason);
+            event.getData().putString("WifiClient", client.getMacAddress().toString());
+            event.getData().putInt("BlockedReason", blockedReason);
+            EventCache.getInstance().postEvent(event);
+        }
+
+        /**
+        * Gets the number of connected clients.
+        *
+        * @return the number of connected clients
+        */
+        public int getConnectedClientsCount() {
+            return this.mConnectedClientsCount;
+        }
+    }
+
+    /**
+   * Gets the number of connected clients.
+   *
+   * @throws WifiManagerSnippetException if softApCallback is not registered
+   * @return the number of connected clients
+   */
+    @Rpc(description = "Get the number of connected clients.")
+    public int wifiGetSoftApConnectedClientsCount() throws WifiManagerSnippetException {
+        if (mSoftApCallback == null) {
+            throw new WifiManagerSnippetException("SoftApCallback is not registered.", null);
+        }
+        return mSoftApCallback.getConnectedClientsCount();
     }
 
     /**
@@ -298,6 +419,17 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
     @Rpc(description = "Get current SoftApConfiguration.")
     public JSONObject wifiGetSoftApConfiguration() throws JSONException {
         return WifiJsonConverter.serialize(mWifiManager.getSoftApConfiguration());
+    }
+
+    /**
+     * Gets the Wi-Fi tethered AP Configuration.
+     *
+     * @return AP details in {@link SoftApConfiguration} as JSON format.
+     */
+    @Rpc(description = "Get current SApConfiguration.")
+    public JSONObject wifiGetSapConfiguration() throws JSONException {
+        return executeWithShellPermission(
+            () -> WifiJsonConverter.serialize(mWifiManager.getSoftApConfiguration()));
     }
 
     /**
@@ -660,5 +792,59 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
                     + "'",
                 null);
         }
+    }
+
+    /**
+   * Toggles WiFi on and off.
+   *
+   * @param enabled {@code true} to turn on, {@code false} to turn off
+   */
+    @Rpc(description = "Toggle WiFi on and off.")
+    public void wifiToggleState(boolean enabled) throws WifiManagerSnippetException {
+        int expectedWifiState =
+                enabled ? WifiManager.WIFI_STATE_ENABLED : WifiManager.WIFI_STATE_DISABLED;
+
+        if (mWifiManager.getWifiState() == expectedWifiState) {
+            return;
+        }
+
+        int wifiStateNeededToWait =
+                enabled ? WifiManager.WIFI_STATE_DISABLING : WifiManager.WIFI_STATE_ENABLING;
+        if (mWifiManager.getWifiState() == wifiStateNeededToWait) {
+            if (!Utils.waitUntil(
+                    () -> mWifiManager.getWifiState() == WifiManager.WIFI_STATE_DISABLED,
+                    TOGGLE_STATE_TIMEOUT_IN_SEC)) {
+                Log.e(TAG, "Wi-Fi failed to stabilize after "
+                        + TOGGLE_STATE_TIMEOUT_IN_SEC + "s.");
+            }
+        }
+
+        if (!executeWithShellPermission(() -> mWifiManager.setWifiEnabled(enabled))) {
+            throw new WifiManagerSnippetException(
+            "Failed to initiate toggling Wi-Fi to " + enabled, null);
+        }
+        if (!Utils.waitUntil(
+                () -> mWifiManager.getWifiState()
+                == expectedWifiState, TOGGLE_STATE_TIMEOUT_IN_SEC)) {
+            throw new WifiManagerSnippetException(
+            "Failed to toggle Wi-Fi to "
+                + enabled
+                + "after "
+                + TOGGLE_STATE_TIMEOUT_IN_SEC
+                + "s timeout",
+            null);
+        }
+    }
+
+    /** Turns on Wi-Fi. */
+    @Rpc(description = "Turn on Wi-Fi.")
+    public void wifiToggleEnable() throws InterruptedException, WifiManagerSnippetException {
+        wifiToggleState(true);
+    }
+
+    /** Turns off Wi-Fi. */
+    @Rpc(description = "Turn off Wi-Fi.")
+    public void wifiToggleDisable() throws InterruptedException, WifiManagerSnippetException {
+        wifiToggleState(false);
     }
 }
