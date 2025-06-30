@@ -19,9 +19,6 @@ package com.google.snippet.wifi;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.WifiConfiguration;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -30,7 +27,6 @@ import org.json.JSONObject;
  * values.
  */
 public final class WifiJsonConverter {
-    private static final Gson GSON = new GsonBuilder().serializeNulls().create();
 
     /**
      * Remove the extra quotation marks from the beginning and the end of a string.
@@ -63,15 +59,15 @@ public final class WifiJsonConverter {
         if (object instanceof WifiConfiguration) {
             return serializeWifiConfiguration((WifiConfiguration) object);
         }
-
-        // By default, depends on Gson to serialize correctly.
-        return new JSONObject(GSON.toJson(object));
+        throw new JSONException(
+                String.format("Unsupported object type: %s", object.getClass().getName()));
     }
 
     private static JSONObject serializeSoftApConfiguration(SoftApConfiguration data)
             throws JSONException {
-        JSONObject result = new JSONObject(GSON.toJson(data));
+        JSONObject result = new JSONObject();
         result.put("SSID", trimQuotationMarks(data.getWifiSsid().toString()));
+        result.put("Passphrase", data.getPassphrase());
         return result;
     }
 

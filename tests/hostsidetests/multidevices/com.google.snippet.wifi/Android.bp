@@ -12,7 +12,6 @@ android_test {
     static_libs: [
         "androidx.test.runner",
         "compatibility-device-util-axt",
-        "gson",
         "guava",
         "mobly-snippet-lib",
         "mobly-bundled-snippets-lib",
