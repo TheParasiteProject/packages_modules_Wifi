@@ -4585,14 +4585,14 @@ public class WifiManagerTest {
     @Test
     public void testAyncGetPrivilegedConfiguredNetworks() throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
-        OutcomeReceiver<List<WifiConfiguration>, Error> resultsSetCallback =
+        OutcomeReceiver<List<WifiConfiguration>, Exception> resultsSetCallback =
                 new OutcomeReceiver<>() {
                     @Override
                     public void onResult(List<WifiConfiguration> configs) {
                     }
 
                     @Override
-                    public void onError(Error error) {
+                    public void onError(Exception ex) {
                     }
                 };
         SynchronousExecutor executor = mock(SynchronousExecutor.class);
