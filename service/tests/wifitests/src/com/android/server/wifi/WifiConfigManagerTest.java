@@ -209,6 +209,8 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     @Mock private PerNetwork mPerNetwork;
     @Mock private WifiMetrics mWifiMetrics;
     @Mock private WifiConfigManager.OnNetworkUpdateListener mListener;
+    @Mock private WifiConfigManager.OnRestrictAutoJoinToSubIdCallback
+            mOnRestrictAutoJoinToSubIdCallback;
     @Mock private ActiveModeWarden mActiveModeWarden;
     @Mock private ClientModeManager mPrimaryClientModeManager;
     @Mock private WifiGlobals mWifiGlobals;
@@ -5496,13 +5498,15 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     }
 
     /**
-     * Verify that when startRestrictingAutoJoinToSubscriptionId is called, all
+     * Verify that when  AutoJoinToSubscriptionId is called, all
      * non-carrier-merged networks are disabled for a duration, and non-carrier-merged networks
      * visible at the time of API call are disabled a longer duration, until they disappear from
      * scan results for sufficiently long.
      */
     @Test
     public void testStartTemporarilyDisablingAllNonCarrierMergedWifi() {
+        mWifiConfigManager.setRestrictAutoJoinToSubIdCallback(
+                mOnRestrictAutoJoinToSubIdCallback);
         verifyAddNetworkToWifiConfigManager(WifiConfigurationTestUtil.createOpenNetwork());
         List<WifiConfiguration> retrievedNetworks =
                 mWifiConfigManager.getConfiguredNetworksWithPasswords();
@@ -5519,6 +5523,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         mWifiConfigManager.updateUserDisabledList(new ArrayList<String>());
         assertTrue(mWifiConfigManager.isNonCarrierMergedNetworkTemporarilyDisabled(visibleNetwork));
         assertTrue(mWifiConfigManager.isNonCarrierMergedNetworkTemporarilyDisabled(otherNetwork));
+        verify(mOnRestrictAutoJoinToSubIdCallback).onRestrictionStarted(5);
 
         // the network visible at the start of the API call should still be disabled, but the
         // other non-carrier-merged network should now be free to connect
@@ -5652,6 +5657,8 @@ public class WifiConfigManagerTest extends WifiBaseTest {
      */
     @Test
     public void testStopRestrictAutoJoinToSubscriptionId() {
+        mWifiConfigManager.setRestrictAutoJoinToSubIdCallback(
+                mOnRestrictAutoJoinToSubIdCallback);
         verifyAddNetworkToWifiConfigManager(WifiConfigurationTestUtil.createOpenNetwork());
         List<WifiConfiguration> retrievedNetworks =
                 mWifiConfigManager.getConfiguredNetworksWithPasswords();
@@ -5668,11 +5675,13 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         mWifiConfigManager.updateUserDisabledList(new ArrayList<String>());
         assertTrue(mWifiConfigManager.isNonCarrierMergedNetworkTemporarilyDisabled(visibleNetwork));
         assertTrue(mWifiConfigManager.isNonCarrierMergedNetworkTemporarilyDisabled(otherNetwork));
+        verify(mOnRestrictAutoJoinToSubIdCallback).onRestrictionStarted(5);
 
         mWifiConfigManager.stopRestrictingAutoJoinToSubscriptionId();
         assertFalse(mWifiConfigManager.isNonCarrierMergedNetworkTemporarilyDisabled(
                 visibleNetwork));
         assertFalse(mWifiConfigManager.isNonCarrierMergedNetworkTemporarilyDisabled(otherNetwork));
+        verify(mOnRestrictAutoJoinToSubIdCallback).onRestrictionStopped();
     }
 
     /**

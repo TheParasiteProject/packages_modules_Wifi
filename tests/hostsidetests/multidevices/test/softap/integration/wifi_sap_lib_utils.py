@@ -31,6 +31,17 @@ from mobly.controllers.android_device_lib import adb
 _CALLBACK_NAME = "callbackName"
 _CALLBACK_TIMEOUT = constants.CALLBACK_TIMEOUT.total_seconds()
 _WIFI_SCAN_INTERVAL_SEC = constants.WIFI_SCAN_INTERVAL_SEC.total_seconds()
+SOFTAP_INFO_FREQUENCY_CALLBACK_KEY = (
+    constants.SoftApOnConnectedClientsChangedDataKey.SOFTAP_INFO_FREQUENCY_CALLBACK_KEY
+)
+SOFTAP_INFO_BANDWIDTH_CALLBACK_KEY = (
+    constants.SoftApOnConnectedClientsChangedDataKey.SOFTAP_INFO_BANDWIDTH_CALLBACK_KEY
+)
+AP_BRIDGED_OPPORTUNISTIC_SHUTDOWN_ENABLE_KEY = (
+    constants.WiFiTethering.AP_BRIDGED_OPPORTUNISTIC_SHUTDOWN_ENABLE_KEY
+)
+
+
 
 def match_networks(target_params, networks):
     """Finds the WiFi networks that match a given set of parameters in a list
@@ -159,7 +170,8 @@ def start_wifi_tethering(ad: android_device.AndroidDevice,
     if security:
         config[constants.WiFiTethering.SECURITY] = security
     if cIsolatEnabled:
-        config[constants.WiFiTethering.AP_CLIENT_ISOLATION_ENABLE] = cIsolatEnabled
+        config[constants.WiFiTethering.AP_CLIENT_ISOLATION_ENABLE] =(
+            cIsolatEnabled)
 
     asserts.assert_true(ad.wifi.wifiSetWifiApConfiguration(config),
                         "Failed to update WifiAp Configuration")
@@ -170,7 +182,6 @@ def start_wifi_tethering(ad: android_device.AndroidDevice,
         result_receiver = handler_state.waitAndGet('TetherStateChangedReceiver')
         callback_name = result_receiver.data["callbackName"]
         ad.log.info('StateChanged callback_name: %s', callback_name)
-        logging.info("result_receiver %s", result_receiver)
         ad.log.debug("Tethering started successfully.")
     except Exception:
         msg = "Failed to receive confirmation of wifi tethering starting"
@@ -244,7 +255,9 @@ def adb_shell_ping(ad, count=4, dest_ip="www.google.com"):
 
     for attempt in range(2): # Allow for one retry
         try:
-            ad.log.info(f"Attempt {attempt + 1}: Pinging {dest_ip} from {ad.serial} with command: '{ping_cmd}'")
+            ad.log.info(
+                f"Attempt {attempt + 1}: Pinging {dest_ip}"+
+                "from {ad.serial} with command: '{ping_cmd}'")
             results = ad.adb.shell(ping_cmd)
             ad.log.info(f"Ping results (Attempt {attempt + 1}): {results}")
 
@@ -253,17 +266,22 @@ def adb_shell_ping(ad, count=4, dest_ip="www.google.com"):
                 # It might not even raise AdbError in some edge cases.
                 ad.log.error("adb.shell returned empty ping results.")
                 # This should probably be an immediate failure rather than trying to parse
-                asserts.fail("ping empty results - seems like a critical failure")
+                asserts.fail(
+                    "ping empty results - seems like a critical failure")
                 return False # Or raise a more specific exception if needed
 
             # Check for success indicators in the ping output
             # Common success indicators: "0% packet loss", "received, 0% packet loss"
-            if "0% packet loss".encode('utf-8') in results or "received, 0% packet loss".encode('utf-8') in results:
+            Zeoloss="0% packet loss".encode('utf-8')
+            received_Zeoloss = "received, 0% packet loss".encode('utf-8')
+            if Zeoloss in results or received_Zeoloss in results:
+            # if "0% packet loss".encode('utf-8') in results or "received, 0% packet loss".encode('utf-8') in results:
                 ad.log.info(f"Ping to {dest_ip} succeeded.")
                 return True
             else:
                 # Ping command ran, but indicated packet loss or other issues.
-                ad.log.warning(f"Ping to {dest_ip} failed with packet loss or other errors. Output: {results}")
+                ad.log.warning(f"Ping to {dest_ip}"+
+                               "failed with packet loss or other errors. Output: {results}")
                 # If this is the last attempt, return False
                 if attempt == 1: # This means it failed on the second attempt too
                     return False
@@ -271,7 +289,8 @@ def adb_shell_ping(ad, count=4, dest_ip="www.google.com"):
                 time.sleep(1) # Wait before retrying
 
         except adb.AdbError as e:
-            ad.log.error(f"Attempt {attempt + 1}: AdbError during ping to {dest_ip}: {e}")
+            ad.log.error(f"Attempt {attempt + 1}: "+
+                        "AdbError during ping to {dest_ip}: {e}")
             # If this is the last attempt, return False
             if attempt == 1:
                 return False
@@ -440,3 +459,298 @@ def connect_to_wifi_network(ad, network, assert_on_fail=True,
         ad.wifi.wifiEnableNetwork(ret, 0)
 
     _wifi_connect(ad, config, check_connectivity=check_connectivity)
+
+def get_current_softap_info(ad, callbackId):
+    frequency = 0
+    bandwidth = 0
+    event= callbackId.waitAndGet(
+        event_name=(
+            constants.SoftApCallbackEventName.SOFTAP_INFO_CHANGED
+            ),
+        timeout=_CALLBACK_TIMEOUT,
+        )
+    frequency = event.data[SOFTAP_INFO_FREQUENCY_CALLBACK_KEY]
+    bandwidth = event.data[SOFTAP_INFO_BANDWIDTH_CALLBACK_KEY]
+    ad.log.info("softap info updated, frequency is %s, bandwidth is %s",
+                frequency, bandwidth)
+    return frequency, bandwidth
+
+def start_softap_and_verify(dut, client, band):
+    dut.wifi.tetheringStartTrackingTetherStateChange()
+    callbackId = dut.wifi.wifiRegisterSoftApCallback()
+    frequency, bandwdith = get_current_softap_info(dut, callbackId)
+    asserts.assert_true(frequency == 0, "Softap frequency is not reset")
+    asserts.assert_true(bandwdith == 0, "Softap bandwdith is not reset")
+    config = create_softap_config()
+    start_wifi_tethering(dut,
+                        config[constants.WiFiTethering.SSID_KEY],
+                        config[constants.WiFiTethering.PWD_KEY],
+                        band=band)
+    asserts.assert_true(dut.wifi.wifiIsApEnabled(),
+                        "SoftAp is not reported as running")
+    start_wifi_connection_scan_and_ensure_network_found(
+        client, config[constants.WiFiTethering.SSID_KEY])
+    config = {
+        "SSID": config[constants.WiFiTethering.SSID_KEY],
+        "password": config[constants.WiFiTethering.PWD_KEY],
+        }
+    _wifi_connect(client, config, check_connectivity=False)
+    frequency, bandwdith = get_current_softap_info(dut, callbackId)
+    asserts.assert_true(frequency > 0, "Softap frequency is not valid")
+    asserts.assert_true(bandwdith > 0, "Softap bandwdith is not valid")
+    dut.wifi.tetheringStopTethering()
+    dut.wifi.wifiUnregisterSoftApCallback()
+    return config
+
+def wait_for_expected_number_of_softap_clients(
+        ad, callbackId, connect, expected_num_of_softap_clients):
+    if connect:
+        on_connected_clients_changed_event = callbackId.waitAndGet(
+            event_name=(
+                constants.SoftApCallbackEventName.ON_CONNECTED_CLIENTS_CHANGED
+            ),
+            timeout=_CALLBACK_TIMEOUT,
+        )
+        expected_num_of_softap_clients  = on_connected_clients_changed_event.data[
+        constants.SoftApOnConnectedClientsChangedDataKey.CONNECTED_CLIENTS_COUNT]
+    else:
+        dis_connected_clients_changed_event = callbackId.waitAndGet(
+            event_name=(
+                constants.SoftApCallbackEventName.ON_CLIENTS_DISCONNECTED
+            ),
+            timeout=_CALLBACK_TIMEOUT,
+        )
+        expected_num_of_softap_clients  = dis_connected_clients_changed_event.data[
+        constants.SoftApOnClientsDisconnectedDataKey.DISCONNECTED_CLIENTS_COUNT]
+
+def convert_decimal_to_mac_address(decimal_mac):
+    """
+    Converts a decimal integer representation of a MAC address
+    to the colon-separated hexadecimal format (e.g., 'aa:bb:cc:dd:ee:ff').
+    """
+    # 1. Convert the decimal integer to a hexadecimal string.
+    #    'x' for hexadecimal, '012' to ensure 12 digits (6 bytes * 2 hex digits/byte)
+    hex_mac = f'{decimal_mac:012x}'
+
+    # 2. Split the hexadecimal string into pairs of characters and join with colons.
+    #    Example: 'aabbccddeeff' -> ['aa', 'bb', 'cc', 'dd', 'ee', 'ff']
+    #  -> 'aa:bb:cc:dd:ee:ff'
+    formatted_mac = ':'.join([hex_mac[i:i+2] for i in range(0, 12, 2)])
+
+    return formatted_mac
+
+def convert_mac_string_to_decimal(mac_string):
+    hex_mac = mac_string.replace(':', '')
+    decimal_mac = int(hex_mac, 16)
+    return decimal_mac
+
+
+def save_wifi_soft_ap_config(ad,
+                             config,
+                             band=None,
+                             hidden=None,
+                             security=None,
+                             password=None,
+                             channel=None,
+                             max_clients=None,
+                             shutdown_timeout_enable=None,
+                             shutdown_timeout_millis=None,
+                             client_control_enable=None,
+                             allowedList=None,
+                             blockedList=None,
+                             bands=None,
+                             channel_frequencys=None,
+                             mac_randomization_setting=None,
+                             bridged_opportunistic_shutdown_enabled=None,
+                             ieee80211ax_enabled=None):
+    """ Save a soft ap configuration and verified
+    Args:
+        ad: android_device to set soft ap configuration.
+        wifi_config: a soft ap configuration object, at least include SSID.
+        band: specifies the band for the soft ap.
+        hidden: specifies the soft ap need to broadcast its SSID or not.
+        security: specifies the security type for the soft ap.
+        password: specifies the password for the soft ap.
+        channel: specifies the channel for the soft ap.
+        max_clients: specifies the maximum connected client number.
+        shutdown_timeout_enable: specifies the auto shut down enable or not.
+        shutdown_timeout_millis: specifies the shut down timeout value.
+        client_control_enable: specifies the client control enable or not.
+        allowedList: specifies allowed clients list.
+        blockedList: specifies blocked clients list.
+        bands: specifies the band list for the soft ap.
+        channel_frequencys: specifies the channel frequency list for soft ap.
+        mac_randomization_setting: specifies the mac randomization setting.
+        bridged_opportunistic_shutdown_enabled: specifies the opportunistic
+                shutdown enable or not.
+        ieee80211ax_enabled: specifies the ieee80211ax enable or not.
+    """
+    if security and password:
+        config[constants.WiFiTethering.PWD_KEY] = password
+        config[constants.WiFiTethering.SECURITY] = security
+    if hidden is not None:
+        config[constants.WiFiTethering.HIDDEN_KEY] = hidden
+    if max_clients is not None:
+        config[constants.WiFiTethering.AP_MAXCLIENTS_KEY] = max_clients
+    if shutdown_timeout_enable is not None:
+        config[constants.WiFiTethering.AP_SHUTDOWNTIMEOUTENABLE_KEY] = (
+            shutdown_timeout_enable)
+    if shutdown_timeout_millis is not None:
+        config[constants.WiFiTethering.AP_SHUTDOWNTIMEOUT_KEY] = (
+            shutdown_timeout_millis)
+    if client_control_enable is not None:
+        config[constants.WiFiTethering.AP_CLIENTCONTROL_KEY] = (
+            client_control_enable)
+    if allowedList is not None:
+        config[constants.WiFiTethering.AP_ALLOWEDLIST_KEY] = allowedList
+    if blockedList is not None:
+        config[constants.WiFiTethering.AP_BLOCKEDLIST_KEY] = blockedList
+    if mac_randomization_setting is not None:
+        config[constants.WiFiTethering.AP_MAC_RANDOMIZATION_SETTING_KEY
+                ] = mac_randomization_setting
+    if bridged_opportunistic_shutdown_enabled is not None:
+        config[
+            constants.WiFiTethering.AP_BRIDGED_OPPORTUNISTIC_SHUTDOWN_ENABLE_KEY
+                ] = bridged_opportunistic_shutdown_enabled
+    if ieee80211ax_enabled is not None:
+        config[constants.WiFiTethering.AP_IEEE80211AX_ENABLED_KEY]= (
+            ieee80211ax_enabled)
+    if channel_frequencys is not None:
+        config[constants.WiFiTethering.AP_CHANNEL_FREQUENCYS_KEY] = (
+            channel_frequencys)
+    elif bands is not None:
+        config[constants.WiFiTethering.AP_BANDS_KEY] = bands
+    elif band is not None:
+        if channel is not None:
+            config[constants.WiFiTethering.AP_BAND_KEY] = band
+            config[constants.WiFiTethering.AP_CHANNEL_KEY] = channel
+        else:
+            config[constants.WiFiTethering.AP_BAND_KEY] = band
+    if constants.WiFiTethering.AP_CHANNEL_KEY in config and config[
+            constants.WiFiTethering.AP_CHANNEL_KEY] == 0:
+        del config[constants.WiFiTethering.AP_CHANNEL_KEY]
+    if constants.WiFiTethering.SECURITY in config and config[
+            constants.WiFiTethering.SECURITY] == (
+                constants.SoftApSecurityType.OPEN):
+        del config[constants.WiFiTethering.SECURITY]
+        del config[constants.WiFiTetheringnums.PWD_KEY]
+    asserts.assert_true(ad.wifi.wifiSetWifiApConfiguration(config),
+                        "Failed to set WifiAp Configuration")
+    wifi_ap = ad.wifi.wifiGetSapConfiguration()
+    asserts.assert_true(
+        wifi_ap[constants.WiFiTethering.SSID_KEY] == (
+            config[constants.WiFiTethering.SSID_KEY]),
+        "Hotspot SSID doesn't match")
+    if constants.WiFiTethering.SECURITY in config:
+        securityType = wifi_ap["mSecurityType"]
+        asserts.assert_true(
+            securityType == config[constants.WiFiTethering.SECURITY],
+            "Hotspot Security doesn't match")
+    if constants.WiFiTethering.PWD_KEY in config:
+        asserts.assert_true(
+            wifi_ap["mPassphrase"] == config[constants.WiFiTethering.PWD_KEY],
+            "Hotspot Password doesn't match")
+
+    if constants.WiFiTethering.HIDDEN_KEY in config:
+        asserts.assert_true(
+            wifi_ap["mHiddenSsid"] == config[constants.WiFiTethering.HIDDEN_KEY],
+            "Hotspot hidden setting doesn't match")
+
+    if constants.WiFiTethering.AP_CHANNEL_KEY in config:
+        asserts.assert_true(
+            wifi_ap["mChannels"]["mValues"][0] == config[
+                constants.WiFiTethering.AP_CHANNEL_KEY],
+                "Hotspot Channel doesn't match")
+    if constants.WiFiTethering.AP_MAXCLIENTS_KEY in config:
+        asserts.assert_true(
+            wifi_ap["mMaxNumberOfClients"] == config[
+                constants.WiFiTethering.AP_MAXCLIENTS_KEY],
+            "Hotspot Max Clients doesn't match")
+    if constants.WiFiTethering.AP_SHUTDOWNTIMEOUTENABLE_KEY in config:
+        asserts.assert_true(
+            wifi_ap["mAutoShutdownEnabled"] == config[
+                constants.WiFiTethering.AP_SHUTDOWNTIMEOUTENABLE_KEY],
+            "Hotspot ShutDown feature flag doesn't match")
+    if constants.WiFiTethering.AP_SHUTDOWNTIMEOUT_KEY in config:
+        asserts.assert_true(
+            wifi_ap["mShutdownTimeoutMillis"] == config[
+                constants.WiFiTethering.AP_SHUTDOWNTIMEOUT_KEY],
+            "Hotspot ShutDown feature flag doesn't match")
+    if constants.WiFiTethering.AP_CLIENTCONTROL_KEY in config:
+        asserts.assert_true(
+            wifi_ap["mClientControlByUser"] == config[
+                constants.WiFiTethering.AP_CLIENTCONTROL_KEY],
+            "Hotspot Client control flag doesn't match")
+    if constants.WiFiTethering.AP_ALLOWEDLIST_KEY in config:
+        mac_address_list = config[constants.WiFiTethering.AP_ALLOWEDLIST_KEY]
+        if mac_address_list == []:
+            converted_decimal = mac_address_list
+            mAllowedClientList = wifi_ap["mAllowedClientList"]
+        else:
+            input_mac_string = mac_address_list[0]
+            converted_decimal = convert_mac_string_to_decimal(input_mac_string)
+            mAllowedClientList = wifi_ap["mAllowedClientList"][0]["mAddr"]
+        asserts.assert_true(
+            mAllowedClientList == converted_decimal,
+            "Hotspot Allowed List doesn't match")
+    if constants.WiFiTethering.AP_BLOCKEDLIST_KEY in config:
+        BlockedClientList =  config[constants.WiFiTethering.AP_BLOCKEDLIST_KEY]
+        if BlockedClientList == []:
+            converted_decimal = BlockedClientList
+            mBlockedClientLis = wifi_ap["mBlockedClientList"]
+        else:
+            input_mac_string = BlockedClientList[0]
+            converted_decimal = convert_mac_string_to_decimal(input_mac_string)
+            mBlockedClientLis = wifi_ap["mBlockedClientList"][0]["mAddr"]
+        asserts.assert_true(
+            mBlockedClientLis == converted_decimal,
+            "Hotspot Blocked List doesn't match")
+
+    if constants.WiFiTethering.AP_MAC_RANDOMIZATION_SETTING_KEY in config:
+        asserts.assert_true(
+            wifi_ap["mMacRandomizationSetting"] == config[
+                constants.WiFiTethering.AP_MAC_RANDOMIZATION_SETTING_KEY],
+            "Hotspot Mac randomization setting doesn't match")
+
+    if AP_BRIDGED_OPPORTUNISTIC_SHUTDOWN_ENABLE_KEY in config:
+        asserts.assert_true(
+            wifi_ap["mBridgedModeOpportunisticShutdownEnabled"] == (
+                config[AP_BRIDGED_OPPORTUNISTIC_SHUTDOWN_ENABLE_KEY]),
+            "Hotspot bridged shutdown enable setting doesn't match")
+
+    if constants.WiFiTethering.AP_IEEE80211AX_ENABLED_KEY in config:
+        asserts.assert_true(
+            wifi_ap["mIeee80211axEnabled"] == config[
+                constants.WiFiTethering.AP_IEEE80211AX_ENABLED_KEY],
+            "Hotspot 80211 AX enable setting doesn't match")
+
+    if constants.WiFiTethering.AP_CHANNEL_FREQUENCYS_KEY in config:
+        raw_channels = wifi_ap['mChannels']['mValues']
+        valid_channels = [channel for channel in raw_channels if channel != 0]
+        channel_to_freq = {
+            v: k for k, v in constants.WifiEnums.freq_to_channel.items()}
+        frequency_list =[]
+        for channel in valid_channels:
+           frequency = channel_to_freq.get(channel)
+           frequency_list.append(frequency)
+        asserts.assert_true(
+            frequency_list == config[
+                constants.WiFiTethering.AP_CHANNEL_FREQUENCYS_KEY],
+            "Hotspot channels setting doesn't match")
+
+def set_wifi_country_code(
+    ad: android_device.AndroidDevice,
+    country_code: str):
+    """Sets the wifi country code on the device.
+
+        Args:
+            ad: An AndroidDevice object.
+            country_code: 2 letter ISO country code
+
+        Raises:
+            An RpcException if unable to set the country code.
+    """
+    try:
+        ad.adb.shell('cmd wifi force-country-code enabled %s' % country_code)
+    except android_device.adb.AdbError as e:
+        ad.log.error(f"Failed to set country code: {e}")

@@ -233,7 +233,7 @@ class WifiSoftApTest(base_test.BaseTestClass):
 
     current_configuration = self.host.wifi.wifiGetSoftApConfiguration()
     ssid = current_configuration['SSID']
-    passphrase = current_configuration['mPassphrase']
+    passphrase = current_configuration['Passphrase']
     return ssid, passphrase
 
   def _stop_tethering(self, ad: android_device.AndroidDevice) -> bool:
