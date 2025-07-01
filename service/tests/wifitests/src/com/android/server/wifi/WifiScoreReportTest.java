@@ -360,7 +360,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
                 mWifiScoreReport.getAospScorerPredictionStatusForEvaluation());
         assertEquals(WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_NONE,
                 mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation());
-        mWifiScoreReport.calculateAndReportScore();
+        assertNotEquals(-1, mWifiScoreReport.calculateAndReportScore());
         // called again after calculateAndReportScore()
         verifySentAnyNetworkScore(times(2));
         verify(mWifiMetrics).incrementWifiScoreCount(eq(TEST_IFACE_NAME), anyInt());
@@ -522,7 +522,8 @@ public class WifiScoreReportTest extends WifiBaseTest {
         verifySentAnyNetworkScore();
 
         mWifiInfo.setRssi(WifiInfo.INVALID_RSSI);
-        mWifiScoreReport.calculateAndReportScore();
+
+        assertEquals(-1, mWifiScoreReport.calculateAndReportScore());
         // still only called once
         verifySentAnyNetworkScore();
         verify(mWifiMetrics, never()).incrementWifiScoreCount(any(), anyInt());

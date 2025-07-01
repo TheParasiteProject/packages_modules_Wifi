@@ -7433,7 +7433,8 @@ public class WifiMetrics {
      * oneshot is used to indicate that this call came from CMD_ONESHOT_RSSI_POLL.
      */
     public void updateWifiUsabilityStatsEntries(String ifaceName, WifiInfo info,
-            WifiLinkLayerStats stats, boolean oneshot, int statusDataStall) {
+            WifiLinkLayerStats stats, boolean oneshot, int statusDataStall, int internalScore,
+            int internalScorerType) {
         synchronized (mLock) {
             // This is only collected for primary STA currently because RSSI polling is disabled for
             // non-primary STAs.
@@ -7878,7 +7879,7 @@ public class WifiMetrics {
             if (isPrimary(ifaceName)) {
                 sendWifiUsabilityStats(mSeqNumInsideFramework, isSameBssidAndFreq,
                         createNewWifiUsabilityStatsEntryParcelable(wifiUsabilityStatsEntry, stats,
-                                info));
+                                info, internalScore, internalScorerType));
             }
 
             // We need the records in the ring buffer to all have the same timebase. The records
@@ -8176,7 +8177,8 @@ public class WifiMetrics {
      * These are two different types.
      */
     private android.net.wifi.WifiUsabilityStatsEntry createNewWifiUsabilityStatsEntryParcelable(
-            WifiUsabilityStatsEntry s, WifiLinkLayerStats stats, WifiInfo info) {
+            WifiUsabilityStatsEntry s, WifiLinkLayerStats stats, WifiInfo info, int internalScore,
+            int internalScorerType) {
         int probeStatus;
         switch (s.probeStatusSinceLastUpdate) {
             case WifiUsabilityStatsEntry.PROBE_STATUS_NO_PROBE:
@@ -8224,8 +8226,8 @@ public class WifiMetrics {
                 s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected,
                 s.uwbAdapterState, s.isLowLatencyActivated, s.maxSupportedTxLinkspeed,
                 s.maxSupportedRxLinkspeed, s.voipMode, s.threadDeviceRole, s.statusDataStall,
-                -1, //TODO: b/427546930
-                android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_INVALID //TODO: b/427546930
+                internalScore,
+                internalScorerType
         );
     }
 
