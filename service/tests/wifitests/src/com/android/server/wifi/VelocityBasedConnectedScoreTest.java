@@ -89,8 +89,7 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
         mWifiInfo.setFrequency(2412);
         when(mContext.getResources()).thenReturn(mResources);
         mClock = new FakeClock();
-        mVelocityBasedConnectedScore = new VelocityBasedConnectedScore(
-            new ScoringParams(mContext), mClock);
+        mVelocityBasedConnectedScore = new VelocityBasedConnectedScore(new ScoringParams(mContext));
         mVelocityBasedConnectedScore.onRoleChanged(ActiveModeManager.ROLE_CLIENT_PRIMARY);
     }
 

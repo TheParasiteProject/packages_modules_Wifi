@@ -594,7 +594,7 @@ public class WifiScoreReport {
         mScoringParams = scoringParams;
         mClock = clock;
         mAdaptiveConnectivityEnabledSettingObserver = adaptiveConnectivityEnabledSettingObserver;
-        mVelocityBasedConnectedScore = new VelocityBasedConnectedScore(scoringParams, clock);
+        mVelocityBasedConnectedScore = new VelocityBasedConnectedScore(scoringParams);
         mWifiMetrics = wifiMetrics;
         mWifiInfo = wifiInfo;
         mWifiNative = wifiNative;
