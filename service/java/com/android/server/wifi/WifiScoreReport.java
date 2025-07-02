@@ -668,9 +668,7 @@ public class WifiScoreReport {
         int score;
 
         long millis = mClock.getWallClockMillis();
-        mVelocityBasedConnectedScore.updateUsingWifiInfo(mWifiInfo, millis);
-
-        int s2 = mVelocityBasedConnectedScore.generateScore();
+        int s2 = mVelocityBasedConnectedScore.generateScore(mWifiInfo, millis);
         score = s2;
 
         final int transitionScore = isPrimary() ? ConnectedScore.WIFI_TRANSITION_SCORE

@@ -104,8 +104,7 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
     /**
      * Updates the state.
      */
-    @Override
-    public void updateUsingWifiInfo(WifiInfo wifiInfo, long millis) {
+    private void updateUsingWifiInfo(WifiInfo wifiInfo, long millis) {
         int frequency = wifiInfo.getFrequency();
         if (frequency != mFrequency) {
             mLastMillis = 0; // Probably roamed; reset filter but retain threshold adjustment
@@ -173,7 +172,9 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
      * Velocity scorer - predict the rssi a few seconds from now
      */
     @Override
-    public int generateScore() {
+    public int generateScore(WifiInfo wifiInfo, long millis) {
+        updateUsingWifiInfo(wifiInfo, millis);
+
         final int transitionScore = isPrimary() ? WIFI_TRANSITION_SCORE
                 : WIFI_SECONDARY_TRANSITION_SCORE;
         if (mFilter.mx == null) return transitionScore + 1;

@@ -94,17 +94,6 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
     }
 
     /**
-     * Generate a score with no updates
-     *
-     * Expect no crash, passing score
-     */
-    @Test
-    public void noCrashWhenNoData() throws Exception {
-        int score = mVelocityBasedConnectedScore.generateScore();
-        assertTrue(score > ConnectedScore.WIFI_TRANSITION_SCORE);
-    }
-
-    /**
      *
      * Low RSSI, but some data is moving and error rate is low.
      *
@@ -117,16 +106,15 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
         mWifiInfo.setSuccessfulTxPacketsPerSecond(2.1); // proportional to pps
         mWifiInfo.setLostTxPacketsPerSecond(.5);
         mWifiInfo.setSuccessfulRxPacketsPerSecond(2.1);
+        int score = -1;
         for (int i = 0; i < 10; i++) {
-            mVelocityBasedConnectedScore.updateUsingWifiInfo(mWifiInfo,
+            score = mVelocityBasedConnectedScore.generateScore(mWifiInfo,
                     mClock.getWallClockMillis());
         }
-        int score = mVelocityBasedConnectedScore.generateScore();
         assertTrue(score > ConnectedScore.WIFI_TRANSITION_SCORE);
         // If we reset, should be below threshold after the first input
         mVelocityBasedConnectedScore.reset();
-        mVelocityBasedConnectedScore.updateUsingWifiInfo(mWifiInfo, mClock.getWallClockMillis());
-        score = mVelocityBasedConnectedScore.generateScore();
+        score = mVelocityBasedConnectedScore.generateScore(mWifiInfo, mClock.getWallClockMillis());
         assertTrue(score < ConnectedScore.WIFI_TRANSITION_SCORE);
     }
 
@@ -143,11 +131,11 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
         mWifiInfo.setSuccessfulTxPacketsPerSecond(.1); // proportional to pps
         mWifiInfo.setLostTxPacketsPerSecond(0);
         mWifiInfo.setSuccessfulRxPacketsPerSecond(.1);
+        int score = -1;
         for (int i = 0; i < 10; i++) {
-            mVelocityBasedConnectedScore.updateUsingWifiInfo(mWifiInfo,
+            score = mVelocityBasedConnectedScore.generateScore(mWifiInfo,
                     mClock.getWallClockMillis());
         }
-        int score = mVelocityBasedConnectedScore.generateScore();
         assertTrue(score < ConnectedScore.WIFI_TRANSITION_SCORE);
     }
 }

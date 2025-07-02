@@ -55,19 +55,11 @@ public abstract class ConnectedScore {
     private ClientRole mCurrentRole = null;
 
     /**
-     * Updates the score using relevant parts of WifiInfo
-     *
-     * @param wifiInfo object holding relevant values.
-     * @param millis millisecond-resolution time.
-     */
-    public abstract void updateUsingWifiInfo(WifiInfo wifiInfo, long millis);
-
-    /**
      * Generates a score based on the current state
      *
      * @return network score - on NetworkAgent scale.
      */
-    public abstract int generateScore();
+    public abstract int generateScore(WifiInfo wifiInfo, long millis);
 
     /**
      * Clears out state associated with the connection
