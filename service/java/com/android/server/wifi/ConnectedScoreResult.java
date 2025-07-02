@@ -21,6 +21,8 @@ import com.google.auto.value.AutoValue;
 public abstract class ConnectedScoreResult {
     /** The calculated score by the scorer */
     public abstract int score();
+    /** The adjusted score by the scorer */
+    public abstract int adjustedScore();
     /** The prediction of Wi-Fi usability by the scorer */
     public abstract boolean isWifiUsable();
     /** The request to check NUD from the scorer */
@@ -42,6 +44,11 @@ public abstract class ConnectedScoreResult {
          * Sets the score.
          */
         public abstract Builder setScore(int score);
+
+        /**
+         * Sets the adjustedScore.
+         */
+        public abstract Builder setAdjustedScore(int adjustedScore);
 
         /**
          * Sets whether the Wi-Fi is usable or not.
