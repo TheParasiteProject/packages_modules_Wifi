@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.doAnswer;
@@ -116,6 +117,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     private static final int TEST_UID = 435546654;
     private static final String EXTERNAL_SCORER_PKG_NAME = "com.google.android.carrier.carrierwifi";
     private static final String DRY_RUN_SCORER_PKG_NAME = "com.example.xxx";
+    private static final int ADJUSTED_SCORE = 50;
 
     FakeClock mClock;
     WifiScoreReport mWifiScoreReport;
@@ -143,6 +145,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     @Mock ActiveModeWarden mActiveModeWarden;
     @Mock WifiConnectivityManager mWifiConnectivityManager;
     @Mock WifiConfigManager mWifiConfigManager;
+    @Mock VelocityBasedConnectedScore mMockVelocityScorer;
     @Captor ArgumentCaptor<WifiManager.ScoreUpdateObserver> mExternalScoreUpdateObserverCbCaptor;
     private TestLooper mLooper;
 
@@ -352,6 +355,9 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void calculateAndReportScoreSucceeds() throws Exception {
+        when(mMockVelocityScorer.adjustScore(any(), anyLong(), anyInt()))
+                .thenReturn(ADJUSTED_SCORE);
+        mWifiScoreReport.mVelocityBasedConnectedScore = mMockVelocityScorer;
         // initially called once
         verifySentAnyNetworkScore();
 
@@ -368,6 +374,11 @@ public class WifiScoreReportTest extends WifiBaseTest {
                 mWifiScoreReport.getAospScorerPredictionStatusForEvaluation());
         assertEquals(WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_NONE,
                 mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation());
+        if (SdkLevel.isAtLeastS()) {
+            assertEquals(mWifiScoreReport.getScore().getLegacyInt(), ADJUSTED_SCORE);
+        } else {
+            assertEquals(mWifiScoreReport.getLegacyIntScore(), ADJUSTED_SCORE);
+        }
     }
 
     @Test
