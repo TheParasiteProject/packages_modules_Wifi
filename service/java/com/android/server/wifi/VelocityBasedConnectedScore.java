@@ -18,6 +18,7 @@ package com.android.server.wifi;
 
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiUsabilityStatsEntry;
 import android.util.Log;
 
 import com.android.server.wifi.util.KalmanFilter;
@@ -246,5 +247,22 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
             adjustedScore = 0;
         }
         return adjustedScore;
+    }
+
+    /**
+     * Generate a {@link ConnectedScoreResult} based on history input data.
+     */
+    @Override
+    public ConnectedScoreResult generateScoreResult(WifiInfo wifiInfo,
+            WifiUsabilityStatsEntry stats, long millis) {
+        final int transitionScore =
+                isPrimary() ? WIFI_TRANSITION_SCORE : WIFI_SECONDARY_TRANSITION_SCORE;
+        int score = generateScore(wifiInfo, millis);
+        int adjustedScore = adjustScore(wifiInfo, millis, score);
+        return ConnectedScoreResult.builder()
+            .setScore(score)
+            .setAdjustedScore(adjustedScore)
+            .setIsWifiUsable(adjustedScore > transitionScore)
+            .build();
     }
 }

@@ -18,6 +18,7 @@ package com.android.server.wifi;
 
 import android.annotation.Nullable;
 import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiUsabilityStatsEntry;
 
 import com.android.server.wifi.ActiveModeManager.ClientRole;
 /**
@@ -60,6 +61,14 @@ public abstract class ConnectedScore {
      * @return network score - on NetworkAgent scale.
      */
     public abstract int generateScore(WifiInfo wifiInfo, long millis);
+
+    /**
+     * Generates a score based on the current state
+     *
+     * @return network score - on NetworkAgent scale.
+     */
+    public abstract ConnectedScoreResult generateScoreResult(WifiInfo wifiInfo,
+            WifiUsabilityStatsEntry stats, long millis);
 
     /**
      * Clears out state associated with the connection
