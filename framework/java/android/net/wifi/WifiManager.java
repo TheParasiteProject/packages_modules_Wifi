@@ -13762,13 +13762,13 @@ public class WifiManager {
         }
     }
 
-    /** Replace the persistently generated random MAC address for the specified wifi network with a
+    /** Replace the persistently generated random MAC address for the specified Wi-Fi network with a
      * newly generated random MAC address. The new randomized MAC will be used the next time the
-     * device connects to the network. If the specified wifi network is already connected when this
-     * API is called, the MAC address won't change until the next time that network is connected.
+     * device connects to the network. If the specified Wi-Fi network is already connected when
+     * this API is called, the MAC address won't change until the next time that network is
+     * connected.
      * <p>
-     * This does not change phone's factory MAC.
-     *
+     * This does not change device's factory MAC.
      * @param networkId the ID of the network as returned by {@link #addNetwork} or {@link
      *        #getConfiguredNetworks}.
      *
