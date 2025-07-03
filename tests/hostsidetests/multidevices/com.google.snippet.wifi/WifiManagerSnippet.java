@@ -37,6 +37,7 @@ import android.net.wifi.WifiClient;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.WifiScanner.ScanData;
 import android.os.Bundle;
@@ -59,8 +60,10 @@ import com.google.android.mobly.snippet.event.EventCache;
 import com.google.android.mobly.snippet.event.SnippetEvent;
 import com.google.android.mobly.snippet.rpc.AsyncRpc;
 import com.google.android.mobly.snippet.rpc.Rpc;
+import com.google.snippet.wifi.aware.WifiAwareJsonDeserializer;
 import com.google.snippet.wifi.softap.WifiSapJsonDeserializer;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -69,11 +72,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 
 
 /**
@@ -85,14 +88,24 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
     private static final long POLLING_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(10);
     private static final int CONNECT_TIMEOUT_IN_SEC = 90;
     private static final int TOGGLE_STATE_TIMEOUT_IN_SEC = 30;
+    // Network Suggestions
+    private static final String EVENT_KEY_CB_NAME = "CallbackName";
+    private static final String EVENT_KEY_CONNECTION_STATUS = "ConnectionStatus";
+    private static final String EVENT_KEY_USER_APPROVAL_STATUS = "UserApprovalStatus";
+    private static final String EVENT_KEY_SUGGESTION = "Suggestion";
 
     private final Context mContext;
     private final WifiManager mWifiManager;
+    private final ConnectivityManager mConnectivityManager;
     private final Handler mHandler;
     private final Object mLock = new Object();
     private WifiManagerSnippet.SnippetSoftApCallback mSoftApCallback;
     private WifiManager.LocalOnlyHotspotReservation mLocalOnlyHotspotReservation;
     private BroadcastReceiver mWifiStateReceiver;
+    private WifiManager.SuggestionConnectionStatusListener mSuggestionConnectionStatusListener;
+    private WifiManager.SuggestionUserApprovalStatusListener mSuggestionUserApprovalStatusListener;
+    private BroadcastReceiver mNetworkSuggestionPostConnectionReceiver;
+
 
     /**
      * Callback to listen in and verify events to SoftAp.
@@ -282,9 +295,91 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
         }
     }
 
+    /**
+     * Listener for Wi-Fi Network Suggestion connection status updates.
+     */
+    private class SuggestionConnectionStatusListener implements
+            WifiManager.SuggestionConnectionStatusListener{
+        private final String mCallbackId;
+
+        SuggestionConnectionStatusListener(String callbackId) {
+            mCallbackId = callbackId;
+        }
+
+        @Override
+        public void onConnectionStatus(@NonNull WifiNetworkSuggestion suggestion, int status) {
+            Log.d(TAG, "onConnectionStatus, suggestion=" + suggestion.getSsid() + ", status="
+                    + status);
+            SnippetEvent event = new SnippetEvent(mCallbackId, "onConnectionStatus");
+            event.getData().putInt(EVENT_KEY_CONNECTION_STATUS, status);
+            try {
+                event.getData().putString(EVENT_KEY_SUGGESTION,
+                        WifiJsonConverter.serializeWifiNetworkSuggestion(suggestion).toString());
+            } catch (JSONException e) {
+                Log.e(TAG, "Failed to serialize WifiNetworkSuggestion", e);
+            }
+            EventCache.getInstance().postEvent(event);
+        }
+    }
+
+    /**
+     * Listener for Wi-Fi Network Suggestion user approval status updates.
+     */
+    private class SuggestionUserApprovalStatusListener implements
+            WifiManager.SuggestionUserApprovalStatusListener {
+        private final String mCallbackId;
+        SuggestionUserApprovalStatusListener(String callbackId) {
+            mCallbackId = callbackId;
+        }
+
+        @Override
+        public void onUserApprovalStatusChange(int approvalStatus) {
+            Log.d(TAG, "onUserApprovalStatusChange: approvalStatus=" + approvalStatus);
+            SnippetEvent event = new SnippetEvent(mCallbackId, "onUserApprovalStatusChange");
+            event.getData().putInt(EVENT_KEY_USER_APPROVAL_STATUS, approvalStatus);
+            EventCache.getInstance().postEvent(event);
+        }
+    }
+
+    /**
+     * BroadcastReceiver for ACTION_WIFI_NETWORK_SUGGESTION_POST_CONNECTION.
+     */
+    private class NetworkSuggestionPostConnectionReceiver extends BroadcastReceiver {
+        private final String mCallbackId;
+        private final EventCache mEventCache = EventCache.getInstance();
+
+        NetworkSuggestionPostConnectionReceiver(String callbackId) {
+            this.mCallbackId = callbackId;
+        }
+
+        @Override
+        public void onReceive(Context ctx, Intent intent) {
+            String action = intent.getAction();
+            if (WifiManager.ACTION_WIFI_NETWORK_SUGGESTION_POST_CONNECTION.equals(action)) {
+                Log.d(TAG, "Received ACTION_WIFI_NETWORK_SUGGESTION_POST_CONNECTION broadcast.");
+                SnippetEvent event = new SnippetEvent(mCallbackId, action);
+                NetworkInfo networkInfo = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
+                WifiInfo wifiInfo = intent.getParcelableExtra(WifiManager.EXTRA_WIFI_INFO);
+
+                if (networkInfo != null) {
+                    event.getData().putString("networkInfoDetailedState",
+                            networkInfo.getDetailedState().name());
+                    event.getData().putString("networkInfoState", networkInfo.getState().name());
+                }
+                if (wifiInfo != null) {
+                    event.getData().putString("ssid",
+                            WifiJsonConverter.trimQuotationMarks(wifiInfo.getSSID()));
+                    event.getData().putString("bssid", wifiInfo.getBSSID());
+                }
+                mEventCache.postEvent(event);
+            }
+        }
+    }
+
     public WifiManagerSnippet() {
         mContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
         mWifiManager = mContext.getSystemService(WifiManager.class);
+        mConnectivityManager = mContext.getSystemService(ConnectivityManager.class);
         HandlerThread handlerThread = new HandlerThread(getClass().getSimpleName());
         handlerThread.start();
         mHandler = new Handler(handlerThread.getLooper());
@@ -378,6 +473,158 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
 
         mWifiManager.unregisterLocalOnlyHotspotSoftApCallback(mSoftApCallback);
         mSoftApCallback = null;
+    }
+
+    /**
+     * Adds a listener for WifiNetworkSuggestion connection status.
+     *
+     * @param callbackId A unique identifier assigned automatically by Mobly.
+     */
+    @AsyncRpc(description = "Adds a listener for WifiNetworkSuggestion connection status.")
+    public void wifiAddSuggestionConnectionStatusListener(String callbackId) {
+        if (mSuggestionConnectionStatusListener != null) {
+            throw new RuntimeException("Another SuggestionConnectionStatusListener is added. "
+                    + "Only one listener is supported.");
+        }
+        mSuggestionConnectionStatusListener =
+                new SuggestionConnectionStatusListener(callbackId);
+        mWifiManager.addSuggestionConnectionStatusListener(Executors.newSingleThreadExecutor(),
+                mSuggestionConnectionStatusListener);
+    }
+
+    /**
+     * Removes the WifiNetworkSuggestion connection status listener.
+     */
+    @Rpc(description = "Removes the WifiNetworkSuggestion connection status listener.")
+    public void wifiRemoveSuggestionConnectionStatusListener() {
+        if (mSuggestionConnectionStatusListener == null) {
+            Log.d(TAG, "No active SuggestionConnectionStatusListener.");
+            return;
+        }
+        mWifiManager.removeSuggestionConnectionStatusListener(
+                mSuggestionConnectionStatusListener);
+        mSuggestionConnectionStatusListener = null;
+        Log.d(TAG, "Removed SuggestionConnectionStatusListener.");
+    }
+
+    /**
+     * Adds a listener for WifiNetworkSuggestion user approval status.
+     *
+     * @param callbackId A unique identifier assigned automatically by Mobly.
+     */
+    @AsyncRpc(description = "Adds a listener for WifiNetworkSuggestion user approval status.")
+    public void wifiAddSuggestionUserApprovalStatusListener(String callbackId) {
+        if (mSuggestionUserApprovalStatusListener != null) {
+            throw new RuntimeException("Another SuggestionUserApprovalStatusListener is added. "
+                    + "Only one listener is supported.");
+        }
+        mSuggestionUserApprovalStatusListener =
+                new SuggestionUserApprovalStatusListener(callbackId);
+        mWifiManager.addSuggestionUserApprovalStatusListener(
+                Executors.newSingleThreadExecutor(), mSuggestionUserApprovalStatusListener);
+
+    }
+
+    /**
+     * Removes the WifiNetworkSuggestion user approval status listener.
+     */
+    @Rpc(description = "Removes the WifiNetworkSuggestion user approval status listener.")
+    public void wifiRemoveSuggestionUserApprovalStatusListener() {
+        if (mSuggestionUserApprovalStatusListener == null) {
+            Log.d(TAG, "No active SuggestionUserApprovalStatusListener.");
+            return;
+        }
+        mWifiManager.removeSuggestionUserApprovalStatusListener(
+                mSuggestionUserApprovalStatusListener);
+        mSuggestionUserApprovalStatusListener = null;
+        Log.d(TAG, "Removed SuggestionUserApprovalStatusListener.");
+    }
+
+    /**
+     * Adds a BroadcastReceiver for ACTION_WIFI_NETWORK_SUGGESTION_POST_CONNECTION.
+     *
+     * @param callbackId A unique identifier assigned automatically by Mobly.
+     */
+    @AsyncRpc(description = "Adds a BroadcastReceiver for "
+            + "ACTION_WIFI_NETWORK_SUGGESTION_POST_CONNECTION.")
+    public void wifiAddNetworkSuggestionPostConnectionReceiver(String callbackId) {
+        if (mNetworkSuggestionPostConnectionReceiver != null) {
+            throw new RuntimeException("Another NetworkSuggestionPostConnectionReceiver is added. "
+                    + "Only one receiver is supported");
+        }
+        mNetworkSuggestionPostConnectionReceiver =
+                new NetworkSuggestionPostConnectionReceiver(callbackId);
+        IntentFilter filter = new IntentFilter(
+                WifiManager.ACTION_WIFI_NETWORK_SUGGESTION_POST_CONNECTION);
+        mContext.registerReceiver(mNetworkSuggestionPostConnectionReceiver, filter);
+        Log.d(TAG, "Added NetworkSuggestionPostConnectionReceiver with ID: " + callbackId);
+    }
+
+    /**
+     * Removes the BroadcastReceiver for ACTION_WIFI_NETWORK_SUGGESTION_POST_CONNECTION.
+     */
+    @Rpc(description = "Removes the BroadcastReceiver for "
+            + "ACTION_WIFI_NETWORK_SUGGESTION_POST_CONNECTION.")
+    public void wifiRemoveNetworkSuggestionPostConnectionReceiver() {
+        if (mNetworkSuggestionPostConnectionReceiver == null) {
+            Log.d(TAG, "No active NetworkSuggestionPostConnectionReceiver.");
+            return;
+        }
+        mContext.unregisterReceiver(mNetworkSuggestionPostConnectionReceiver);
+        mNetworkSuggestionPostConnectionReceiver = null;
+        Log.d(TAG, "Removed NetworkSuggestionPostConnectionReceiver.");
+    }
+
+    /**
+     * Adds Wi-Fi network suggestion.
+     *
+     * @param jsonSuggestions A JSONArray of WifiNetworkSuggestion objects.
+     * @return The status of the operation, as defined by WifiManager.STATUS_*.
+     */
+    @Rpc(description = "Adds a list of Wi-Fi network suggestions.")
+    public int wifiAddNetworkSuggestions(JSONArray jsonSuggestions) throws JSONException {
+        List<WifiNetworkSuggestion> suggestions = new ArrayList<>();
+        for (int i = 0; i < jsonSuggestions.length(); i++) {
+            JSONObject jsonSuggestion = jsonSuggestions.getJSONObject(i);
+            suggestions.add(WifiAwareJsonDeserializer.jsonToWifiNetworkSuggestion(jsonSuggestion));
+        }
+        int status = mWifiManager.addNetworkSuggestions(suggestions);
+        Log.i(TAG, "Added network suggestion, status: " + status);
+        return status;
+    }
+
+    /**
+     * Removes Wi-Fi network suggestion.
+     *
+     * @param jsonSuggestions A JSONArray of WifiNetworkSuggestion objects to be removed.
+     * @return The status of the operation, as defined by WifiManager.STATUS_*.
+     */
+    @Rpc(description = "Removes a list of Wi-Fi network suggestions.")
+    public int wifiRemoveNetworkSuggestions(JSONArray jsonSuggestions) throws JSONException {
+        List<WifiNetworkSuggestion> suggestions = new ArrayList<>();
+        for (int i = 0; i < jsonSuggestions.length(); i++) {
+            JSONObject jsonSuggestion = jsonSuggestions.getJSONObject(i);
+            suggestions.add(WifiAwareJsonDeserializer.jsonToWifiNetworkSuggestion(jsonSuggestion));
+        }
+        int status = mWifiManager.removeNetworkSuggestions(suggestions);
+        Log.i(TAG, "Removed network suggestion, status: " + status);
+        return status;
+    }
+
+    /**
+     * Retrieves the list of network suggestions currently active from this app.
+     *
+     * @return A JSONArray of WifiNetworkSuggestion objects in JSON format.
+     */
+    @Rpc(description = "Retrieves the list of network suggestions currently active from this app.")
+    public JSONArray wifiGetNetworkSuggestions() throws JSONException {
+        List<WifiNetworkSuggestion> suggestions = mWifiManager.getNetworkSuggestions();
+        JSONArray jsonSuggestions = new JSONArray();
+        for (WifiNetworkSuggestion suggestion : suggestions) {
+            jsonSuggestions.put(WifiJsonConverter.serializeWifiNetworkSuggestion(suggestion));
+        }
+        Log.i(TAG, "Fetched " + suggestions.size() + " network suggestions.");
+        return jsonSuggestions;
     }
 
     /**

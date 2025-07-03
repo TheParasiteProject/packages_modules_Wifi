@@ -16,8 +16,12 @@
 
 package com.google.snippet.wifi;
 
+import android.net.MacAddress;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiNetworkSuggestion;
+
+import androidx.annotation.NonNull;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -59,8 +63,11 @@ public final class WifiJsonConverter {
         if (object instanceof WifiConfiguration) {
             return serializeWifiConfiguration((WifiConfiguration) object);
         }
+        if (object instanceof WifiNetworkSuggestion) {
+            return serializeWifiNetworkSuggestion((WifiNetworkSuggestion) object);
+        }
         throw new JSONException(
-                String.format("Unsupported object type: %s", object.getClass().getName()));
+            "Unsupported object type: " + object.getClass().getName());
     }
 
     private static JSONObject serializeSoftApConfiguration(SoftApConfiguration data)
@@ -69,6 +76,30 @@ public final class WifiJsonConverter {
         result.put("SSID", trimQuotationMarks(data.getWifiSsid().toString()));
         result.put("Passphrase", data.getPassphrase());
         return result;
+    }
+
+    /**
+     * {@link WifiNetworkSuggestion} covert to JSONObject.
+     *
+     * @param suggestion WifiNetworkSuggestion object to serialize.
+     * @return JSONObject of the input object.
+     * @throws JSONException if there is an error serializing the object.
+     */
+    public static JSONObject serializeWifiNetworkSuggestion(
+            @NonNull WifiNetworkSuggestion suggestion) throws JSONException {
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("ssid", suggestion.getSsid());
+        MacAddress bssidMacAddress = suggestion.getBssid();
+        if (bssidMacAddress != null) {
+            jsonObject.put("bssid", bssidMacAddress.toString());
+        } else {
+            jsonObject.put("bssid", null);
+        }
+
+        jsonObject.put("is_hidden_ssid", suggestion.isHiddenSsid());
+        jsonObject.put("is_metered", suggestion.isMetered());
+
+        return jsonObject;
     }
 
     private static JSONObject serializeWifiConfiguration(WifiConfiguration data)

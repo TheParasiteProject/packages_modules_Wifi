@@ -278,6 +278,21 @@ public class ConnectivityManagerSnippet implements Snippet {
     }
 
     /**
+     * Registers a Connectivity.NetworkCallback to listen for network events.
+     *
+     * @param callbackId A unique identifier of the network request.
+     * @param request The NetworkRequest object that specifies the desired network
+     *     characteristics.
+     */
+    @AsyncRpc(description = "Registers a network callback")
+    public void connectivityRegisterNetworkCallback(String callbackId, NetworkRequest request) {
+        Log.v("Register network with request: " + request.toString());
+        NetworkCallback callback = new NetworkCallback(callbackId);
+        mConnectivityManager.registerNetworkCallback(request, callback);
+        mNetworkCallBacks.put(callbackId, callback);
+    }
+
+    /**
      * Unregisters the registered network callback and possibly releases requested networks.
      *
      * @param requestId Id of the network request.

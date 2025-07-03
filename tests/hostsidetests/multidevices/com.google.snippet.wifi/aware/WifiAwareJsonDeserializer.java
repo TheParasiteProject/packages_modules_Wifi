@@ -21,6 +21,7 @@ import android.net.MacAddress;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.net.wifi.WifiNetworkSpecifier;
+import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.aware.AwarePairingConfig;
 import android.net.wifi.aware.PeerHandle;
 import android.net.wifi.aware.PublishConfig;
@@ -95,6 +96,10 @@ public class WifiAwareJsonDeserializer {
     private static final String PATTERN_TYPE = "pattern_type";
     private static final String BSSID_PATTERN = "bssid_pattern";
     private static final String BSSID_MASK = "bssid_mask";
+    // JSON Keys for WifiNetworkSuggestion
+    private static final String IS_HIDDEN_SSID = "is_hidden_ssid";
+    private static final String IS_METERED = "is_metered";
+    private static final String PRIORITY = "priority";
     //WifiAwareDataPathSecurityConfig specific
     private static final String CIPHER_SUITE = "cipher_suite";
     private static final String SECURITY_CONFIG_PMK = "pmk";
@@ -362,6 +367,43 @@ public class WifiAwareJsonDeserializer {
             return requestBuilder.build();
         }
         else return null;
+    }
+
+    /**
+     * Converts JSON object to {@link WifiNetworkSuggestion}.
+     *
+     * @param jsonObject corresponding to WifiNetworkSuggestion.
+     * @return WifiNetworkSuggestion object.
+     * @throws JSONException if parsing fails.
+     */
+    public static WifiNetworkSuggestion jsonToWifiNetworkSuggestion(JSONObject jsonObject)
+            throws JSONException {
+        WifiNetworkSuggestion.Builder builder = new WifiNetworkSuggestion.Builder();
+        if (jsonObject == null) {
+            return builder.build();
+        }
+        if (jsonObject.has(SSID)) {
+            builder.setSsid(jsonObject.getString(SSID));
+        }
+        if (jsonObject.has(BSSID)) {
+            try {
+                builder.setBssid(MacAddress.fromString(jsonObject.getString(BSSID)));
+            } catch (IllegalArgumentException e) {
+                throw new JSONException("Error parsing BSSID for WifiNetworkSuggestion: "
+                    + e.getMessage());
+            }
+        }
+        if (jsonObject.has(PSK)) {
+            builder.setWpa2Passphrase(jsonObject.getString(PSK));
+        }
+        if (jsonObject.has(IS_HIDDEN_SSID)) {
+            builder.setIsHiddenSsid(jsonObject.getBoolean(IS_HIDDEN_SSID));
+        }
+        if (jsonObject.has(PRIORITY)) {
+            builder.setPriority(jsonObject.getInt(PRIORITY));
+        }
+
+        return builder.build();
     }
 
     /**

@@ -410,3 +410,10 @@ flag {
     bug: "201143076"
     is_fixed_read_only: true
 }
+
+flag {
+    name: "scan_optimization_with_mobility_change"
+    namespace: "wifi"
+    description: "Add new callback API to listen on restrict autojoin to subscription ID state"
+    bug: "422594154"
+}

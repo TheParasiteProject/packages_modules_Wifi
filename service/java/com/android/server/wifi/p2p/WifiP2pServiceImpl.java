@@ -153,7 +153,6 @@ import com.android.server.wifi.util.WaitingState;
 import com.android.server.wifi.util.WifiPermissionsUtil;
 import com.android.server.wifi.util.WifiPermissionsWrapper;
 import com.android.wifi.flags.FeatureFlags;
-import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import java.io.FileDescriptor;
@@ -6439,7 +6438,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     pinOrPassword = pin;
                 } else {
                     pinOrPassword = password;
-                    if (Flags.externalApproverSupportForWfdr2PasswordBasedBootstrapping()
+                    if (mFeatureFlags.externalApproverSupportForWfdr2PasswordBasedBootstrapping()
                             && checkExternalApproverCallerTargetSdkNewerThanB(entry.getMessage())) {
                         credentialType = WifiP2pManager.CREDENTIAL_TYPE_PASSWORD;
                     }
@@ -6840,7 +6839,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         private boolean isWifiDirect2Enabled() {
             if (Environment.isSdkAtLeastB()
                     && isFeatureSupported(WifiP2pManager.FEATURE_WIFI_DIRECT_R2)
-                    && Flags.wifiDirectR2()) {
+                    && mFeatureFlags.wifiDirectR2()) {
                 return true;
             }
             return false;
@@ -8858,7 +8857,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 return true;
             } else if ((WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PIN_TO_SERVICE
                             == message.arg1
-                    || (Flags.externalApproverSupportForWfdr2PasswordBasedBootstrapping()
+                    || (mFeatureFlags.externalApproverSupportForWfdr2PasswordBasedBootstrapping()
                     && WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PASSWORD_TO_SERVICE
                     == message.arg1))
                     && WifiP2pManager.ExternalApproverRequestListener.REQUEST_TYPE_NEGOTIATION
@@ -8938,7 +8937,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             // the application again.
             if ((WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PIN_TO_SERVICE
                     == message.arg1
-                    || (Flags.externalApproverSupportForWfdr2PasswordBasedBootstrapping()
+                    || (mFeatureFlags.externalApproverSupportForWfdr2PasswordBasedBootstrapping()
                     && WifiP2pManager.CONNECTION_REQUEST_DEFER_SHOW_PASSWORD_TO_SERVICE
                     == message.arg1))
                     && isConfigForBootstrappingMethodDisplayPinOrPassphrase(mSavedPeerConfig)) {
