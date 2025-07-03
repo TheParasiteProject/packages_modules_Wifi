@@ -3958,7 +3958,7 @@ public class WifiConfigManager {
         }
     }
 
-    private boolean writeBufferedData() {
+    private synchronized boolean writeBufferedData() {
         stopBufferedWriteAlarm();
         ArrayList<WifiConfiguration> sharedConfigurations = new ArrayList<>();
         ArrayList<WifiConfiguration> userConfigurations = new ArrayList<>();
