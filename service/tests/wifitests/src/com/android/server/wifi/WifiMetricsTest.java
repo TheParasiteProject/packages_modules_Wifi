@@ -7809,4 +7809,35 @@ public class WifiMetricsTest extends WifiBaseTest {
                 true, false,
                 WifiStatsLog.WIFI_PERIODIC_SCAN_REPORT__SCAN_TYPE__LOW_LATENCY, 2000));
     }
+
+    /**
+     * Test conversion of preamble type to usability stats type.
+     */
+    @Test
+    public void testConvertPreambleTypeEnumToUsabilityStatsType() {
+        int[][] preambleTypeToUsabilityStatsType = new int[][]{{RateStats.WIFI_PREAMBLE_OFDM,
+                android.net.wifi.WifiUsabilityStatsEntry.WIFI_PREAMBLE_OFDM},
+                {RateStats.WIFI_PREAMBLE_CCK,
+                        android.net.wifi.WifiUsabilityStatsEntry.WIFI_PREAMBLE_CCK},
+                {RateStats.WIFI_PREAMBLE_HT,
+                        android.net.wifi.WifiUsabilityStatsEntry.WIFI_PREAMBLE_HT},
+                {RateStats.WIFI_PREAMBLE_VHT,
+                        android.net.wifi.WifiUsabilityStatsEntry.WIFI_PREAMBLE_VHT},
+                {RateStats.WIFI_PREAMBLE_HE,
+                        android.net.wifi.WifiUsabilityStatsEntry.WIFI_PREAMBLE_HE},
+                {RateStats.WIFI_PREAMBLE_EHT,
+                        android.net.wifi.WifiUsabilityStatsEntry.WIFI_PREAMBLE_EHT},
+                {-1, android.net.wifi.WifiUsabilityStatsEntry.WIFI_PREAMBLE_INVALID},
+                {7, android.net.wifi.WifiUsabilityStatsEntry.WIFI_PREAMBLE_INVALID},
+                {100, android.net.wifi.WifiUsabilityStatsEntry.WIFI_PREAMBLE_INVALID}};
+        for (int[] testCase : preambleTypeToUsabilityStatsType) {
+            int inputType = testCase[0];
+            int expectedOutputType = testCase[1];
+            int actualUsabilityPreambleType = convertPreambleTypeEnumToUsabilityStatsType(
+                    inputType);
+            assertEquals("Conversion failed for input type: " + inputType, expectedOutputType,
+                    actualUsabilityPreambleType);
+        }
+
+    }
 }
