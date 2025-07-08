@@ -29,7 +29,7 @@ import com.android.server.wifi.util.Matrix;
  */
 public class VelocityBasedConnectedScore extends ConnectedScore {
 
-    public static final String TAG = "WifiVelocityBasedConnectedScore";
+    public static final String TAG = "VelocityBasedConnectedScore";
     private final ScoringParams mScoringParams;
 
     private int mFrequency = ScanResult.BAND_5_GHZ_START_FREQ_MHZ;
@@ -37,8 +37,7 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
     private final KalmanFilter mFilter;
     private long mLastMillis;
 
-    public VelocityBasedConnectedScore(ScoringParams scoringParams, Clock clock) {
-        super(clock);
+    public VelocityBasedConnectedScore(ScoringParams scoringParams) {
         mScoringParams = scoringParams;
         mFilter = new KalmanFilter();
         mFilter.mH = new Matrix(2, new double[]{1.0, 0.0});
@@ -79,8 +78,7 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
      * @param millis            millisecond-resolution time.
      * @param standardDeviation of the RSSI.
      */
-    @Override
-    public void updateUsingRssi(int rssi, long millis, double standardDeviation) {
+    private void updateUsingRssi(int rssi, long millis, double standardDeviation) {
         if (millis <= 0) return;
         try {
             if (mLastMillis <= 0 || millis < mLastMillis || mFilter.mx == null) {
@@ -106,8 +104,7 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
     /**
      * Updates the state.
      */
-    @Override
-    public void updateUsingWifiInfo(WifiInfo wifiInfo, long millis) {
+    private void updateUsingWifiInfo(WifiInfo wifiInfo, long millis) {
         int frequency = wifiInfo.getFrequency();
         if (frequency != mFrequency) {
             mLastMillis = 0; // Probably roamed; reset filter but retain threshold adjustment
@@ -175,7 +172,9 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
      * Velocity scorer - predict the rssi a few seconds from now
      */
     @Override
-    public int generateScore() {
+    public int generateScore(WifiInfo wifiInfo, long millis) {
+        updateUsingWifiInfo(wifiInfo, millis);
+
         final int transitionScore = isPrimary() ? WIFI_TRANSITION_SCORE
                 : WIFI_SECONDARY_TRANSITION_SCORE;
         if (mFilter.mx == null) return transitionScore + 1;
