@@ -17,6 +17,7 @@
 package com.android.server.wifi;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
@@ -106,16 +107,22 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
         mWifiInfo.setSuccessfulTxPacketsPerSecond(2.1); // proportional to pps
         mWifiInfo.setLostTxPacketsPerSecond(.5);
         mWifiInfo.setSuccessfulRxPacketsPerSecond(2.1);
-        int score = -1;
+        ConnectedScoreResult scoreResult = null;
         for (int i = 0; i < 10; i++) {
-            score = mVelocityBasedConnectedScore.generateScore(mWifiInfo,
+            scoreResult = mVelocityBasedConnectedScore.generateScoreResult(mWifiInfo, null,
                     mClock.getWallClockMillis());
         }
-        assertTrue(score > ConnectedScore.WIFI_TRANSITION_SCORE);
+        assertTrue(scoreResult.score() > ConnectedScore.WIFI_TRANSITION_SCORE);
+        assertTrue(scoreResult.adjustedScore() > ConnectedScore.WIFI_TRANSITION_SCORE);
+        assertTrue(scoreResult.isWifiUsable());
+
         // If we reset, should be below threshold after the first input
         mVelocityBasedConnectedScore.reset();
-        score = mVelocityBasedConnectedScore.generateScore(mWifiInfo, mClock.getWallClockMillis());
-        assertTrue(score < ConnectedScore.WIFI_TRANSITION_SCORE);
+        scoreResult = mVelocityBasedConnectedScore.generateScoreResult(mWifiInfo, null,
+                mClock.getWallClockMillis());
+        assertTrue(scoreResult.score() < ConnectedScore.WIFI_TRANSITION_SCORE);
+        assertTrue(scoreResult.adjustedScore() < ConnectedScore.WIFI_TRANSITION_SCORE);
+        assertFalse(scoreResult.isWifiUsable());
     }
 
     /**
@@ -131,11 +138,13 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
         mWifiInfo.setSuccessfulTxPacketsPerSecond(.1); // proportional to pps
         mWifiInfo.setLostTxPacketsPerSecond(0);
         mWifiInfo.setSuccessfulRxPacketsPerSecond(.1);
-        int score = -1;
+        ConnectedScoreResult scoreResult = null;
         for (int i = 0; i < 10; i++) {
-            score = mVelocityBasedConnectedScore.generateScore(mWifiInfo,
+            scoreResult = mVelocityBasedConnectedScore.generateScoreResult(mWifiInfo, null,
                     mClock.getWallClockMillis());
         }
-        assertTrue(score < ConnectedScore.WIFI_TRANSITION_SCORE);
+        assertTrue(scoreResult.score() < ConnectedScore.WIFI_TRANSITION_SCORE);
+        assertTrue(scoreResult.adjustedScore() < ConnectedScore.WIFI_TRANSITION_SCORE);
+        assertFalse(scoreResult.isWifiUsable());
     }
 }

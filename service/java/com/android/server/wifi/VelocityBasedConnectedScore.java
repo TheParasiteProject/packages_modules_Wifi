@@ -173,10 +173,9 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
     }
 
     /**
-     * Velocity scorer - predict the rssi a few seconds from now
+     * Generates a score based on the current state.
      */
-    @Override
-    public int generateScore(WifiInfo wifiInfo, long millis) {
+    private int generateScore(WifiInfo wifiInfo, long millis) {
         updateUsingWifiInfo(wifiInfo, millis);
 
         final int transitionScore = isPrimary() ? WIFI_TRANSITION_SCORE
@@ -198,9 +197,8 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
 
     /**
      * Adjust the score.
-     * TODO: Will change it to private method soon. So no unit test.
      */
-    public int adjustScore(WifiInfo wifiInfo, long millis, int score) {
+    private int adjustScore(WifiInfo wifiInfo, long millis, int score) {
         int adjustedScore = score;
         final int transitionScore = isPrimary() ? ConnectedScore.WIFI_TRANSITION_SCORE
                 : ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE;

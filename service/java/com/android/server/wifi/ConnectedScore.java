@@ -56,14 +56,7 @@ public abstract class ConnectedScore {
     private ClientRole mCurrentRole = null;
 
     /**
-     * Generates a score based on the current state
-     *
-     * @return network score - on NetworkAgent scale.
-     */
-    public abstract int generateScore(WifiInfo wifiInfo, long millis);
-
-    /**
-     * Generates a score based on the current state
+     * Generate a {@link ConnectedScoreResult} based on the current state.
      *
      * @return network score - on NetworkAgent scale.
      */
