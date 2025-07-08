@@ -121,6 +121,7 @@ public final class WifiJsonConverter {
 
         jsonObject.put("is_hidden_ssid", suggestion.isHiddenSsid());
         jsonObject.put("is_metered", suggestion.isMetered());
+        jsonObject.put("is_app_interaction_required", suggestion.isAppInteractionRequired());
 
         return jsonObject;
     }

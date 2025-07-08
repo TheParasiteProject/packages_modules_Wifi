@@ -16,20 +16,23 @@
 
 package com.google.snippet.wifi.aware;
 
+import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.net.wifi.ScanResult;
+import android.net.wifi.WifiInfo;
 import android.net.wifi.aware.PublishConfig;
 import android.net.wifi.aware.SubscribeConfig;
-import android.net.wifi.ScanResult;
 import android.net.wifi.aware.WifiAwareNetworkSpecifier;
 
-import com.google.android.mobly.snippet.SnippetObjectConverter;
-import com.google.android.mobly.snippet.util.Log;
+import androidx.annotation.NonNull;
 
+import com.google.android.mobly.snippet.SnippetObjectConverter;
+
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.lang.reflect.Type;
-import java.util.List;
 
 /**
  * The converter class that allows users to use custom type as snippet RPC arguments and return
@@ -56,6 +59,12 @@ public class WifiAwareSnippetConverter implements SnippetObjectConverter {
         // need to define it here.
         // If the object type is not recognized, you can throw an exception or return null
         // depending on your application's needs.
+        if (object instanceof WifiInfo) {
+            return serializeWifiInfo((android.net.wifi.WifiInfo) object);
+        }
+        if (object instanceof NetworkCapabilities) {
+            return serializeNetworkCapabilities((NetworkCapabilities) object);
+        }
         JSONObject result = new JSONObject();
         if (object instanceof WifiAwareNetworkSpecifier) {
             WifiAwareNetworkSpecifier frame = (WifiAwareNetworkSpecifier) object;
@@ -80,6 +89,48 @@ public class WifiAwareSnippetConverter implements SnippetObjectConverter {
         result.put("timestamp", data.timestamp);
         result.put("venueName", (data.venueName != null) ? data.venueName.toString() : "");
         result.put("scan_result_parcel", SerializationUtil.parcelableToString(data));
+        return result;
+    }
+
+    /**
+     * {@link android.net.wifi.WifiInfo} convert to JSONObject.
+     *
+     * @param wifiInfo WifiInfo object to serialize.
+     * @return JSONObject of the input object.
+     * @throws JSONException if there is an error serializing the object.
+     */
+    public static JSONObject serializeWifiInfo(@NonNull android.net.wifi.WifiInfo wifiInfo)
+            throws JSONException {
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("ssid", trimQuotationMarks(wifiInfo.getSSID()));
+        jsonObject.put("bssid", wifiInfo.getBSSID());
+        return jsonObject;
+    }
+
+    /**
+     * Serializes a {@link NetworkCapabilities} object to JSONObject
+     *
+     * @param capabilities The NetworkCapabilities object to convert
+     * @return A JSONObject representation of the input Object
+     * @Throws JSONException if there is an error serializing the object
+     */
+    public static JSONObject serializeNetworkCapabilities(@NonNull NetworkCapabilities capabilities)
+            throws JSONException {
+        JSONObject result = new JSONObject();
+
+        JSONArray transportTypesArray = new JSONArray();
+        for (int type : capabilities.getTransportTypes()) {
+            transportTypesArray.put(type);
+        }
+        result.put("transportTypes", transportTypesArray);
+
+        //Serialize capabilities
+        JSONArray capabilitiesArray = new JSONArray();
+        for (int cap: capabilities.getCapabilities()) {
+            capabilitiesArray.put(cap);
+        }
+        result.put("capabilities", capabilitiesArray);
+
         return result;
     }
 
