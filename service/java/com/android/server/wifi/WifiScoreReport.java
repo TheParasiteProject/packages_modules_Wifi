@@ -664,22 +664,23 @@ public class WifiScoreReport {
             Log.d(TAG, "Not reporting score because RSSI is invalid");
             return -1;
         }
-        int score;
 
         long millis = mClock.getWallClockMillis();
-        int s2 = mVelocityBasedConnectedScore.generateScore(mWifiInfo, millis);
-        score = mVelocityBasedConnectedScore.adjustScore(mWifiInfo, millis, s2);
+        ConnectedScoreResult scoreResult =
+                mVelocityBasedConnectedScore.generateScoreResult(mWifiInfo, null, millis);
+        int score = scoreResult.score();
+        int adjustScore = scoreResult.adjustedScore();
 
         final int transitionScore = isPrimary() ? ConnectedScore.WIFI_TRANSITION_SCORE
                 : ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE;
         mAospScorerPredictionStatusForEvaluation = convertToPredictionStatusForEvaluation(
-                score >= transitionScore);
+                adjustScore >= transitionScore);
         // Bypass AOSP scorer if Wifi connected network scorer is set
         if (mWifiConnectedNetworkScorerHolder != null && !mIsExternalScorerDryRun) {
-            return score;
+            return adjustScore;
         }
 
-        if (score < mWifiGlobals.getWifiLowConnectedScoreThresholdToTriggerScanForMbb()
+        if (adjustScore < mWifiGlobals.getWifiLowConnectedScoreThresholdToTriggerScanForMbb()
                 && enoughTimePassedSinceLastLowConnectedScoreScan()
                 && mActiveModeWarden.canRequestSecondaryTransientClientModeManager()) {
             mLastLowScoreScanTimestampMs = mClock.getElapsedSinceBootMillis();
@@ -687,10 +688,10 @@ public class WifiScoreReport {
         }
 
         // report score
-        mLegacyIntScore = score;
+        mLegacyIntScore = adjustScore;
         reportNetworkScoreToConnectivityServiceIfNecessary();
-        updateWifiMetrics(millis, s2);
-        return score;
+        updateWifiMetrics(millis, score);
+        return adjustScore;
     }
 
     private boolean enoughTimePassedSinceLastLowConnectedScoreScan() {
