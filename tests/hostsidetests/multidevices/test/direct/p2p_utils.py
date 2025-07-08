@@ -640,7 +640,8 @@ def check_discovered_services(
     channel_id = channel_id or requester.channel_ids[0]
     start_time = datetime.datetime.now()
     timeout = _DEFAULT_TIMEOUT
-    check_discovered_dns_sd_response(
+    all_service_as_expected = True
+    all_service_as_expected &= check_discovered_dns_sd_response(
         requester,
         expected_responses=expected_dns_sd_sequence,
         expected_src_device_address=expected_src_device_address,
@@ -648,7 +649,7 @@ def check_discovered_services(
         timeout=timeout,
     )
     remaining_timeout = timeout - (datetime.datetime.now() - start_time)
-    check_discovered_dns_sd_txt_record(
+    all_service_as_expected &= check_discovered_dns_sd_txt_record(
         requester,
         expected_records=expected_dns_txt_sequence,
         expected_src_device_address=expected_src_device_address,
@@ -656,14 +657,14 @@ def check_discovered_services(
         timeout=remaining_timeout,
     )
     remaining_timeout = timeout - (datetime.datetime.now() - start_time)
-    check_discovered_upnp_services(
+    all_service_as_expected &= check_discovered_upnp_services(
         requester,
         expected_services=expected_upnp_sequence,
         expected_src_device_address=expected_src_device_address,
         channel_id=channel_id,
         timeout=remaining_timeout,
     )
-
+    return all_service_as_expected
 
 def check_discovered_upnp_services(
     device: DeviceState,
@@ -698,7 +699,7 @@ def check_discovered_upnp_services(
             expected_src_device_address=expected_src_device_address,
             timeout=timeout,
         )
-        return
+        return True
 
     expected_services = set(expected_services)
     def _all_service_received(event):
@@ -724,11 +725,9 @@ def check_discovered_upnp_services(
             predicate=_all_service_received,
             timeout=timeout.total_seconds(),
         )
+        return True
     except errors.CallbackHandlerTimeoutError as e:
-        asserts.fail(
-            f'{device.ad} Timed out waiting for services: {expected_services}'
-        )
-
+        return False
 
 def check_discovered_dns_sd_response(
     device: DeviceState,
@@ -763,7 +762,7 @@ def check_discovered_dns_sd_response(
             expected_src_device_address=expected_src_device_address,
             timeout=timeout,
         )
-        return
+        return True
 
     expected_responses = list(expected_responses)
 
@@ -792,10 +791,9 @@ def check_discovered_dns_sd_response(
             predicate=_all_service_received,
             timeout=timeout.total_seconds(),
         )
+        return True
     except errors.CallbackHandlerTimeoutError as e:
-        asserts.fail(
-            f'{device.ad} Timed out waiting for services: {expected_responses}'
-        )
+        return False
 
 
 def check_discovered_dns_sd_txt_record(
@@ -832,7 +830,7 @@ def check_discovered_dns_sd_txt_record(
             expected_src_device_address=expected_src_device_address,
             timeout=timeout,
         )
-        return
+        return True
 
     expected_records = list(expected_records)
     device.ad.log.debug('Expected DNS SD TXT records: %s', expected_records)
@@ -861,10 +859,9 @@ def check_discovered_dns_sd_txt_record(
             predicate=_all_service_received,
             timeout=timeout.total_seconds(),
         )
+        return True
     except errors.CallbackHandlerTimeoutError as e:
-        asserts.fail(
-            f'{device.ad} Timed out waiting for services: {expected_records}'
-        )
+        return False
 
 
 def _check_no_discovered_service(
