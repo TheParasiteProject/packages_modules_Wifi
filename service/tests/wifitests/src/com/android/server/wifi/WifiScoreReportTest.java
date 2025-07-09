@@ -117,6 +117,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     private static final int TEST_UID = 435546654;
     private static final String EXTERNAL_SCORER_PKG_NAME = "com.google.android.carrier.carrierwifi";
     private static final String DRY_RUN_SCORER_PKG_NAME = "com.example.xxx";
+    private static final int TEST_SCORE = 55;
     private static final int ADJUSTED_SCORE = 50;
 
     FakeClock mClock;
@@ -355,8 +356,13 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void calculateAndReportScoreSucceeds() throws Exception {
-        when(mMockVelocityScorer.adjustScore(any(), anyLong(), anyInt()))
-                .thenReturn(ADJUSTED_SCORE);
+        ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
+                .setScore(TEST_SCORE)
+                .setAdjustedScore(ADJUSTED_SCORE)
+                .setIsWifiUsable(true)
+                .build();
+        when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong()))
+                .thenReturn(scoreResult);
         mWifiScoreReport.mVelocityBasedConnectedScore = mMockVelocityScorer;
         // initially called once
         verifySentAnyNetworkScore();

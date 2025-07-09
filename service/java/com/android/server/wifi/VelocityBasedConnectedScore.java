@@ -18,6 +18,7 @@ package com.android.server.wifi;
 
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiUsabilityStatsEntry;
 import android.util.Log;
 
 import com.android.server.wifi.util.KalmanFilter;
@@ -172,10 +173,9 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
     }
 
     /**
-     * Velocity scorer - predict the rssi a few seconds from now
+     * Generates a score based on the current state.
      */
-    @Override
-    public int generateScore(WifiInfo wifiInfo, long millis) {
+    private int generateScore(WifiInfo wifiInfo, long millis) {
         updateUsingWifiInfo(wifiInfo, millis);
 
         final int transitionScore = isPrimary() ? WIFI_TRANSITION_SCORE
@@ -197,9 +197,8 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
 
     /**
      * Adjust the score.
-     * TODO: Will change it to private method soon. So no unit test.
      */
-    public int adjustScore(WifiInfo wifiInfo, long millis, int score) {
+    private int adjustScore(WifiInfo wifiInfo, long millis, int score) {
         int adjustedScore = score;
         final int transitionScore = isPrimary() ? ConnectedScore.WIFI_TRANSITION_SCORE
                 : ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE;
@@ -246,5 +245,22 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
             adjustedScore = 0;
         }
         return adjustedScore;
+    }
+
+    /**
+     * Generate a {@link ConnectedScoreResult} based on history input data.
+     */
+    @Override
+    public ConnectedScoreResult generateScoreResult(WifiInfo wifiInfo,
+            WifiUsabilityStatsEntry stats, long millis) {
+        final int transitionScore =
+                isPrimary() ? WIFI_TRANSITION_SCORE : WIFI_SECONDARY_TRANSITION_SCORE;
+        int score = generateScore(wifiInfo, millis);
+        int adjustedScore = adjustScore(wifiInfo, millis, score);
+        return ConnectedScoreResult.builder()
+            .setScore(score)
+            .setAdjustedScore(adjustedScore)
+            .setIsWifiUsable(adjustedScore > transitionScore)
+            .build();
     }
 }
