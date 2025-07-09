@@ -21,6 +21,7 @@ import static com.android.wifi.flags.Flags.softapConfigStoreMaxChannelWidth;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
+import android.app.ActivityManager;
 import android.app.compat.CompatChanges;
 import android.net.InetAddresses;
 import android.net.IpConfiguration;
@@ -45,6 +46,7 @@ import android.net.wifi.WifiSsid;
 import android.net.wifi.util.Environment;
 import android.os.ParcelUuid;
 import android.os.PersistableBundle;
+import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
@@ -410,6 +412,7 @@ public class XmlUtil {
         public static final String XML_TAG_ENABLE_WIFI7 = "EnableWifi7";
         public static final String XML_TAG_ALLOW_UPDATE_BY_OTHER_USERS =
                 "AllowedToUpdateByOtherUsers";
+        public static final String XML_TAG_CREATOR_USER_ID = "CreatorUserId";
 
         /**
          * Write Wep Keys to the XML stream.
@@ -717,6 +720,11 @@ public class XmlUtil {
             }
             XmlUtil.writeNextValue(out, XML_TAG_PERSISTENT_MAC_RANDOMIZATION_SEED,
                     configuration.persistentMacRandomizationSeed);
+
+            if (Flags.multiUserWifiEnhancement() && Environment.isSdkNewerThanB()) {
+                XmlUtil.writeNextValue(out, XML_TAG_CREATOR_USER_ID,
+                        configuration.getStoredCreatorUserId());
+            }
         }
 
         private static List<String> covertMacAddressListToStringList(List<MacAddress> macList) {
@@ -892,6 +900,7 @@ public class XmlUtil {
             String configKeyInData = null;
             boolean macRandomizationSettingExists = false;
             boolean sendDhcpHostnameExists = false;
+            boolean isCreatorUserIdExists = false;
             byte[] dppConnector = null;
             byte[] dppCSign = null;
             byte[] dppNetAccessKey = null;
@@ -1105,6 +1114,13 @@ public class XmlUtil {
                                 configuration.setAllowedToUpdateByOtherUsers((boolean) value);
                             }
                             break;
+                        case XML_TAG_CREATOR_USER_ID:
+                            if (Flags.multiUserWifiEnhancement() && Environment.isSdkNewerThanB()) {
+                                isCreatorUserIdExists = true;
+                                // Setup current user
+                                configuration.setCreatorUserId((int) value);
+                            }
+                            break;
                         default:
                             Log.w(TAG, "Ignoring unknown value name found: " + valueName[0]);
                             break;
@@ -1183,6 +1199,16 @@ public class XmlUtil {
                 configuration.setSendDhcpHostnameEnabled(
                         !configuration.isSecurityType(WifiConfiguration.SECURITY_TYPE_OPEN)
                         && !configuration.isSecurityType(WifiConfiguration.SECURITY_TYPE_OWE));
+            }
+            if (Flags.multiUserWifiEnhancement() && Environment.isSdkNewerThanB()
+                    && !isCreatorUserIdExists) {
+                int userId = UserHandle.getUserHandleForUid(configuration.creatorUid)
+                        .getIdentifier();
+                if (userId == UserHandle.SYSTEM.getIdentifier()) {
+                    // When creatorUid is system , make sure it sets to current user.
+                    userId = ActivityManager.getCurrentUser();
+                }
+                configuration.setCreatorUserId(userId);
             }
             configuration.convertLegacyFieldsToSecurityParamsIfNeeded();
             configuration.setDppConnectionKeys(dppConnector, dppCSign, dppNetAccessKey);

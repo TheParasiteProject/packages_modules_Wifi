@@ -19,6 +19,8 @@ import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_HIGH_MVMT;
 import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_LOW_MVMT;
 import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_STATIONARY;
 import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_UNKNOWN;
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_VELOCITY;
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_ML;
 
 import static com.android.server.wifi.WifiMetrics.convertBandwidthEnumToUsabilityStatsType;
 import static com.android.server.wifi.WifiMetrics.convertPreambleTypeEnumToUsabilityStatsType;
@@ -219,6 +221,10 @@ public class WifiMetricsTest extends WifiBaseTest {
     private static final int TEST_CHANNEL = 36;
     private static final int POLLING_INTERVAL_DEFAULT = 3000;
     private static final int POLLING_INTERVAL_NOT_DEFAULT = 6000;
+    private static final int INTERNAL_SCORE_1 = 40;
+    private static final int INTERNAL_SCORER_TYPE_1 = SCORER_TYPE_VELOCITY;
+    private static final int INTERNAL_SCORE_2 = 60;
+    private static final int INTERNAL_SCORER_TYPE_2 = SCORER_TYPE_ML;
     private MockitoSession mSession;
     @Mock Context mContext;
     MockResources mResources;
@@ -4549,7 +4555,8 @@ public class WifiMetricsTest extends WifiBaseTest {
                 TEST_IFACE_NAME, nextRandInt(), nextRandInt(), nextRandInt(), 12);
         // This is used as the timestamp when the record lands in the ring buffer.
         when(mClock.getElapsedSinceBootMillis()).thenReturn((long) 618);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1, false, 0);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1, false, 0,
+                INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
         mWifiMetrics.incrementWifiScoreCount(TEST_IFACE_NAME, 58);
         mWifiMetrics.incrementWifiUsabilityScoreCount(TEST_IFACE_NAME, 3, 56, 15);
         mWifiMetrics.logLinkProbeFailure(TEST_IFACE_NAME, nextRandInt(), nextRandInt(),
@@ -4558,7 +4565,8 @@ public class WifiMetricsTest extends WifiBaseTest {
 
         // This is used as the timestamp when the record lands in the ring buffer.
         when(mClock.getElapsedSinceBootMillis()).thenReturn((long) 1791);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0,
+                INTERNAL_SCORE_2, INTERNAL_SCORER_TYPE_2);
         assertEquals(stats2.beacon_rx, mWifiMetrics.getTotalBeaconRxCount());
 
         assertEquals(2, mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.size());
@@ -4856,7 +4864,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         mModeChangeCallbackArgumentCaptor.getValue()
                 .onActiveModeManagerRoleChanged(concreteClientModeManager);
         mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats, false,
-                0);
+                0, INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
         verify(mOnWifiUsabilityStatsListener, never()).onWifiUsabilityStats(anyInt(), anyBoolean(),
                 any());
 
@@ -4867,7 +4875,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         mModeChangeCallbackArgumentCaptor.getValue()
                 .onActiveModeManagerRoleChanged(concreteClientModeManager);
         mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats, false,
-                0);
+                0, INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
 
         // Client should get the stats.
         verify(mOnWifiUsabilityStatsListener).onWifiUsabilityStats(anyInt(), anyBoolean(),
@@ -4987,6 +4995,8 @@ public class WifiMetricsTest extends WifiBaseTest {
                 i++;
             }
         }
+        assertEquals(INTERNAL_SCORE_1, usabilityStats.getValue().getInternalScore());
+        assertEquals(INTERNAL_SCORER_TYPE_1, usabilityStats.getValue().getInternalScorerType());
     }
 
     /**
@@ -5004,7 +5014,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         when(info.getLinkSpeed()).thenReturn(nextRandInt());
         WifiLinkLayerStats linkLayerStats = nextRandomStats(new WifiLinkLayerStats());
         mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats, false,
-                0);
+                0, INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
 
         verify(mOnWifiUsabilityStatsListener, never()).onWifiUsabilityStats(anyInt(),
                 anyBoolean(), any());
@@ -5034,7 +5044,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         when(info.getLinkSpeed()).thenReturn(nextRandInt());
         WifiLinkLayerStats linkLayerStats = nextRandomStats(new WifiLinkLayerStats());
         mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats, false,
-                0);
+                0, INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
 
         // Client should not get any message listener add failed.
         verify(mOnWifiUsabilityStatsListener, never()).onWifiUsabilityStats(anyInt(),
@@ -5801,13 +5811,15 @@ public class WifiMetricsTest extends WifiBaseTest {
         int upper = WifiMetrics.LOW_WIFI_SCORE + 7;
         int lower = WifiMetrics.LOW_WIFI_SCORE - 8;
         mWifiMetrics.incrementWifiScoreCount(TEST_IFACE_NAME, upper);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0,
+                INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
         stats2 = nextRandomStats(stats2);
         long timeMs = 0;
         when(mClock.getElapsedSinceBootMillis()).thenReturn(timeMs);
         // Wifi score breaches low
         mWifiMetrics.incrementWifiScoreCount(TEST_IFACE_NAME, lower);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0,
+                INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
         stats2 = nextRandomStats(stats2);
         return stats2;
     }
@@ -5818,13 +5830,15 @@ public class WifiMetricsTest extends WifiBaseTest {
         int upper = WifiMetrics.LOW_WIFI_USABILITY_SCORE + 7;
         int lower = WifiMetrics.LOW_WIFI_USABILITY_SCORE - 8;
         mWifiMetrics.incrementWifiUsabilityScoreCount(TEST_IFACE_NAME, 1, upper, 30);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0,
+                INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
         stats2 = nextRandomStats(stats2);
         long timeMs = 0;
         when(mClock.getElapsedSinceBootMillis()).thenReturn(timeMs);
         // Wifi usability score breaches low
         mWifiMetrics.incrementWifiUsabilityScoreCount(TEST_IFACE_NAME, 2, lower, 30);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0,
+                INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
         stats2 = nextRandomStats(stats2);
         return stats2;
     }

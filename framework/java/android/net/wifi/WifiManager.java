@@ -13712,7 +13712,7 @@ public class WifiManager {
     }
 
     /**
-     * Query the list of {@link WifiConfiguration} with credentials.
+     * Returns the list of {@link WifiConfiguration} with credentials.
      *
      * <p> This API is similar to {@link #getPrivilegedConfiguredNetworks()}, but this new API
      * is the async version of it.
@@ -13731,7 +13731,7 @@ public class WifiManager {
     @SystemApi
     @RequiresPermission(allOf = {NEARBY_WIFI_DEVICES, READ_WIFI_CREDENTIAL})
     public void queryPrivilegedConfiguredNetworks(@NonNull @CallbackExecutor Executor executor,
-            @NonNull OutcomeReceiver<List<WifiConfiguration>, Error> resultsCallback) {
+            @NonNull OutcomeReceiver<List<WifiConfiguration>, Exception> resultsCallback) {
         if (!SdkLevel.isAtLeastT()) {
             throw new UnsupportedOperationException();
         }
@@ -13752,7 +13752,7 @@ public class WifiManager {
                                         if (result != null) {
                                             resultsCallback.onResult(result.getList());
                                         } else {
-                                            resultsCallback.onError(new Error(errorMsg));
+                                            resultsCallback.onError(new Exception(errorMsg));
                                         }
                                     });
                         }

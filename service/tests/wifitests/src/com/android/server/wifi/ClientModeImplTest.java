@@ -6260,7 +6260,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         mCmi.sendMessage(ClientModeImpl.CMD_RSSI_POLL, 1);
         mLooper.dispatchAll();
         verify(mWifiMetrics).updateWifiUsabilityStatsEntries(any(), any(), eq(stats), eq(false),
-                anyInt());
+                anyInt(), anyInt(), anyInt());
 
         when(mWifiDataStall.checkDataStallAndThroughputSufficiency(any(), any(), any(), any(),
                 any(), anyLong(), anyLong()))
@@ -6269,7 +6269,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         mCmi.sendMessage(ClientModeImpl.CMD_RSSI_POLL, 1);
         mLooper.dispatchAll();
         verify(mWifiMetrics, times(2)).updateWifiUsabilityStatsEntries(any(), any(), eq(stats),
-                eq(false), anyInt());
+                eq(false), anyInt(), anyInt(), anyInt());
     }
 
     /**
