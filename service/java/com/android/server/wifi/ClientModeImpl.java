@@ -29,6 +29,8 @@ import static android.net.wifi.WifiManager.WIFI_FEATURE_LINK_LAYER_STATS;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_TDLS;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SAE;
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_INVALID;
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_VELOCITY;
 
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_LOCAL_ONLY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_PRIMARY;
@@ -7014,8 +7016,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             // mWifiMetrics.logScorerPredictionResult
             mWifiMetrics.updateWiFiEvaluationAndScorerStats(mWifiScoreReport.getLingering(),
                     mWifiInfo, mLastConnectionCapabilities);
-            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats, oneshot,
-                    statusDataStall);
+
             if (getClientRoleForMetrics(getConnectedWifiConfiguration())
                     == WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY) {
                 mWifiMetrics.logScorerPredictionResult(mWifiInjector.hasActiveModem(),
@@ -7027,7 +7028,11 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 mWifiScoreReport.clearScorerPredictionStatusForEvaluation();
             }
             // Send the update score to network agent.
-            mWifiScoreReport.calculateAndReportScore();
+            int internalScore = mWifiScoreReport.calculateAndReportScore();
+            int internalScorerType =
+                    internalScore == -1 ? SCORER_TYPE_INVALID : SCORER_TYPE_VELOCITY;
+            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats, oneshot,
+                    statusDataStall, internalScore, internalScorerType);
 
             if (mWifiScoreReport.shouldCheckIpLayer()) {
                 if (mIpClient != null) {

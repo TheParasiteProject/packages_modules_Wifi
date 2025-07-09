@@ -16,6 +16,8 @@
 
 package com.android.server.wifi;
 
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_INVALID;
+
 import static com.android.server.wifi.ClientModeImpl.WIFI_WORK_SOURCE;
 
 import android.annotation.Nullable;
@@ -257,7 +259,7 @@ public class WifiScoreReport {
 
             // TODO(b/153075963): This should not be plumbed through WifiMetrics
             mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats, false,
-                    0);
+                    0, -1, SCORER_TYPE_INVALID);
         }
 
         @Override
@@ -655,15 +657,15 @@ public class WifiScoreReport {
      * Calculate the new wifi network score based on updated link layer stats.
      *
      * Called periodically (POLL_RSSI_INTERVAL_MSECS) about every 3 seconds.
-     *
+     * @return scorer from the VelocityBasedConnectedScore.
      * Note: This function will only notify connectivity services of the updated route if we are NOT
      * using a connected external WiFi scorer.
      *
      */
-    public void calculateAndReportScore() {
+    public int calculateAndReportScore() {
         if (mWifiInfo.getRssi() == mWifiInfo.INVALID_RSSI) {
             Log.d(TAG, "Not reporting score because RSSI is invalid");
-            return;
+            return -1;
         }
         int score;
 
@@ -720,7 +722,7 @@ public class WifiScoreReport {
                 score >= transitionScore);
         // Bypass AOSP scorer if Wifi connected network scorer is set
         if (mWifiConnectedNetworkScorerHolder != null && !mIsExternalScorerDryRun) {
-            return;
+            return score;
         }
 
         if (score < mWifiGlobals.getWifiLowConnectedScoreThresholdToTriggerScanForMbb()
@@ -734,6 +736,7 @@ public class WifiScoreReport {
         mLegacyIntScore = score;
         reportNetworkScoreToConnectivityServiceIfNecessary();
         updateWifiMetrics(millis, s2);
+        return score;
     }
 
     private boolean enoughTimePassedSinceLastLowConnectedScoreScan() {
