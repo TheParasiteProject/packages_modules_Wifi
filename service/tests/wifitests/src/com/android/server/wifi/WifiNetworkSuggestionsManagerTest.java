@@ -105,6 +105,7 @@ import com.android.server.wifi.WifiNetworkSuggestionsManager.PerAppInfo;
 import com.android.server.wifi.hotspot2.PasspointManager;
 import com.android.server.wifi.util.LruConnectionTracker;
 import com.android.server.wifi.util.WifiPermissionsUtil;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import org.junit.After;
@@ -222,8 +223,13 @@ public class WifiNetworkSuggestionsManagerTest extends WifiBaseTest {
         MockitoAnnotations.initMocks(this);
         mStaticMockSession = mockitoSession()
                 .mockStatic(WifiInjector.class)
+                .mockStatic(ActivityManager.class)
+                .mockStatic(Flags.class)
                 .startMocking();
         lenient().when(WifiInjector.getInstance()).thenReturn(mWifiInjector);
+        // Mock necessary method and enable flag by default to make sure test won't be broken.
+        lenient().when(ActivityManager.getCurrentUser()).thenReturn(0);
+        lenient().when(Flags.multiUserWifiEnhancement()).thenReturn(true);
         mLooper = new TestLooper();
 
         mInorder = inOrder(mContext, mWifiPermissionsUtil);

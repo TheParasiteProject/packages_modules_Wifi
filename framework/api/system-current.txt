@@ -599,6 +599,7 @@ package android.net.wifi {
     method @NonNull public java.util.Set<java.lang.String> getAllNetworkKeys();
     method public int getAuthType();
     method @Nullable public java.util.List<android.net.MacAddress> getBssidAllowlist();
+    method @FlaggedApi("com.android.wifi.flags.multi_user_wifi_enhancement") public int getCreatorUserId();
     method public int getDeletionPriority();
     method @NonNull public byte[] getDppCSignKey();
     method @NonNull public byte[] getDppConnector();

@@ -48,6 +48,7 @@ import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.WifiSsid;
 import android.net.wifi.hotspot2.PasspointConfiguration;
+import android.net.wifi.util.Environment;
 import android.os.Process;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
@@ -67,6 +68,7 @@ import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.util.LruConnectionTracker;
 import com.android.server.wifi.util.WifiPermissionsUtil;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import java.io.FileDescriptor;
@@ -327,6 +329,9 @@ public class WifiNetworkSuggestionsManager {
             this.wns.wifiConfiguration.ephemeral = true;
             this.wns.wifiConfiguration.creatorName = perAppInfo.packageName;
             this.wns.wifiConfiguration.creatorUid = perAppInfo.uid;
+            if (Environment.isSdkNewerThanB() && Flags.multiUserWifiEnhancement()) {
+                this.wns.wifiConfiguration.setCreatorUserId(ActivityManager.getCurrentUser());
+            }
             if (perAppInfo.carrierId == TelephonyManager.UNKNOWN_CARRIER_ID) {
                 return;
             }
