@@ -33,11 +33,11 @@ import static com.android.server.wifi.nl80211.NetlinkConstants.NL80211_MULTICAST
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.os.Handler;
-import android.os.HandlerThread;
 import android.system.ErrnoException;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.modules.utils.BackgroundThread;
 import com.android.net.module.util.netlink.NetlinkUtils;
 import com.android.net.module.util.netlink.StructNlAttr;
 import com.android.net.module.util.netlink.StructNlMsgHdr;
@@ -67,8 +67,8 @@ public class Nl80211Proxy {
     private FileDescriptor mNetlinkFd;
     private short mNl80211FamilyId;
     private int mSequenceNumber;
-    private Handler mAsyncHandler;
-
+    private Handler mWifiHandler;
+    private Nl80211BroadcastMonitor mBroadcastMonitor;
     private Map<String, Integer> mMulticastGroups = new HashMap<>();
 
     /**
@@ -83,8 +83,8 @@ public class Nl80211Proxy {
         void onResponse(@Nullable List<GenericNetlinkMsg> responses);
     }
 
-    public Nl80211Proxy(HandlerThread asyncHandlerThread) {
-        mAsyncHandler = new Handler(asyncHandlerThread.getLooper());
+    public Nl80211Proxy(Handler wifiHandler) {
+        mWifiHandler = wifiHandler;
     }
 
     private int getSequenceNumber() {
@@ -150,9 +150,27 @@ public class Nl80211Proxy {
      * @return true if initialization was successful, false otherwise
      */
     public boolean initialize() {
+        if (mIsInitialized) {
+            Log.i(TAG, "Instance is already initialized");
+            return true;
+        }
         mNetlinkFd = createNetlinkFileDescriptor();
         if (mNetlinkFd == null) return false;
         if (!retrieveNl80211FamilyInfo()) return false;
+
+        // If the family info was successfully retrieved above, then
+        // all the required group IDs will be in the map.
+        List<Integer> requiredGroupIds = new ArrayList<>();
+        for (String groupName : sRequiredMulticastGroups) {
+            requiredGroupIds.add(mMulticastGroups.get(groupName));
+        }
+
+        // Start the broadcast monitor on the background thread.
+        // Received events will be posted to the Wifi thread.
+        Handler backgroundHandler = BackgroundThread.getHandler();
+        mBroadcastMonitor = new Nl80211BroadcastMonitor(
+                backgroundHandler, mWifiHandler, requiredGroupIds);
+        backgroundHandler.post(mBroadcastMonitor::start);
 
         Log.i(TAG, "Initialization was successful");
         mIsInitialized = true;
@@ -221,7 +239,7 @@ public class Nl80211Proxy {
             Log.e(TAG, "Null argument was provided");
             return false;
         }
-        mAsyncHandler.post(() -> {
+        mWifiHandler.post(() -> {
             List<GenericNetlinkMsg> responses = sendMessageAndReceiveResponses(request);
             executor.execute(() -> listener.onResponse(responses));
         });
@@ -325,5 +343,37 @@ public class Nl80211Proxy {
             request.addAttribute(attribute);
         }
         return request;
+    }
+
+    /**
+     * Register a callback to trigger when the specified broadcast event type is received.
+     *
+     * @param type Type of broadcast event on which to trigger the callback.
+     * @param callback Callback object that should be called.
+     */
+    public boolean registerBroadcastCallback(
+            short type, @NonNull Nl80211BroadcastMonitor.Nl80211BroadcastCallback callback) {
+        if (!mIsInitialized || mBroadcastMonitor == null) {
+            Log.e(TAG, "Unable to register broadcast callback before initialization");
+            return false;
+        }
+        mBroadcastMonitor.registerBroadcastCallback(type, callback);
+        return true;
+    }
+
+    /**
+     * Unregister a broadcast event callback that was previously registered.
+     *
+     * @param type Type of broadcast event which the callback is associated with.
+     * @param callback Callback object which was registered.
+     */
+    public boolean unregisterBroadcastCallback(
+            short type, @NonNull Nl80211BroadcastMonitor.Nl80211BroadcastCallback callback) {
+        if (!mIsInitialized || mBroadcastMonitor == null) {
+            Log.e(TAG, "Unable to unregister broadcast callback before initialization");
+            return false;
+        }
+        mBroadcastMonitor.unregisterBroadcastCallback(type, callback);
+        return true;
     }
 }

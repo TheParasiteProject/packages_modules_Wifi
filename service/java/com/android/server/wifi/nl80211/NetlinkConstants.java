@@ -20,8 +20,14 @@ package com.android.server.wifi.nl80211;
  * Constants used by Netlink and Nl80211.
  */
 public class NetlinkConstants {
+    // Socket levels. See libc/include/sys/socket.h
+    public static final int SOL_NETLINK = 270;
+
     // Netlink protocols. See kernel/uapi/linux/netlink.h
     public static final int NETLINK_GENERIC = 16;
+
+    // Netlink socket options. See kernel/uapi/linux/netlink.h
+    public static final int NETLINK_ADD_MEMBERSHIP = 1;
 
     // Control message types. See kernel/uapi/linux/genetlink.h
     public static final short GENL_ID_CTRL = 0x10;
