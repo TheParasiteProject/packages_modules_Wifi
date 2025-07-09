@@ -65,6 +65,7 @@ import com.android.server.wifi.hotspot2.PasspointNetworkNominateHelper;
 import com.android.server.wifi.hotspot2.PasspointObjectFactory;
 import com.android.server.wifi.mainline_supplicant.MainlineSupplicant;
 import com.android.server.wifi.mockwifi.MockWifiServiceUtil;
+import com.android.server.wifi.nl80211.Nl80211Native;
 import com.android.server.wifi.p2p.SupplicantP2pIfaceHal;
 import com.android.server.wifi.p2p.WifiP2pMetrics;
 import com.android.server.wifi.p2p.WifiP2pMonitor;
@@ -182,6 +183,7 @@ public class WifiInjector {
     private final OpenNetworkNotifier mOpenNetworkNotifier;
     private final WifiLockManager mLockManager;
     private final WifiNl80211Manager mWifiCondManager;
+    private final Nl80211Native mNl80211Native;
     private final Clock mClock = new Clock();
     private final WifiMetrics mWifiMetrics;
     private final WifiP2pMetrics mWifiP2pMetrics;
@@ -360,6 +362,7 @@ public class WifiInjector {
         mHostapdHal = new HostapdHal(mContext, mWifiHandler);
         mWifiCondManager = (WifiNl80211Manager) mContext.getSystemService(
                 Context.WIFI_NL80211_SERVICE);
+        mNl80211Native = new Nl80211Native(mWifiHandler);
         mWifiNative = new WifiNative(
                 mWifiVendorHal, mSupplicantStaIfaceHal, mHostapdHal, mWifiCondManager,
                 mWifiMonitor, mPropertyService, mWifiMetrics,
@@ -1121,6 +1124,10 @@ public class WifiInjector {
 
     public WifiNl80211Manager getWifiCondManager() {
         return mWifiCondManager;
+    }
+
+    public Nl80211Native getNl80211Native() {
+        return mNl80211Native;
     }
 
     public WifiHealthMonitor getWifiHealthMonitor() {

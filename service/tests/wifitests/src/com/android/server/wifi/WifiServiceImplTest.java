@@ -262,6 +262,7 @@ import com.android.server.wifi.entitlement.PseudonymInfo;
 import com.android.server.wifi.hotspot2.PasspointManager;
 import com.android.server.wifi.hotspot2.PasspointNetworkNominateHelper;
 import com.android.server.wifi.hotspot2.PasspointProvisioningTestUtil;
+import com.android.server.wifi.nl80211.Nl80211Native;
 import com.android.server.wifi.proto.WifiStatsLog;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.UserActionEvent;
 import com.android.server.wifi.util.ActionListenerWrapper;
@@ -486,6 +487,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
     @Mock SimRequiredNotifier mSimRequiredNotifier;
     @Mock WifiGlobals mWifiGlobals;
     @Mock AdaptiveConnectivityEnabledSettingObserver mAdaptiveConnectivityEnabledSettingObserver;
+    @Mock Nl80211Native mNl80211Native;
     @Mock MakeBeforeBreakManager mMakeBeforeBreakManager;
     @Mock WifiCarrierInfoManager mWifiCarrierInfoManager;
     @Mock WifiPseudonymManager mWifiPseudonymManager;
@@ -648,6 +650,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         when(mWifiInjector.getWifiGlobals()).thenReturn(mWifiGlobals);
         when(mWifiInjector.getAdaptiveConnectivityEnabledSettingObserver())
                 .thenReturn(mAdaptiveConnectivityEnabledSettingObserver);
+        when(mWifiInjector.getNl80211Native()).thenReturn(mNl80211Native);
         when(mClientModeManager.syncStartSubscriptionProvisioning(anyInt(),
                 any(OsuProvider.class), any(IProvisioningCallback.class))).thenReturn(true);
         // Create an OSU provider that can be provisioned via an open OSU AP
