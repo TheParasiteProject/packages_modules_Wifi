@@ -8348,6 +8348,8 @@ public class WifiMetrics {
                 return android.net.wifi.WifiUsabilityStatsEntry.WIFI_PREAMBLE_VHT;
             case RateStats.WIFI_PREAMBLE_HE:
                 return android.net.wifi.WifiUsabilityStatsEntry.WIFI_PREAMBLE_HE;
+            case RateStats.WIFI_PREAMBLE_EHT:
+                return android.net.wifi.WifiUsabilityStatsEntry.WIFI_PREAMBLE_EHT;
         }
         return android.net.wifi.WifiUsabilityStatsEntry.WIFI_PREAMBLE_INVALID;
     }
