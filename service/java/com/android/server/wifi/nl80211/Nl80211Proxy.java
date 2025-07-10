@@ -41,6 +41,7 @@ import com.android.modules.utils.BackgroundThread;
 import com.android.net.module.util.netlink.NetlinkUtils;
 import com.android.net.module.util.netlink.StructNlAttr;
 import com.android.net.module.util.netlink.StructNlMsgHdr;
+import com.android.wifi.flags.Flags;
 
 import java.io.FileDescriptor;
 import java.io.InterruptedIOException;
@@ -150,6 +151,10 @@ public class Nl80211Proxy {
      * @return true if initialization was successful, false otherwise
      */
     public boolean initialize() {
+        if (!Flags.nl80211ProxyEnabled()) {
+            Log.i(TAG, "Feature is not enabled");
+            return false;
+        }
         if (mIsInitialized) {
             Log.i(TAG, "Instance is already initialized");
             return true;

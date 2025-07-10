@@ -417,3 +417,10 @@ flag {
     description: "Add new callback API to listen on restrict autojoin to subscription ID state"
     bug: "422594154"
 }
+
+flag {
+    name: "nl80211_proxy_enabled"
+    namespace: "wifi"
+    description: "Allow the Nl80211 proxy to be initialized"
+    bug: "344891670"
+}

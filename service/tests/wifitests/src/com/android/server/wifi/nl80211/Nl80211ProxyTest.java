@@ -49,6 +49,7 @@ import com.android.dx.mockito.inline.extended.ExtendedMockito;
 import com.android.modules.utils.BackgroundThread;
 import com.android.net.module.util.netlink.NetlinkUtils;
 import com.android.net.module.util.netlink.StructNlAttr;
+import com.android.wifi.flags.Flags;
 
 import org.junit.After;
 import org.junit.Before;
@@ -92,11 +93,13 @@ public class Nl80211ProxyTest {
         mSession = ExtendedMockito.mockitoSession()
                 .strictness(Strictness.LENIENT)
                 .mockStatic(BackgroundThread.class, withSettings().lenient())
+                .mockStatic(Flags.class, withSettings().lenient())
                 .mockStatic(NetlinkUtils.class, withSettings().lenient())
                 .mockStatic(Os.class)
                 .mockStatic(SocketUtils.class)
                 .startMocking();
         when(NetlinkUtils.netlinkSocketForProto(anyInt())).thenReturn(mFileDescriptor);
+        when(Flags.nl80211ProxyEnabled()).thenReturn(true);
 
         // Use a test looper to dispatch events in the tests.
         mWifiLooper = new TestLooper();
