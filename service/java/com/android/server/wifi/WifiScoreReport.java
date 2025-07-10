@@ -69,9 +69,6 @@ public class WifiScoreReport {
     private boolean mVerboseLoggingEnabled = false;
     private static final long FIRST_REASONABLE_WALL_CLOCK = 1490000000000L; // mid-December 2016
 
-    private static final long MIN_TIME_TO_KEEP_BELOW_TRANSITION_SCORE_MILLIS = 9000;
-    private long mLastDownwardBreachTimeMillis = 0;
-
     private static final int WIFI_CONNECTED_NETWORK_SCORER_IDENTIFIER = 0;
     private static final int INVALID_SESSION_ID = -1;
     private static final long MIN_TIME_TO_WAIT_BEFORE_BLOCKLIST_BSSID_MILLIS = 29000;
@@ -115,7 +112,8 @@ public class WifiScoreReport {
     private long mLastScoreBreachLowTimeMillis = INVALID_WALL_CLOCK_MILLIS;
     private long mLastScoreBreachHighTimeMillis = INVALID_WALL_CLOCK_MILLIS;
 
-    private VelocityBasedConnectedScore mVelocityBasedConnectedScore;
+    @VisibleForTesting
+    VelocityBasedConnectedScore mVelocityBasedConnectedScore;
     private final WifiSettingsStore mWifiSettingsStore;
     private int mSessionIdNoReset = INVALID_SESSION_ID;
     // Indicate whether current network is selected by the user
@@ -639,7 +637,6 @@ public class WifiScoreReport {
         if (mVelocityBasedConnectedScore != null) {
             mVelocityBasedConnectedScore.reset();
         }
-        mLastDownwardBreachTimeMillis = 0;
         mLastScoreBreachLowTimeMillis = INVALID_WALL_CLOCK_MILLIS;
         mLastScoreBreachHighTimeMillis = INVALID_WALL_CLOCK_MILLIS;
         mLastLowScoreScanTimestampMs = -1;
@@ -667,65 +664,23 @@ public class WifiScoreReport {
             Log.d(TAG, "Not reporting score because RSSI is invalid");
             return -1;
         }
-        int score;
 
         long millis = mClock.getWallClockMillis();
-        int s2 = mVelocityBasedConnectedScore.generateScore(mWifiInfo, millis);
-        score = s2;
+        ConnectedScoreResult scoreResult =
+                mVelocityBasedConnectedScore.generateScoreResult(mWifiInfo, null, millis);
+        int score = scoreResult.score();
+        int adjustScore = scoreResult.adjustedScore();
 
         final int transitionScore = isPrimary() ? ConnectedScore.WIFI_TRANSITION_SCORE
                 : ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE;
-        final int maxScore = isPrimary() ? ConnectedScore.WIFI_MAX_SCORE
-                : ConnectedScore.WIFI_MAX_SCORE - ConnectedScore.WIFI_SECONDARY_DELTA_SCORE;
-
-        if (mWifiInfo.getScore() > transitionScore && score <= transitionScore
-                && mWifiInfo.getSuccessfulTxPacketsPerSecond()
-                >= mScoringParams.getYippeeSkippyPacketsPerSecond()
-                && mWifiInfo.getSuccessfulRxPacketsPerSecond()
-                >= mScoringParams.getYippeeSkippyPacketsPerSecond()
-        ) {
-            score = transitionScore + 1;
-        }
-
-        if (mWifiInfo.getScore() > transitionScore && score <= transitionScore) {
-            // We don't want to trigger a downward breach unless the rssi is
-            // below the entry threshold.  There is noise in the measured rssi, and
-            // the kalman-filtered rssi is affected by the trend, so check them both.
-            // TODO(b/74613347) skip this if there are other indications to support the low score
-            int entry = mScoringParams.getEntryRssi(mWifiInfo.getFrequency());
-            if (mVelocityBasedConnectedScore.getFilteredRssi() >= entry
-                    || mWifiInfo.getRssi() >= entry) {
-                // Stay a notch above the transition score to reduce ambiguity.
-                score = transitionScore + 1;
-            }
-        }
-
-        if (mWifiInfo.getScore() >= transitionScore && score < transitionScore) {
-            mLastDownwardBreachTimeMillis = millis;
-        } else if (mWifiInfo.getScore() < transitionScore && score >= transitionScore) {
-            // Staying at below transition score for a certain period of time
-            // to prevent going back to wifi network again in a short time.
-            long elapsedMillis = millis - mLastDownwardBreachTimeMillis;
-            if (elapsedMillis < MIN_TIME_TO_KEEP_BELOW_TRANSITION_SCORE_MILLIS) {
-                score = mWifiInfo.getScore();
-            }
-        }
-        //sanitize boundaries
-        if (score > maxScore) {
-            score = maxScore;
-        }
-        if (score < 0) {
-            score = 0;
-        }
-
         mAospScorerPredictionStatusForEvaluation = convertToPredictionStatusForEvaluation(
-                score >= transitionScore);
+                adjustScore >= transitionScore);
         // Bypass AOSP scorer if Wifi connected network scorer is set
         if (mWifiConnectedNetworkScorerHolder != null && !mIsExternalScorerDryRun) {
-            return score;
+            return adjustScore;
         }
 
-        if (score < mWifiGlobals.getWifiLowConnectedScoreThresholdToTriggerScanForMbb()
+        if (adjustScore < mWifiGlobals.getWifiLowConnectedScoreThresholdToTriggerScanForMbb()
                 && enoughTimePassedSinceLastLowConnectedScoreScan()
                 && mActiveModeWarden.canRequestSecondaryTransientClientModeManager()) {
             mLastLowScoreScanTimestampMs = mClock.getElapsedSinceBootMillis();
@@ -733,10 +688,10 @@ public class WifiScoreReport {
         }
 
         // report score
-        mLegacyIntScore = score;
+        mLegacyIntScore = adjustScore;
         reportNetworkScoreToConnectivityServiceIfNecessary();
-        updateWifiMetrics(millis, s2);
-        return score;
+        updateWifiMetrics(millis, score);
+        return adjustScore;
     }
 
     private boolean enoughTimePassedSinceLastLowConnectedScoreScan() {

@@ -16,12 +16,15 @@
 
 package android.net.wifi.p2p;
 
+import static android.annotation.RestrictedForEnvironment.ENVIRONMENT_SDK_RUNTIME;
+
 import android.annotation.CallbackExecutor;
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
+import android.annotation.RestrictedForEnvironment;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SuppressLint;
@@ -162,6 +165,8 @@ import java.util.function.Consumer;
  * {@see WifiP2pDeviceList}
  * {@see android.net.wifi.WpsInfo}
  */
+@RestrictedForEnvironment(
+        environments = ENVIRONMENT_SDK_RUNTIME, from = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 @SystemService(Context.WIFI_P2P_SERVICE)
 public class WifiP2pManager {
     private static final String TAG = "WifiP2pManager";
