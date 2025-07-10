@@ -666,8 +666,8 @@ public class WifiScoreReport {
         }
 
         long millis = mClock.getWallClockMillis();
-        ConnectedScoreResult scoreResult =
-                mVelocityBasedConnectedScore.generateScoreResult(mWifiInfo, null, millis);
+        ConnectedScoreResult scoreResult = mVelocityBasedConnectedScore.generateScoreResult(
+                mWifiInfo, null, millis, isPrimary());
         int score = scoreResult.score();
         int adjustScore = scoreResult.adjustedScore();
 
@@ -1243,7 +1243,6 @@ public class WifiScoreReport {
     /** Called when the owner {@link ConcreteClientModeManager}'s role changes. */
     public void onRoleChanged(@Nullable ClientRole role) {
         mCurrentRole = role;
-        if (mVelocityBasedConnectedScore != null) mVelocityBasedConnectedScore.onRoleChanged(role);
         sendNetworkScore();
     }
 

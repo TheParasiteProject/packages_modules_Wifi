@@ -175,11 +175,9 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
     /**
      * Generates a score based on the current state.
      */
-    private int generateScore(WifiInfo wifiInfo, long millis) {
+    private int generateScore(WifiInfo wifiInfo, long millis, int transitionScore) {
         updateUsingWifiInfo(wifiInfo, millis);
 
-        final int transitionScore = isPrimary() ? WIFI_TRANSITION_SCORE
-                : WIFI_SECONDARY_TRANSITION_SCORE;
         if (mFilter.mx == null) return transitionScore + 1;
         double badRssi = getAdjustedRssiThreshold();
         double horizonSeconds = mScoringParams.getHorizonSeconds();
@@ -198,13 +196,9 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
     /**
      * Adjust the score.
      */
-    private int adjustScore(WifiInfo wifiInfo, long millis, int score) {
+    private int adjustScore(WifiInfo wifiInfo, long millis, int transitionScore, int maxScore,
+            int score) {
         int adjustedScore = score;
-        final int transitionScore = isPrimary() ? ConnectedScore.WIFI_TRANSITION_SCORE
-                : ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE;
-        final int maxScore = isPrimary() ? ConnectedScore.WIFI_MAX_SCORE
-                : ConnectedScore.WIFI_MAX_SCORE - ConnectedScore.WIFI_SECONDARY_DELTA_SCORE;
-
         if (wifiInfo.getScore() > transitionScore && adjustedScore <= transitionScore
                 && wifiInfo.getSuccessfulTxPacketsPerSecond()
                         >= mScoringParams.getYippeeSkippyPacketsPerSecond()
@@ -252,11 +246,13 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
      */
     @Override
     public ConnectedScoreResult generateScoreResult(WifiInfo wifiInfo,
-            WifiUsabilityStatsEntry stats, long millis) {
+            WifiUsabilityStatsEntry stats, long millis, boolean isPrimary) {
         final int transitionScore =
-                isPrimary() ? WIFI_TRANSITION_SCORE : WIFI_SECONDARY_TRANSITION_SCORE;
-        int score = generateScore(wifiInfo, millis);
-        int adjustedScore = adjustScore(wifiInfo, millis, score);
+                isPrimary ? WIFI_TRANSITION_SCORE : WIFI_SECONDARY_TRANSITION_SCORE;
+        final int maxScore =
+                isPrimary ? WIFI_MAX_SCORE : WIFI_MAX_SCORE - WIFI_SECONDARY_DELTA_SCORE;
+        int score = generateScore(wifiInfo, millis, transitionScore);
+        int adjustedScore = adjustScore(wifiInfo, millis, transitionScore, maxScore, score);
         return ConnectedScoreResult.builder()
             .setScore(score)
             .setAdjustedScore(adjustedScore)
