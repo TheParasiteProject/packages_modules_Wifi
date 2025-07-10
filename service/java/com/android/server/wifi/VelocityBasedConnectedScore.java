@@ -260,7 +260,7 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
         return ConnectedScoreResult.builder()
             .setScore(score)
             .setAdjustedScore(adjustedScore)
-            .setIsWifiUsable(adjustedScore > transitionScore)
+            .setIsWifiUsable(adjustedScore >= transitionScore)
             .build();
     }
 }

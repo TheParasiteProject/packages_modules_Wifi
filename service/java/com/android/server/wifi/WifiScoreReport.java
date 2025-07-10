@@ -671,10 +671,9 @@ public class WifiScoreReport {
         int score = scoreResult.score();
         int adjustScore = scoreResult.adjustedScore();
 
-        final int transitionScore = isPrimary() ? ConnectedScore.WIFI_TRANSITION_SCORE
-                : ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE;
-        mAospScorerPredictionStatusForEvaluation = convertToPredictionStatusForEvaluation(
-                adjustScore >= transitionScore);
+        mAospScorerPredictionStatusForEvaluation =
+                convertToPredictionStatusForEvaluation(scoreResult.isWifiUsable());
+
         // Bypass AOSP scorer if Wifi connected network scorer is set
         if (mWifiConnectedNetworkScorerHolder != null && !mIsExternalScorerDryRun) {
             return adjustScore;
