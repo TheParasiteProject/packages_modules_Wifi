@@ -311,7 +311,7 @@ public class RttServiceImplTest extends WifiBaseTest {
                 mockPermissionUtil, mWifiSettingsConfigStore, mockHalDeviceManager,
                 mWifiConfigManager, mSsidTranslator);
         mMockLooper.dispatchAll();
-        verify(mockContext).registerReceiver(any(BroadcastReceiver.class),
+        verify(mockContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
                 argThat(filter -> filter.hasAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)),
                 eq(null), any(Handler.class));
     }

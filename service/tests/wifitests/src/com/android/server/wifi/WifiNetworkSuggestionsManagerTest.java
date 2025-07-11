@@ -68,6 +68,7 @@ import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.net.wifi.EAPConstants;
 import android.net.wifi.ISuggestionConnectionStatusListener;
@@ -5305,5 +5306,27 @@ public class WifiNetworkSuggestionsManagerTest extends WifiBaseTest {
         assertEquals(WifiManager.STATUS_NETWORK_SUGGESTIONS_ERROR_INTERNAL,
                 mWifiNetworkSuggestionsManager.remove(Collections.emptyList(), TEST_UID_1,
                         TEST_PACKAGE_1, ACTION_REMOVE_SUGGESTION_DISCONNECT));
+    }
+
+    @Test
+    public void testUsingRegisterReceiverForAllUsersWhenFlagEnabled() throws Exception {
+        when(Flags.monitorIntentForAllUsers()).thenReturn(true);
+        mWifiNetworkSuggestionsManager =
+                new WifiNetworkSuggestionsManager(
+                        mContext,
+                        new RunnerHandler(mLooper.getLooper(), 100, new LocalLog(128)),
+                        mWifiInjector,
+                        mWifiPermissionsUtil,
+                        mWifiConfigManager,
+                        mWifiConfigStore,
+                        mWifiMetrics,
+                        mWifiCarrierInfoManager,
+                        mWifiKeyStore,
+                        mLruConnectionTracker,
+                        mClock);
+        mLooper.dispatchAll();
+        verify(mContext).registerReceiverForAllUsers(any(BroadcastReceiver.class),
+                any(IntentFilter.class),
+                eq(null), any());
     }
 }
