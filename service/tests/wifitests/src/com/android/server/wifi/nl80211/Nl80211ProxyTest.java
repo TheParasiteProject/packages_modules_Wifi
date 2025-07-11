@@ -22,6 +22,8 @@ import static com.android.server.wifi.nl80211.NetlinkConstants.GENL_ID_CTRL;
 import static com.android.server.wifi.nl80211.NetlinkConstants.NL80211_MULTICAST_GROUP_MLME;
 import static com.android.server.wifi.nl80211.NetlinkConstants.NL80211_MULTICAST_GROUP_REG;
 import static com.android.server.wifi.nl80211.NetlinkConstants.NL80211_MULTICAST_GROUP_SCAN;
+import static com.android.server.wifi.nl80211.NetlinkConstants.NLMSG_DONE;
+import static com.android.server.wifi.nl80211.NetlinkConstants.NLMSG_ERROR;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -49,6 +51,7 @@ import com.android.dx.mockito.inline.extended.ExtendedMockito;
 import com.android.modules.utils.BackgroundThread;
 import com.android.net.module.util.netlink.NetlinkUtils;
 import com.android.net.module.util.netlink.StructNlAttr;
+import com.android.net.module.util.netlink.StructNlMsgHdr;
 import com.android.wifi.flags.Flags;
 
 import org.junit.After;
@@ -133,13 +136,22 @@ public class Nl80211ProxyTest {
     }
 
     /**
-     * Set the response returned by {@link NetlinkUtils#recvMessage(FileDescriptor, int, long)}
+     * Convert GenericNetlinkMsg to ByteBuffer.
      */
-    private void setResponseMessage(GenericNetlinkMsg responseMessage) throws Exception {
+    private ByteBuffer genericNetlinkMsgToByteBuffer(
+            GenericNetlinkMsg responseMessage) throws Exception {
         ByteBuffer responseMsgBuffer =
                 Nl80211TestUtils.createByteBuffer(responseMessage.nlHeader.nlmsg_len);
         responseMessage.pack(responseMsgBuffer);
         responseMsgBuffer.position(0); // reset to the beginning of the buffer
+        return responseMsgBuffer;
+    }
+
+    /**
+     * Set the response returned by {@link NetlinkUtils#recvMessage(FileDescriptor, int, long)}
+     */
+    private void setResponseMessage(GenericNetlinkMsg responseMessage) throws Exception {
+        ByteBuffer responseMsgBuffer = genericNetlinkMsgToByteBuffer(responseMessage);
         when(NetlinkUtils.recvMessage(any(), anyInt(), anyLong())).thenReturn(responseMsgBuffer);
     }
 
@@ -169,13 +181,66 @@ public class Nl80211ProxyTest {
         // Use a non-default command id to identify this as the response message
         GenericNetlinkMsg expectedResponse = new GenericNetlinkMsg(
                 (short) (Nl80211TestUtils.TEST_COMMAND + 15),
-                Nl80211TestUtils.TEST_FLAGS,
                 Nl80211TestUtils.TEST_TYPE,
+                Nl80211TestUtils.TEST_FLAGS,
                 Nl80211TestUtils.TEST_SEQUENCE);
         setResponseMessage(expectedResponse);
         GenericNetlinkMsg requestMsg = Nl80211TestUtils.createTestMessage();
         GenericNetlinkMsg receivedResponse = mDut.sendMessageAndReceiveResponse(requestMsg);
         assertTrue(expectedResponse.equals(receivedResponse));
+    }
+
+    /**
+     * Test that the messages after the error response are ignored.
+     */
+    @Test
+    public void testSendAndReceiveMessage_errorResponse() throws Exception {
+        // Use a non-default command id to identify this as the response message
+        GenericNetlinkMsg errorResponse = new GenericNetlinkMsg(
+                (short) (Nl80211TestUtils.TEST_COMMAND + 15),
+                NLMSG_ERROR,
+                Nl80211TestUtils.TEST_FLAGS,
+                Nl80211TestUtils.TEST_SEQUENCE);
+        // Message after the error response should be ignored.
+        GenericNetlinkMsg extraResponse = new GenericNetlinkMsg(
+                (short) (Nl80211TestUtils.TEST_COMMAND + 15),
+                Nl80211TestUtils.TEST_TYPE,
+                StructNlMsgHdr.NLM_F_MULTI,
+                Nl80211TestUtils.TEST_SEQUENCE + 1);
+        when(NetlinkUtils.recvMessage(any(), anyInt(), anyLong()))
+                .thenReturn(genericNetlinkMsgToByteBuffer(errorResponse))
+                .thenReturn(genericNetlinkMsgToByteBuffer(extraResponse));
+        GenericNetlinkMsg requestMsg = Nl80211TestUtils.createTestMessage();
+        List<GenericNetlinkMsg> receivedResponses = mDut.sendMessageAndReceiveResponses(requestMsg);
+        assertEquals(1, receivedResponses.size());
+        assertTrue(errorResponse.equals(receivedResponses.get(0)));
+    }
+
+    /**
+     * Test that we can successfully send an Nl80211 message and receive multi part response using
+     * the synchronous send/receive method.
+     */
+    @Test
+    public void testSendAndReceiveMessage_multiPartResponse() throws Exception {
+        GenericNetlinkMsg response1 = new GenericNetlinkMsg(
+                (short) (Nl80211TestUtils.TEST_COMMAND + 15),
+                Nl80211TestUtils.TEST_TYPE,
+                StructNlMsgHdr.NLM_F_MULTI,
+                Nl80211TestUtils.TEST_SEQUENCE);
+        // Message with NLMSG_DONE marks the end of the multipart response
+        // and should not be returned to the framework caller
+        GenericNetlinkMsg response2 = new GenericNetlinkMsg(
+                (short) (Nl80211TestUtils.TEST_COMMAND + 16),
+                NLMSG_DONE,
+                StructNlMsgHdr.NLM_F_MULTI,
+                Nl80211TestUtils.TEST_SEQUENCE);
+        when(NetlinkUtils.recvMessage(any(), anyInt(), anyLong()))
+                .thenReturn(genericNetlinkMsgToByteBuffer(response1))
+                .thenReturn(genericNetlinkMsgToByteBuffer(response2));
+        GenericNetlinkMsg requestMsg = Nl80211TestUtils.createTestMessage();
+        List<GenericNetlinkMsg> receivedResponses = mDut.sendMessageAndReceiveResponses(requestMsg);
+        assertEquals(1, receivedResponses.size());
+        assertTrue(response1.equals(receivedResponses.get(0)));
     }
 
     /**
