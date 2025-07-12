@@ -879,7 +879,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                         },
                         new Handler(mWifiHandlerThread.getLooper()));
             }
-            mContext.registerReceiver(
+            registerBroadcastReceiver(
                     new BroadcastReceiver() {
                         @Override
                         public void onReceive(Context context, Intent intent) {
@@ -895,7 +895,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     null,
                     new Handler(mWifiHandlerThread.getLooper()));
 
-            mContext.registerReceiver(
+            registerBroadcastReceiver(
                     new BroadcastReceiver() {
                         @Override
                         public void onReceive(Context context, Intent intent) {
@@ -911,7 +911,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     null,
                     new Handler(mWifiHandlerThread.getLooper()));
 
-            mContext.registerReceiver(
+            registerBroadcastReceiver(
                     new BroadcastReceiver() {
                         private int mLastSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
                         @Override
@@ -930,7 +930,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     null,
                     new Handler(mWifiHandlerThread.getLooper()));
 
-            mContext.registerReceiver(
+            registerBroadcastReceiver(
                     new BroadcastReceiver() {
                         @Override
                         public void onReceive(Context context, Intent intent) {
@@ -944,7 +944,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     null,
                     new Handler(mWifiHandlerThread.getLooper()));
 
-            mContext.registerReceiver(
+            registerBroadcastReceiver(
                     new BroadcastReceiver() {
                         @Override
                         public void onReceive(Context context, Intent intent) {
@@ -958,7 +958,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     new Handler(mWifiHandlerThread.getLooper()));
 
             if (SdkLevel.isAtLeastT()) {
-                mContext.registerReceiver(
+                registerBroadcastReceiver(
                         new BroadcastReceiver() {
                             @Override
                             public void onReceive(Context context, Intent intent) {
@@ -984,6 +984,16 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             mWifiInjector.getAdaptiveConnectivityEnabledSettingObserver().initialize();
             mIsWifiServiceStarted = true;
         }, TAG + "#checkAndStartWifi");
+    }
+
+    private void registerBroadcastReceiver(@Nullable BroadcastReceiver receiver,
+            IntentFilter filter, @Nullable String broadcastPermission,
+            @Nullable Handler scheduler) {
+        if (mFeatureFlags.monitorIntentForAllUsers()) {
+            mContext.registerReceiverForAllUsers(receiver, filter, broadcastPermission, scheduler);
+        } else {
+            mContext.registerReceiver(receiver, filter, broadcastPermission, scheduler);
+        }
     }
 
     private void setPulledAtomCallbacks() {
@@ -1063,7 +1073,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             intentFilter.addAction(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED);
             intentFilter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
             intentFilter.addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED);
-            mContext.registerReceiver(
+            registerBroadcastReceiver(
                     new BroadcastReceiver() {
                         @Override
                         public void onReceive(Context context, Intent intent) {
@@ -1108,7 +1118,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     intentFilter,
                     null,
                     new Handler(mWifiHandlerThread.getLooper()));
-            mContext.registerReceiver(
+            registerBroadcastReceiver(
                     new BroadcastReceiver() {
                         @Override
                         public void onReceive(Context context, Intent intent) {
@@ -1116,7 +1126,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                                 handleShutDown();
                             }
                         }},
-                    new IntentFilter(Intent.ACTION_SHUTDOWN));
+                    new IntentFilter(Intent.ACTION_SHUTDOWN), null, null);
             mMemoryStoreImpl.start();
             mPasspointManager.initializeProvisioner(
                     mWifiInjector.getPasspointProvisionerHandlerThread().getLooper());
@@ -6092,7 +6102,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         intentFilter.addAction(Intent.ACTION_PACKAGE_CHANGED);
         intentFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
         intentFilter.addDataScheme("package");
-        mContext.registerReceiver(
+        registerBroadcastReceiver(
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
@@ -6137,7 +6147,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
     private void registerForCarrierConfigChange() {
         IntentFilter filter = new IntentFilter();
         filter.addAction(CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED);
-        mContext.registerReceiver(
+        registerBroadcastReceiver(
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
