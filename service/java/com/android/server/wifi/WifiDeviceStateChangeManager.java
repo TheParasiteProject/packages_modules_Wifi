@@ -84,7 +84,8 @@ public class WifiDeviceStateChangeManager {
         IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_SCREEN_ON);
         filter.addAction(Intent.ACTION_SCREEN_OFF);
-        mContext.registerReceiver(
+
+        BroadcastReceiver screenChangedReceiver =
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
@@ -96,8 +97,13 @@ public class WifiDeviceStateChangeManager {
                                             Intent.ACTION_SCREEN_ON)), TAG + "SCREEN_CHANGE");
                         }
                     }
-                },
-                filter);
+                };
+        if (mFeatureFlags.monitorIntentForAllUsers()) {
+            mContext.registerReceiverForAllUsers(screenChangedReceiver, filter,
+                    null, mWifiThreadRunner.getHandler());
+        } else {
+            mContext.registerReceiver(screenChangedReceiver, filter);
+        }
         handleScreenStateChanged(mPowerManager.isInteractive());
         if (Environment.isSdkAtLeastB() && mFeatureFlags.wepDisabledInApm()
                 && isAapmApiFlagEnabled()) {

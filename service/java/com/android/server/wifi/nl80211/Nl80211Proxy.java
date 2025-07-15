@@ -29,6 +29,8 @@ import static com.android.server.wifi.nl80211.NetlinkConstants.NL80211_GENL_NAME
 import static com.android.server.wifi.nl80211.NetlinkConstants.NL80211_MULTICAST_GROUP_MLME;
 import static com.android.server.wifi.nl80211.NetlinkConstants.NL80211_MULTICAST_GROUP_REG;
 import static com.android.server.wifi.nl80211.NetlinkConstants.NL80211_MULTICAST_GROUP_SCAN;
+import static com.android.server.wifi.nl80211.NetlinkConstants.NLMSG_DONE;
+import static com.android.server.wifi.nl80211.NetlinkConstants.NLMSG_ERROR;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -116,33 +118,52 @@ public class Nl80211Proxy {
         }
     }
 
-    private static @Nullable List<GenericNetlinkMsg> parseNl80211MessagesFromBuffer(
+    private static @Nullable GenericNetlinkMsg parseNl80211MessageFromBuffer(
             @NonNull ByteBuffer buffer) {
-        if (buffer == null) return null;
-        List<GenericNetlinkMsg> parsedMessages = new ArrayList<>();
-
-        // Expect buffer to be the exact size of all the contained messages
-        while (buffer.remaining() > 0) {
-            GenericNetlinkMsg message = GenericNetlinkMsg.parse(buffer);
-            if (message == null) {
-                Log.e(TAG, "Unable to parse a received message. numParsed=" + parsedMessages.size()
-                        + ", bufRemaining=" + buffer.remaining());
-                return null;
-            }
-            parsedMessages.add(message);
+        if (buffer.remaining() == 0) {
+            return null;
         }
-        return parsedMessages;
+        GenericNetlinkMsg message = GenericNetlinkMsg.parse(buffer);
+        if (message == null) {
+            Log.e(TAG, "Unable to parse a received message. bufRemaining=" + buffer.remaining());
+            return null;
+        }
+        return message;
     }
 
     private @Nullable List<GenericNetlinkMsg> receiveNl80211Messages() {
+        List<GenericNetlinkMsg> messages = new ArrayList<>();
         try {
-            ByteBuffer recvBuffer = NetlinkUtils.recvMessage(
-                    mNetlinkFd, NetlinkUtils.DEFAULT_RECV_BUFSIZE, NetlinkUtils.IO_TIMEOUT_MS);
-            return parseNl80211MessagesFromBuffer(recvBuffer);
+            while (true) {
+                ByteBuffer recvBuffer =
+                        NetlinkUtils.recvMessage(
+                                mNetlinkFd,
+                                NetlinkUtils.DEFAULT_RECV_BUFSIZE,
+                                NetlinkUtils.IO_TIMEOUT_MS);
+                GenericNetlinkMsg message = parseNl80211MessageFromBuffer(recvBuffer);
+                if (message == null) {
+                    Log.e(TAG, "Unable to parse a received message.");
+                    return null;
+                }
+                if (message.nlHeader.nlmsg_type == NLMSG_DONE) {
+                    break;
+                }
+                messages.add(message);
+                if (message.nlHeader.nlmsg_type == NLMSG_ERROR) {
+                    Log.e(TAG, "Received NLMSG_ERROR: " + message);
+                    break;
+                }
+                if ((message.nlHeader.nlmsg_flags & StructNlMsgHdr.NLM_F_MULTI)
+                        != StructNlMsgHdr.NLM_F_MULTI) {
+                    break;
+                }
+
+            }
         } catch (ErrnoException | IllegalArgumentException | InterruptedIOException e) {
             Log.i(TAG, "Unable to receive Nl80211 messages. " + e);
             return null;
         }
+        return messages;
     }
 
     /**

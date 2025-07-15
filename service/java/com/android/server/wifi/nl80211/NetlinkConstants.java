@@ -45,6 +45,10 @@ public class NetlinkConstants {
 
     public static final short CTRL_ATTR_MCAST_GROUPS = 7;
 
+    // Netlink message types. See kernel/uapi/linux/netlink.h
+    public static final short NLMSG_ERROR = 2;
+    public static final short NLMSG_DONE = 3;
+
     // Nl80211 strings for initialization. See kernel/uapi/linux/nl80211.h
     public static final String NL80211_GENL_NAME = "nl80211";
     public static final String NL80211_MULTICAST_GROUP_SCAN = "scan";
