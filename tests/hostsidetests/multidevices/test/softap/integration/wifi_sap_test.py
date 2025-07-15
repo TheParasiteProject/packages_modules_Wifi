@@ -104,6 +104,7 @@ class WifiSoftApTest(base_test.BaseTestClass):
   def teardown_test(self):
     for ad in self.ads:
       sutils._stop_tethering(self.host)
+      self.host.wifi.wifiUnregisterSoftApCallback()
       ad.wifi.wifiClearConfiguredNetworks()
       ad.wifi.wifiDisableAllSavedNetworks()
       if not ad.wifi.wifiIsEnabled():
@@ -238,7 +239,7 @@ class WifiSoftApTest(base_test.BaseTestClass):
         self.host.log.info("DUT rebooted successfully")
         time.sleep(WAIT_REBOOT_SEC)
     sutils.start_wifi_tethering_saved_config(self.host)
-    sutils.connect_to_wifi_network(self.client,softap_config, hidden=hidden)
+    sutils.connect_to_wifi_network(self.client,config, hidden=hidden)
 
   @ApiTest(
     apis=[
@@ -1451,7 +1452,7 @@ class WifiSoftApTest(base_test.BaseTestClass):
     sutils.save_wifi_soft_ap_config(self.host,
                                     config,
                                     shutdown_timeout_millis=(
-                                      test_shutdown_timeout_value_s * 1000))
+                                    test_shutdown_timeout_value_s * 1000))
     self.host.wifi.tetheringStartTrackingTetherStateChange()
     self.host.wifi.tetheringStartTetheringWithProvisioning(0, False)
     asserts.assert_true(self.host.wifi.wifiIsApEnabled(),
@@ -1675,6 +1676,7 @@ class WifiSoftApTest(base_test.BaseTestClass):
         4. Verify a client device can connect to it.
     """
     sutils.set_wifi_country_code(self.host, "DE")
+    sutils.set_wifi_country_code(self.client, "DE")
     sap_config = sutils.create_softap_config()
     wifi_network = sap_config.copy()
     sap_config[
@@ -1687,13 +1689,13 @@ class WifiSoftApTest(base_test.BaseTestClass):
     self.host.wifi.tetheringStartTrackingTetherStateChange()
     self.host.wifi.tetheringStartTetheringWithProvisioning(0, False)
     softap_conf = self.host.wifi.wifiGetSapConfiguration()
-    sap_band = softap_conf["mChannels"]["mKeys"][0]
+    sap_band = softap_conf["apBand"]
     asserts.assert_true(
       sap_band == constants.WiFiHotspotBand.WIFI_CONFIG_SOFTAP_BAND_2G_5G,
       "Soft AP didn't start in 5G preferred band")
     config = {
       "SSID": wifi_network[constants.WiFiTethering.SSID_KEY],
-      "password": wifi_network["mPassphrase"],
+      "password":wifi_network[constants.WiFiTethering.PWD_KEY]
       }
     sutils._wifi_connect(self.client, config)
     sutils.verify_11ax_softap(self.host, self.client, WIFI6_MODELS)

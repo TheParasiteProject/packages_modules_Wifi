@@ -23,8 +23,11 @@ import android.net.wifi.WifiNetworkSuggestion;
 
 import androidx.annotation.NonNull;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.List;
 
 /**
  * The converter class that allows users to use custom type as snippet RPC arguments and return
@@ -75,7 +78,27 @@ public final class WifiJsonConverter {
         JSONObject result = new JSONObject();
         result.put("SSID", trimQuotationMarks(data.getWifiSsid().toString()));
         result.put("Passphrase", data.getPassphrase());
+        result.put("hiddenSSID", data.isHiddenSsid());
+        result.put("mSecurityType", data.getSecurityType());
+        result.put("apBand", data.getBand());
+        int channel = data.getChannel();
+        result.put("apChannel", channel);
         return result;
+    }
+
+    /**
+     * Helper to convert a List of MacAddress objects to a JSONArray of strings.
+     */
+    private static JSONArray macAddressListToJsonArray(List<MacAddress> macAddresses) {
+        JSONArray jsonArray = new JSONArray();
+        if (macAddresses != null) {
+            for (MacAddress mac : macAddresses) {
+                if (mac != null) {
+                    jsonArray.put(mac.toString());
+                }
+            }
+        }
+        return jsonArray;
     }
 
     /**
