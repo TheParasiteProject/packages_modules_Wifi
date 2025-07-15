@@ -17,6 +17,7 @@ android_test {
         "mobly-bundled-snippets-lib",
         "wifi_aconfig_flags_lib",
     ],
+    resource_dirs: ["res"],
     min_sdk_version: "30",
     target_sdk_version: "35",
 }
