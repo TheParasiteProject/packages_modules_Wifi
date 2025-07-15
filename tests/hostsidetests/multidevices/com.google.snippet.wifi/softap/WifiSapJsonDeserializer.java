@@ -80,8 +80,8 @@ public class WifiSapJsonDeserializer {
         if (configJson.has("SSID")) {
             configBuilder.setSsid(configJson.getString("SSID"));
         }
-        if (configJson.has("mPassphrase")) {
-            String pwd = configJson.getString("mPassphrase");
+        if (configJson.has("Passphrase")) {
+            String pwd = configJson.getString("Passphrase");
             // Check if new security type SAE (WPA3) is present. Default to PSK
             if (configJson.has("mSecurityType")) {
                 String securityTypeStr = configJson.getString("mSecurityType");

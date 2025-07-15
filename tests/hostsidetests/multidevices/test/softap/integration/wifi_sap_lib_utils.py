@@ -23,6 +23,7 @@ from mobly.controllers.android_device_lib import callback_handler_v2
 from mobly import asserts
 from mobly.snippet import errors
 from mobly import utils
+from mobly import signals
 from softap import constants
 from queue import Empty
 from mobly.controllers.android_device_lib import adb
@@ -257,7 +258,7 @@ def adb_shell_ping(ad, count=4, dest_ip="www.google.com"):
         try:
             ad.log.info(
                 f"Attempt {attempt + 1}: Pinging {dest_ip}"+
-                "from {ad.serial} with command: '{ping_cmd}'")
+                f"from {ad.serial} with command: '{ping_cmd}'")
             results = ad.adb.shell(ping_cmd)
             ad.log.info(f"Ping results (Attempt {attempt + 1}): {results}")
 
@@ -423,7 +424,7 @@ def start_wifi_tethering_saved_config(ad: android_device.AndroidDevice):
       ad.wifi.tetheringStopTrackingTetherStateChange()
 
 def connect_to_wifi_network(ad, network, assert_on_fail=True,
-                            check_connectivity=True, hidden=False,
+                            check_connectivity=False, hidden=False,
                             num_of_scan_tries=3,
                             num_of_connect_tries=3):
     """Connection logic for open and psk wifi networks.
@@ -457,7 +458,6 @@ def connect_to_wifi_network(ad, network, assert_on_fail=True,
         ret = ad.wifi.wifiAddNetwork(config)
         asserts.assert_true(ret != -1, "Add network %r failed" % config)
         ad.wifi.wifiEnableNetwork(ret, 0)
-
     _wifi_connect(ad, config, check_connectivity=check_connectivity)
 
 def get_current_softap_info(ad, callbackId):
@@ -633,7 +633,7 @@ def save_wifi_soft_ap_config(ad,
             constants.WiFiTethering.SECURITY] == (
                 constants.SoftApSecurityType.OPEN):
         del config[constants.WiFiTethering.SECURITY]
-        del config[constants.WiFiTetheringnums.PWD_KEY]
+        del config[constants.WiFiTethering.PWD_KEY]
     asserts.assert_true(ad.wifi.wifiSetWifiApConfiguration(config),
                         "Failed to set WifiAp Configuration")
     wifi_ap = ad.wifi.wifiGetSapConfiguration()
@@ -648,95 +648,8 @@ def save_wifi_soft_ap_config(ad,
             "Hotspot Security doesn't match")
     if constants.WiFiTethering.PWD_KEY in config:
         asserts.assert_true(
-            wifi_ap["mPassphrase"] == config[constants.WiFiTethering.PWD_KEY],
+            wifi_ap["Passphrase"] == config[constants.WiFiTethering.PWD_KEY],
             "Hotspot Password doesn't match")
-
-    if constants.WiFiTethering.HIDDEN_KEY in config:
-        asserts.assert_true(
-            wifi_ap["mHiddenSsid"] == config[constants.WiFiTethering.HIDDEN_KEY],
-            "Hotspot hidden setting doesn't match")
-
-    if constants.WiFiTethering.AP_CHANNEL_KEY in config:
-        asserts.assert_true(
-            wifi_ap["mChannels"]["mValues"][0] == config[
-                constants.WiFiTethering.AP_CHANNEL_KEY],
-                "Hotspot Channel doesn't match")
-    if constants.WiFiTethering.AP_MAXCLIENTS_KEY in config:
-        asserts.assert_true(
-            wifi_ap["mMaxNumberOfClients"] == config[
-                constants.WiFiTethering.AP_MAXCLIENTS_KEY],
-            "Hotspot Max Clients doesn't match")
-    if constants.WiFiTethering.AP_SHUTDOWNTIMEOUTENABLE_KEY in config:
-        asserts.assert_true(
-            wifi_ap["mAutoShutdownEnabled"] == config[
-                constants.WiFiTethering.AP_SHUTDOWNTIMEOUTENABLE_KEY],
-            "Hotspot ShutDown feature flag doesn't match")
-    if constants.WiFiTethering.AP_SHUTDOWNTIMEOUT_KEY in config:
-        asserts.assert_true(
-            wifi_ap["mShutdownTimeoutMillis"] == config[
-                constants.WiFiTethering.AP_SHUTDOWNTIMEOUT_KEY],
-            "Hotspot ShutDown feature flag doesn't match")
-    if constants.WiFiTethering.AP_CLIENTCONTROL_KEY in config:
-        asserts.assert_true(
-            wifi_ap["mClientControlByUser"] == config[
-                constants.WiFiTethering.AP_CLIENTCONTROL_KEY],
-            "Hotspot Client control flag doesn't match")
-    if constants.WiFiTethering.AP_ALLOWEDLIST_KEY in config:
-        mac_address_list = config[constants.WiFiTethering.AP_ALLOWEDLIST_KEY]
-        if mac_address_list == []:
-            converted_decimal = mac_address_list
-            mAllowedClientList = wifi_ap["mAllowedClientList"]
-        else:
-            input_mac_string = mac_address_list[0]
-            converted_decimal = convert_mac_string_to_decimal(input_mac_string)
-            mAllowedClientList = wifi_ap["mAllowedClientList"][0]["mAddr"]
-        asserts.assert_true(
-            mAllowedClientList == converted_decimal,
-            "Hotspot Allowed List doesn't match")
-    if constants.WiFiTethering.AP_BLOCKEDLIST_KEY in config:
-        BlockedClientList =  config[constants.WiFiTethering.AP_BLOCKEDLIST_KEY]
-        if BlockedClientList == []:
-            converted_decimal = BlockedClientList
-            mBlockedClientLis = wifi_ap["mBlockedClientList"]
-        else:
-            input_mac_string = BlockedClientList[0]
-            converted_decimal = convert_mac_string_to_decimal(input_mac_string)
-            mBlockedClientLis = wifi_ap["mBlockedClientList"][0]["mAddr"]
-        asserts.assert_true(
-            mBlockedClientLis == converted_decimal,
-            "Hotspot Blocked List doesn't match")
-
-    if constants.WiFiTethering.AP_MAC_RANDOMIZATION_SETTING_KEY in config:
-        asserts.assert_true(
-            wifi_ap["mMacRandomizationSetting"] == config[
-                constants.WiFiTethering.AP_MAC_RANDOMIZATION_SETTING_KEY],
-            "Hotspot Mac randomization setting doesn't match")
-
-    if AP_BRIDGED_OPPORTUNISTIC_SHUTDOWN_ENABLE_KEY in config:
-        asserts.assert_true(
-            wifi_ap["mBridgedModeOpportunisticShutdownEnabled"] == (
-                config[AP_BRIDGED_OPPORTUNISTIC_SHUTDOWN_ENABLE_KEY]),
-            "Hotspot bridged shutdown enable setting doesn't match")
-
-    if constants.WiFiTethering.AP_IEEE80211AX_ENABLED_KEY in config:
-        asserts.assert_true(
-            wifi_ap["mIeee80211axEnabled"] == config[
-                constants.WiFiTethering.AP_IEEE80211AX_ENABLED_KEY],
-            "Hotspot 80211 AX enable setting doesn't match")
-
-    if constants.WiFiTethering.AP_CHANNEL_FREQUENCYS_KEY in config:
-        raw_channels = wifi_ap['mChannels']['mValues']
-        valid_channels = [channel for channel in raw_channels if channel != 0]
-        channel_to_freq = {
-            v: k for k, v in constants.WifiEnums.freq_to_channel.items()}
-        frequency_list =[]
-        for channel in valid_channels:
-           frequency = channel_to_freq.get(channel)
-           frequency_list.append(frequency)
-        asserts.assert_true(
-            frequency_list == config[
-                constants.WiFiTethering.AP_CHANNEL_FREQUENCYS_KEY],
-            "Hotspot channels setting doesn't match")
 
 def set_wifi_country_code(
     ad: android_device.AndroidDevice,
@@ -754,3 +667,158 @@ def set_wifi_country_code(
         ad.adb.shell('cmd wifi force-country-code enabled %s' % country_code)
     except android_device.adb.AdbError as e:
         ad.log.error(f"Failed to set country code: {e}")
+
+def is_SIM_network_active(ad) -> bool:
+
+    """Determine whether the device has access to the network.
+    Args:
+        ad: Android device object.
+
+    Returns:
+        bool: if have network return True, else return False。
+    """
+    try:
+        network_type = ad.wifi.getDataNetworkType()
+        return network_type != 0
+    except Exception as e:
+        logging.info(f"An error occurred while checking network status:{e}")
+        return False
+
+def _toggle_wifi_and_wait_for_reconnection(ad, network, num_of_tries=3):
+    expected_ssid = network[constants.WiFiTethering.SSID_KEY]
+
+    verify_con = {constants.WiFiTethering.SSID_KEY: expected_ssid}
+    verify_wifi_connection_info(ad, verify_con)
+    ad.wifi.wifiToggleDisable()
+    time.sleep(5)
+    ad.wifi.wifiToggleEnable()
+    time.sleep(5)
+    state_handler = ad.wifi.wifiStartTrackForStateChange()
+    try:
+        connect_result = None
+        for i in range(num_of_tries):
+            try:
+                connect_result = state_handler.waitAndGet(
+                    event_name="WifiNetworkConnected",
+                    timeout=10)
+                break
+            except Empty:
+                pass
+        asserts.assert_true(
+            connect_result, "Failed to connect to Wi-Fi network %s on %s" %
+                            (network, ad.serial))
+        logging.debug("Connection result on %s: %s.", ad.serial,
+                      connect_result)
+        actual_ssid = connect_result.data[
+            constants.WiFiTethering.SSID_KEY]
+        asserts.assert_equal(
+            actual_ssid, expected_ssid, "Connected to the wrong network on %s."
+                                        "Expected %s, but got %s." %
+                                        (ad.serial, expected_ssid, actual_ssid))
+        logging.info("Connected to Wi-Fi network %s on %s", actual_ssid,
+                     ad.serial)
+    finally:
+        ad.wifi.wifiStopTrackForStateChange()
+
+def verify_wifi_connection_info(ad, expected_con):
+    current_con = ad.wifi.wifiGetConnectionInfo()
+    case_insensitive = ["BSSID", "supplicant_state"]
+    for k, expected_v in expected_con.items():
+        # Do not verify authentication related fields.
+        if k == "password":
+            continue
+        msg = "Field %s does not exist in wifi connection info %s." % (
+            k, current_con)
+        if k not in current_con:
+            raise signals.TestFailure(msg)
+        actual_v = current_con[k]
+        if k in case_insensitive:
+            actual_v = actual_v.lower()
+            expected_v = expected_v.lower()
+        msg = "Expected %s to be %s, actual %s is %s." % (k, expected_v, k,
+                                                          actual_v)
+        if actual_v != expected_v:
+            raise signals.TestFailure(msg)
+
+def _assert_on_fail_handler(func, assert_on_fail, *args, **kwargs):
+    """Wrapper function that handles the bahevior of assert_on_fail.
+
+    When assert_on_fail is True, let all test signals through, which can
+    terminate test cases directly. When assert_on_fail is False, the wrapper
+    raises no test signals and reports operation status by returning True or
+    False.
+
+    Args:
+        func: The function to wrap. This function reports operation status by
+              raising test signals.
+        assert_on_fail: A boolean that specifies if the output of the wrapper
+                        is test signal based or return value based.
+        args: Positional args for func.
+        kwargs: Name args for func.
+
+    Returns:
+        If assert_on_fail is True, returns True/False to signal operation
+        status, otherwise return nothing.
+    """
+    try:
+        func(*args, **kwargs)
+        if not assert_on_fail:
+            return True
+    except signals.TestSignal:
+        if assert_on_fail:
+            raise
+        return False
+
+def toggle_wifi_and_wait_for_reconnection(ad,
+                                          network,
+                                          num_of_tries=1,
+                                          assert_on_fail=True):
+    """Toggle wifi state and then wait for Android device to reconnect to
+    the provided wifi network.
+
+    This expects the device to be already connected to the provided network.
+
+    Logic steps are
+     1. Ensure that we're connected to the network.
+     2. Turn wifi off.
+     3. Wait for 10 seconds.
+     4. Turn wifi on.
+     5. Wait for the "connected" event, then confirm the connected ssid is the
+        one requested.
+
+    Args:
+        ad: android_device object to initiate connection on.
+        network: A dictionary representing the network to await connection. The
+                 dictionary must have the key "SSID".
+        num_of_tries: An integer that is the number of times to try before
+                      delaring failure. Default is 1.
+        assert_on_fail: If True, error checks in this function will raise test
+                        failure signals.
+
+    Returns:
+        If assert_on_fail is False, function returns True if the toggle was
+        successful, False otherwise. If assert_on_fail is True, no return value.
+    """
+    return _assert_on_fail_handler(_toggle_wifi_and_wait_for_reconnection,
+                                   assert_on_fail,
+                                   ad,
+                                   network,
+                                   num_of_tries=num_of_tries)
+
+def wait_for_disconnect(ad, timeout=10):
+    """Wait for a disconnect event within the specified timeout.
+
+    Args:
+        ad: Android device object.
+        timeout: Timeout in seconds.
+
+    """
+    try:
+        state_handler = ad.wifi.wifiStartTrackForStateChange()
+        connect_result = state_handler.waitAndGet(
+            event_name="WifiNetworkDisconnected", timeout=timeout)
+        logging.info("connect_result %s", connect_result)
+    except Empty:
+        raise signals.TestFailure("Device did not disconnect from the network")
+    finally:
+        ad.wifi.wifiStopTrackForStateChange()

@@ -169,7 +169,7 @@ class WiFiTethering(enum.StrEnum):
     NETID_KEY = "network_id"
     BSSID_KEY = "BSSID"  # Used for Wifi & SoftAp
     BSSID_PATTERN_KEY = "bssidPattern"
-    PWD_KEY = "mPassphrase"  # Used for Wifi & SoftAp
+    PWD_KEY = "Passphrase"  # Used for Wifi & SoftAp
     frequency_key = "frequency"
     HIDDEN_KEY = "hiddenSSID"  # Used for Wifi & SoftAp
     IS_APP_INTERACTION_REQUIRED = "isAppInteractionRequired"
