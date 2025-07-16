@@ -31,9 +31,15 @@
                        com.google.snippet.wifi.UtilitySnippet,
                        com.google.snippet.wifi.WifiManagerSnippet,
                        com.google.android.mobly.snippet.bundled.WifiManagerSnippet,
-                      com.google.android.mobly.snippet.bundled.TelephonySnippet"/>
+                       com.google.android.mobly.snippet.uiautomator.ConfiguratorSnippet,
+                       com.google.android.mobly.snippet.uiautomator.UiAutomationSnippet,
+                       com.google.android.mobly.snippet.uiautomator.UiDeviceSnippet,
+                       com.google.android.mobly.snippet.uiautomator.UiObject2Snippet,
+                       com.google.android.mobly.snippet.uiautomator.UiWatcherSnippet,
+                       com.google.android.mobly.snippet.bundled.TelephonySnippet"/>
     <meta-data
         android:name="mobly-object-converter"
+        tools:replace="android:value"
         android:value="com.google.snippet.wifi.aware.WifiAwareSnippetConverter"/>
 
     <activity

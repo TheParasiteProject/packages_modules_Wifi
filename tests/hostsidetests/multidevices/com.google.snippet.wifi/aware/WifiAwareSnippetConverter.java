@@ -26,7 +26,7 @@ import android.net.wifi.aware.WifiAwareNetworkSpecifier;
 
 import androidx.annotation.NonNull;
 
-import com.google.android.mobly.snippet.SnippetObjectConverter;
+import com.google.android.mobly.snippet.uiautomator.Converter;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -37,8 +37,10 @@ import java.lang.reflect.Type;
 /**
  * The converter class that allows users to use custom type as snippet RPC arguments and return
  * values.
+ *
+ * We need to use Snippet UiAutomator so we have to inherit from its converter.
  */
-public class WifiAwareSnippetConverter implements SnippetObjectConverter {
+public class WifiAwareSnippetConverter extends Converter {
 
 
     public static String trimQuotationMarks(String originalString) {
@@ -71,7 +73,7 @@ public class WifiAwareSnippetConverter implements SnippetObjectConverter {
             result.put("result", SerializationUtil.parcelableToString(frame));
             return result;
         }
-        return null;
+        return super.serialize(object);
     }
 
     public static JSONObject serializeScanResult(ScanResult data) throws JSONException {
@@ -147,6 +149,6 @@ public class WifiAwareSnippetConverter implements SnippetObjectConverter {
         }
         // If the type is not recognized, you can throw an exception or return null
         // depending on your application's needs.
-        return null;
+        return super.deserialize(jsonObject, type);
     }
 }
