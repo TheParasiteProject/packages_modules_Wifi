@@ -177,7 +177,6 @@ import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.ClientMode.LinkProbeCallback;
 import com.android.server.wifi.ClientModeManagerBroadcastQueue.QueuedBroadcast;
 import com.android.server.wifi.WifiNative.ConnectionCapabilities;
-import com.android.server.wifi.WifiScoreCard.PerBssid;
 import com.android.server.wifi.WifiScoreCard.PerNetwork;
 import com.android.server.wifi.b2b.WifiRoamingModeManager;
 import com.android.server.wifi.hotspot2.NetworkDetail;
@@ -539,7 +538,6 @@ public class ClientModeImplTest extends WifiBaseTest {
     @Mock WifiNative mWifiNative;
     @Mock WifiScoreCard mWifiScoreCard;
     @Mock PerNetwork mPerNetwork;
-    @Mock PerBssid mPerBssid;
     @Mock WifiScoreCard.NetworkConnectionStats mPerNetworkRecentStats;
     @Mock WifiHealthMonitor mWifiHealthMonitor;
     @Mock WifiTrafficPoller mWifiTrafficPoller;
@@ -801,7 +799,6 @@ public class ClientModeImplTest extends WifiBaseTest {
                 .thenReturn(WifiHealthMonitor.REASON_NO_FAILURE);
         when(mPerNetwork.getRecentStats()).thenReturn(mPerNetworkRecentStats);
         when(mWifiScoreCard.lookupNetwork(any())).thenReturn(mPerNetwork);
-        when(mWifiScoreCard.lookupBssid(any(), any())).thenReturn(mPerBssid);
         when(mThroughputPredictor.predictMaxTxThroughput(any())).thenReturn(90);
         when(mThroughputPredictor.predictMaxRxThroughput(any())).thenReturn(80);
         when(mWifiInjector.getWifiRoamingModeManager()).thenReturn(mWifiRoamingModeManager);
@@ -6856,15 +6853,12 @@ public class ClientModeImplTest extends WifiBaseTest {
     }
 
     /**
-     * Verify that the current network is permanently disabled when
-     * NETWORK_STATUS_UNWANTED_DISABLE_AUTOJOIN is received and percent internet availability is
-     * less than the threshold.
+     * Permanently disable network due to no internet if network never has internet validated
      */
     @Test
-    public void testLowPrababilityInternetPermanentlyDisableNetwork() throws Exception {
+    public void testNetworkStatusUnwantedDisableAutojoinDisableNetworkPermanent() throws Exception {
+        mConnectedNetwork.getNetworkSelectionStatus().setHasEverValidatedInternetAccess(false);
         connect();
-        when(mPerBssid.estimatePercentInternetAvailability()).thenReturn(
-                ClientModeImpl.PROBABILITY_WITH_INTERNET_TO_PERMANENTLY_DISABLE_NETWORK - 1);
         mCmi.sendMessage(CMD_UNWANTED_NETWORK,
                 ClientModeImpl.NETWORK_STATUS_UNWANTED_DISABLE_AUTOJOIN);
         mLooper.dispatchAll();
@@ -6874,15 +6868,12 @@ public class ClientModeImplTest extends WifiBaseTest {
     }
 
     /**
-     * Verify that the current network is temporarily disabled when
-     * NETWORK_STATUS_UNWANTED_DISABLE_AUTOJOIN is received and percent internet availability is
-     * over the threshold.
+     * Temporarily disable network due to no internet if network had internet validated
      */
     @Test
-    public void testHighProbabilityInternetTemporarilyDisableNetwork() throws Exception {
+    public void testNetworkStatusUnwantedDisableAutojoinDisableNetworkTemporary() throws Exception {
+        mConnectedNetwork.getNetworkSelectionStatus().setHasEverValidatedInternetAccess(true);
         connect();
-        when(mPerBssid.estimatePercentInternetAvailability()).thenReturn(
-                ClientModeImpl.PROBABILITY_WITH_INTERNET_TO_PERMANENTLY_DISABLE_NETWORK);
         mCmi.sendMessage(CMD_UNWANTED_NETWORK,
                 ClientModeImpl.NETWORK_STATUS_UNWANTED_DISABLE_AUTOJOIN);
         mLooper.dispatchAll();
