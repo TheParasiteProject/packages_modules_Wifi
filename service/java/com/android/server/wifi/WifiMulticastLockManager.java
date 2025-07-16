@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 /**
  * WifiMulticastLockManager tracks holders of multicast locks and
@@ -135,7 +136,11 @@ public class WifiMulticastLockManager {
         }
 
         void unlinkDeathRecipient() {
-            mBinder.unlinkToDeath(this, 0);
+            try {
+                mBinder.unlinkToDeath(this, 0);
+            } catch (NoSuchElementException e) {
+                Log.e(TAG, "Unable to unlink death recipient " + e);
+            }
         }
 
         public int getUid() {
