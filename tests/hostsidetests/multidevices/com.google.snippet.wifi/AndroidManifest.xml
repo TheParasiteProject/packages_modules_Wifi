@@ -35,6 +35,15 @@
     <meta-data
         android:name="mobly-object-converter"
         android:value="com.google.snippet.wifi.aware.WifiAwareSnippetConverter"/>
+
+    <activity
+        android:name="com.google.snippet.wifi.MainActivity"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
   </application>
   <instrumentation
       android:name="com.google.android.mobly.snippet.SnippetRunner"

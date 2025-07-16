@@ -16,7 +16,11 @@
 
 package com.google.snippet.wifi;
 
+import android.content.Context;
+import android.content.Intent;
 import android.os.RemoteException;
+
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.google.android.mobly.snippet.Snippet;
 import com.google.android.mobly.snippet.rpc.Rpc;
@@ -28,7 +32,12 @@ import com.google.android.mobly.snippet.rpc.RpcOptional;
  */
 public class UtilitySnippet extends WifiShellPermissionSnippet implements Snippet {
 
+    private final Context mContext;
     private static final String TAG = "UtilitySnippet";
+
+    public UtilitySnippet() {
+        mContext = InstrumentationRegistry.getInstrumentation().getContext();
+    }
 
     /**
      * Drops the shell permission. This is no-op if shell permission identity
@@ -54,5 +63,26 @@ public class UtilitySnippet extends WifiShellPermissionSnippet implements Snippe
         } else {
             adoptShellPermission(permissions);
         }
+    }
+
+    /**
+     * Bring the snippet service to the foreground by starting an activity.
+     */
+    @Rpc(description = "Bring the snippet service to the foreground by starting an activity.")
+    public void utilityBringToForeground() {
+        Intent intent = new Intent(mContext, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        mContext.startActivity(intent);
+    }
+
+    /**
+     * Bring the snippet service to the background by launching the home screen.
+     */
+    @Rpc(description = "Bring the snippet service to the background by launching the home screen.")
+    public void utilityBringToBackground() {
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.addCategory(Intent.CATEGORY_HOME);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        mContext.startActivity(intent);
     }
 }
