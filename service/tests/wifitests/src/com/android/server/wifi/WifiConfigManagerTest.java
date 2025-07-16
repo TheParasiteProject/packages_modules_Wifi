@@ -8605,10 +8605,15 @@ public class WifiConfigManagerTest extends WifiBaseTest {
                 openNetwork.networkId, TEST_UPDATE_UID, TEST_CREATOR_NAME));
         assertFalse(mWifiConfigManager.removeNetwork(
                 openNetwork.networkId, TEST_UPDATE_UID, TEST_CREATOR_NAME));
+
+        int user2_id = TEST_DEFAULT_USER + 1;
+        Context user2Context = mock(Context.class);
+        when(user2Context.getSystemService(eq(UserManager.class))).thenReturn(mUserManager);
+        when(mContext.createContextAsUser(any(), eq(0))).thenReturn(user2Context);
+        when(mUserManager.isAdminUser()).thenReturn(true);
         // Now switch the user to user 2 and user 2 is admin
-        when(mUserManager.isForegroundUserAdmin()).thenReturn(true);
-        mWifiConfigManager.handleUserSwitch(TEST_DEFAULT_USER + 1);
-        mWifiConfigManager.handleUserUnlock(TEST_DEFAULT_USER + 1);
+        mWifiConfigManager.handleUserSwitch(user2_id);
+        mWifiConfigManager.handleUserUnlock(user2_id);
         // Current user is admin and allow to remove a network.
         assertTrue(mWifiConfigManager.removeNetwork(
                 openNetwork.networkId, TEST_UPDATE_UID, TEST_CREATOR_NAME));
