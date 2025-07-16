@@ -8151,8 +8151,33 @@ public class ClientModeImplTest extends WifiBaseTest {
         triggerConnect();
         Log.i(TAG, "Triggering Connect done");
 
+        // should not trigger disconnect on short watchdog timeout
+        mLooper.moveTimeForward(ClientModeImpl.CONNECTING_WATCHDOG_SHORT_TIMEOUT_MS);
+        mLooper.dispatchAll();
+        verify(mWifiMetrics, never()).logStaEvent(eq(WIFI_IFACE_NAME),
+                eq(StaEvent.TYPE_FRAMEWORK_DISCONNECT),
+                eq(StaEvent.DISCONNECT_CONNECT_WATCHDOG_TIMER));
+
         // Simulate watchdog timeout and ensure we retuned to disconnected state.
         mLooper.moveTimeForward(ClientModeImpl.CONNECTING_WATCHDOG_TIMEOUT_MS + 5L);
+        mLooper.dispatchAll();
+        verify(mWifiMetrics).logStaEvent(eq(WIFI_IFACE_NAME),
+                eq(StaEvent.TYPE_FRAMEWORK_DISCONNECT),
+                eq(StaEvent.DISCONNECT_CONNECT_WATCHDOG_TIMER));
+        if (SdkLevel.isAtLeastS()) {
+            verify(mWifiConfigManager).setRecentFailureAssociationStatus(anyInt(),
+                    eq(WifiConfiguration.RECENT_FAILURE_NETWORK_NOT_FOUND));
+        }
+    }
+
+    @Test
+    public void testConnectionWatchdogShortTimeout() throws Exception {
+        // mock network to be from network specifier
+        mConnectedNetwork.fromWifiNetworkSpecifier = true;
+        triggerConnect();
+
+        // should trigger disconnect on the short watchdog timeout
+        mLooper.moveTimeForward(ClientModeImpl.CONNECTING_WATCHDOG_SHORT_TIMEOUT_MS);
         mLooper.dispatchAll();
         verify(mWifiMetrics).logStaEvent(eq(WIFI_IFACE_NAME),
                 eq(StaEvent.TYPE_FRAMEWORK_DISCONNECT),
