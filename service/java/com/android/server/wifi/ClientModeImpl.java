@@ -221,7 +221,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
     private static final int IPCLIENT_SHUTDOWN_TIMEOUT_MS = 60_000; // 60 seconds
     private static final int NETWORK_AGENT_TEARDOWN_DELAY_MS = 5_000; // Max teardown delay.
     private static final int DISASSOC_AP_BUSY_DISABLE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
-    @VisibleForTesting public static final long CONNECTING_WATCHDOG_TIMEOUT_MS = 8_000; // 8 secs.
+    @VisibleForTesting public static final long CONNECTING_WATCHDOG_TIMEOUT_MS = 30_000; // 30 secs.
+    @VisibleForTesting public static final long CONNECTING_WATCHDOG_SHORT_TIMEOUT_MS = 8_000;
     public static final int PROVISIONING_TIMEOUT_FILS_CONNECTION_MS = 36_000; // 36 secs.
     @VisibleForTesting
     public static final String ARP_TABLE_PATH = "/proc/net/arp";
@@ -6171,8 +6172,16 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             mL2ConnectingStateTimestamp = mClock.getElapsedSinceBootMillis();
             mConnectingWatchdogCount++;
             logd("Start Connecting Watchdog " + mConnectingWatchdogCount);
+            WifiConfiguration connectingConfig = getConnectingWifiConfigurationInternal();
+            long watchdogTimeout = CONNECTING_WATCHDOG_TIMEOUT_MS;
+            if (connectingConfig != null
+                    && getClientRoleForMetrics(connectingConfig)
+                    == WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_LOCAL_ONLY) {
+                // Use shorter watchdog timeout to speedup retry for local only connections
+                watchdogTimeout = CONNECTING_WATCHDOG_SHORT_TIMEOUT_MS;
+            }
             sendMessageDelayed(obtainMessage(CMD_CONNECTING_WATCHDOG_TIMER,
-                    mConnectingWatchdogCount, 0), CONNECTING_WATCHDOG_TIMEOUT_MS);
+                    mConnectingWatchdogCount, 0), watchdogTimeout);
         }
 
         @Override
