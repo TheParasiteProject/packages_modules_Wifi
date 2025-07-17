@@ -26,6 +26,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -102,6 +103,8 @@ public class WifiSettingsConfigStoreTest extends WifiBaseTest {
     @Mock
     private FeatureFlags mFeatureFlags;
     @Mock
+    private FrameworkFacade mFrameworkFacade;
+    @Mock
     private UserManager mUserManager;
 
     private MockitoSession mSession;
@@ -134,7 +137,7 @@ public class WifiSettingsConfigStoreTest extends WifiBaseTest {
         mWifiSettingsConfigStore =
                 new WifiSettingsConfigStore(mContext, new Handler(mLooper.getLooper()),
                         mSettingsMigrationDataHolder, mWifiConfigManager, mWifiConfigStore,
-                        mFeatureFlags, mUserManager);
+                        mFeatureFlags, mFrameworkFacade, mUserManager);
     }
 
     @Test
@@ -411,6 +414,51 @@ public class WifiSettingsConfigStoreTest extends WifiBaseTest {
         userStoreData.deserializeData(/* input */ null, in.getDepth(), -1, null);
         assertEquals(TEST_PRIVATE_SETTING_NON_DEFAULT_VALUE,
                 mWifiSettingsConfigStore.get(TEST_PRIVATE_SETTING));
+    }
+
+    /**
+     * When migration data is not available from shared store, either fallback to default
+     * (e.g. {@link WifiSettingsConfigStore#WIFI_WEP_ALLOWED}) or Settings.Global (e.g.
+     * {@link WifiSettingsConfigStore#WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON}).
+     */
+    @Test
+    public void testSharedToPrivateMigration_dataNotFoundFromSharedStore() throws Exception {
+        assumeTrue(Environment.isSdkNewerThanB());
+        when(mFeatureFlags.multiUserWifiEnhancement()).thenReturn(true);
+        initializeWifiSettingsConfigStore();
+
+        // Capture both shared and user-specific StoreData.
+        ArgumentCaptor<WifiConfigStore.StoreData> storeDataCaptor = ArgumentCaptor.forClass(
+                WifiConfigStore.StoreData.class);
+        verify(mWifiConfigStore, times(2)).registerStoreData(storeDataCaptor.capture());
+        WifiConfigStore.StoreData sharedStoreData = storeDataCaptor.getAllValues().get(0);
+        WifiConfigStore.StoreData userStoreData = storeDataCaptor.getAllValues().get(1);
+
+        // Load from DE that does not contain private settings to be migrated.
+        when(mFrameworkFacade.getIntegerSetting(any(), any())).thenReturn(0);
+        when(mUserManager.getUserHandles(anyBoolean())).thenReturn(List.of(TEST_USER_HANDLE));
+        XmlPullParser in = createSettingsTestXmlForParsing(Map.of(
+                TEST_SHARED_SETTING.key, TEST_SHARED_SETTING_NON_DEFAULT_VALUE
+        ));
+        sharedStoreData.deserializeData(in, in.getDepth(), -1, null);
+        // In migration cache, WIFI_WEP_ALLOWED fallbacks to default value (true) and
+        // WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON fallbacks to the Settings.Global value (0).
+        assertTrue((boolean) mWifiSettingsConfigStore.mSharedToPrivateMigrationDataHolder.get(
+                WifiSettingsConfigStore.WIFI_WEP_ALLOWED.key));
+        assertFalse((boolean) mWifiSettingsConfigStore.mSharedToPrivateMigrationDataHolder.get(
+                WifiSettingsConfigStore.WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON.key));
+        // Flip the WIFI_WEP_ALLOWED value in mSettings to track change from migration.
+        mWifiSettingsConfigStore.put(WifiSettingsConfigStore.WIFI_WEP_ALLOWED, false);
+        assertFalse(mWifiSettingsConfigStore.get(WifiSettingsConfigStore.WIFI_WEP_ALLOWED));
+        assertTrue(mWifiSettingsConfigStore.get(
+                WifiSettingsConfigStore.WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON));
+
+        // CE doesn't contain settings and try to migrate.
+        when(ActivityManager.getCurrentUser()).thenReturn(UserHandle.getUserId(TEST_UID));
+        userStoreData.deserializeData(/* input */ null, in.getDepth(), -1, null);
+        assertTrue(mWifiSettingsConfigStore.get(WifiSettingsConfigStore.WIFI_WEP_ALLOWED));
+        assertFalse(mWifiSettingsConfigStore.get(
+                WifiSettingsConfigStore.WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON));
     }
 
     private XmlPullParser createSettingsTestXmlForParsing(final Map<String, Object> settings)
