@@ -982,6 +982,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             mActiveModeWarden.start();
             registerForCarrierConfigChange();
             mWifiInjector.getAdaptiveConnectivityEnabledSettingObserver().initialize();
+            mWifiInjector.getNl80211Native().initialize();
             mIsWifiServiceStarted = true;
         }, TAG + "#checkAndStartWifi");
     }
