@@ -355,21 +355,40 @@ public class Nl80211Proxy {
      * Wrapper to construct an Nl80211 request message.
      *
      * @param command Command ID for this request.
+     * @param flags Flags for this request.
+     * @param attributes Attributes for this request.
      * @return Nl80211 message, or null if the Nl80211Proxy has not been initialized
      */
     public @Nullable GenericNetlinkMsg createNl80211Request(
-            short command, StructNlAttr... attributes) {
+            short command, short flags, StructNlAttr... attributes) {
         if (!mIsInitialized) {
             Log.e(TAG, "Instance has not been initialized");
             return null;
         }
-        GenericNetlinkMsg request = new GenericNetlinkMsg(
-                command, mNl80211FamilyId, StructNlMsgHdr.NLM_F_REQUEST, getSequenceNumber());
+        GenericNetlinkMsg request =
+                new GenericNetlinkMsg(
+                        command,
+                        mNl80211FamilyId,
+                        (short) (flags | StructNlMsgHdr.NLM_F_REQUEST),
+                        getSequenceNumber());
         for (StructNlAttr attribute : attributes) {
             request.addAttribute(attribute);
         }
         return request;
     }
+
+    /**
+     * Wrapper to construct an Nl80211 request message.
+     *
+     * @param command Command ID for this request.
+     * @param attributes Attributes for this request.
+     * @return Nl80211 message, or null if the Nl80211Proxy has not been initialized
+     */
+    public @Nullable GenericNetlinkMsg createNl80211Request(
+            short command, StructNlAttr... attributes) {
+        return createNl80211Request(command, (short) 0x0, attributes);
+    }
+
 
     /**
      * Register a callback to trigger when the specified broadcast event type is received.

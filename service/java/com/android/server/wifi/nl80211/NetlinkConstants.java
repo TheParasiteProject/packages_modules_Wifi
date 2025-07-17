@@ -54,4 +54,10 @@ public class NetlinkConstants {
     public static final String NL80211_MULTICAST_GROUP_SCAN = "scan";
     public static final String NL80211_MULTICAST_GROUP_REG = "regulatory";
     public static final String NL80211_MULTICAST_GROUP_MLME = "mlme";
+
+    // Nl80211 commands. See kernel/uapi/linux/nl80211.h
+    public static final short NL80211_CMD_GET_INTERFACE = 5;
+
+    // Nl80211 attributes. See kernel/uapi/linux/nl80211.h
+    public static final byte NL80211_ATTR_IFNAME = 4;
 }
