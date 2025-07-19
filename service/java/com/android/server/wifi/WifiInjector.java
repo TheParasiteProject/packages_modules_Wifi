@@ -456,7 +456,7 @@ public class WifiInjector {
                         mWifiHandler);
         mSettingsConfigStore = new WifiSettingsConfigStore(context, mWifiHandler,
                 mSettingsMigrationDataHolder, mWifiConfigManager, mWifiConfigStore, mFeatureFlags,
-                mUserManager);
+                mFrameworkFacade, mUserManager);
         mWifiSettingsBackupRestore = new WifiSettingsBackupRestore(mSettingsConfigStore);
         mSettingsStore = new WifiSettingsStore(mContext, mSettingsConfigStore, mWifiThreadRunner,
                 mFrameworkFacade, mWifiNotificationManager, mDeviceConfigFacade,
