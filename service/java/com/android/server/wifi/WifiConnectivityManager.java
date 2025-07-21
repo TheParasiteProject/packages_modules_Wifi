@@ -453,10 +453,13 @@ public class WifiConnectivityManager {
         List<WifiCandidates.Candidate> secondaryCmmCandidates;
         if (mMultiInternetManager.isStaConcurrencyForMultiInternetMultiApAllowed()) {
             if (primaryCcm.isMlo()) {
-                // An MLO connection can have links in multiple bands. So pick any candidates other
-                // than affiliated BSSID's. Accordingly, firmware will adjust multi-links.
+                // For an MLO connection, select candidate BSSIDs that are not affiliated or the
+                // primary link's BSSID, as the primary's BSSID may differ from its link MAC
+                // address.
                 secondaryCmmCandidates = candidates.stream()
-                        .filter(c -> !primaryCcm.isAffiliatedLinkBssid(c.getKey().bssid))
+                        .filter(c -> !primaryCcm.isAffiliatedLinkBssid(c.getKey().bssid)
+                                && !TextUtils.equals(
+                                c.getKey().bssid.toString(), primaryCcm.getConnectedBssid()))
                         .collect(Collectors.toList());
             } else {
                 // A BSSID can only exist in one band, so when evaluating candidates, only those
