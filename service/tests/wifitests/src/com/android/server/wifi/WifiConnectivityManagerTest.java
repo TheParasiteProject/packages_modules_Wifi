@@ -1633,6 +1633,32 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
     }
 
     @Test
+    public void multiInternetSecondaryConnectionRequestFailsWithMultiApAllowedAndPrimaryMlo() {
+        setupMocksForMultiInternetTests(false);
+        // Add a new candidate (CANDIDATE_BSSID_5) in same band as primary candidate
+        // (CANDIDATE_BSSID). Add at the index 0, as setupMockSecondaryNetworkSelect() returns the
+        // first network match.
+        mCandidateList.add(0,
+                getTestWifiCandidate(CANDIDATE_NETWORK_ID_2, CANDIDATE_SSID_2, CANDIDATE_BSSID_5,
+                        -40, TEST_FREQUENCY));
+        // Enable Multi-Link operation (MLO) for primary.
+        when(mPrimaryClientModeManager.isMlo()).thenReturn(true);
+        // Make all CANDIDATE BSSIDs affiliated with primary.
+        when(mPrimaryClientModeManager.isAffiliatedLinkBssid(
+                MacAddress.fromString(CANDIDATE_BSSID))).thenReturn(true);
+        when(mPrimaryClientModeManager.isAffiliatedLinkBssid(
+                MacAddress.fromString(CANDIDATE_BSSID_2))).thenReturn(true);
+        when(mPrimaryClientModeManager.isAffiliatedLinkBssid(
+                MacAddress.fromString(CANDIDATE_BSSID_3))).thenReturn(true);
+        when(mPrimaryClientModeManager.isAffiliatedLinkBssid(
+                MacAddress.fromString(CANDIDATE_BSSID_4))).thenReturn(true);
+        // Return the primary BSSID as CANDIDATE_BSSID_5
+        when(mPrimaryClientModeManager.getConnectedBssid()).thenReturn(CANDIDATE_BSSID_5);
+        // Test secondary STA should not select CANDIDATE_BSSID_5 should fail.
+        testMultiInternetSecondaryConnectionRequest(false, true, false, CANDIDATE_BSSID_5);
+    }
+
+    @Test
     public void multiInternetSecondaryConnectionDisconnectedBeforeNetworkSelection() {
         setupMocksForMultiInternetTests(false);
         testMultiInternetSecondaryConnectionRequest(false, true, true, CANDIDATE_BSSID_2);
