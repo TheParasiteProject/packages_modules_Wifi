@@ -16,6 +16,8 @@
 
 package com.android.server.wifi;
 
+import static com.android.server.wifi.Clock.INVALID_TIMESTAMP_MS;
+
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiUsabilityStatsEntry;
@@ -38,7 +40,7 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
     private double mThresholdAdjustment;
     private final KalmanFilter mFilter;
     private long mLastMillis;
-    private long mLastDownwardBreachTimeMillis = 0;
+    private long mLastDownwardBreachTimeMillis = INVALID_TIMESTAMP_MS;
 
     public VelocityBasedConnectedScore(ScoringParams scoringParams) {
         mScoringParams = scoringParams;
@@ -69,7 +71,7 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
         mLastMillis = 0;
         mThresholdAdjustment = 0;
         mFilter.mx = null;
-        mLastDownwardBreachTimeMillis = 0;
+        mLastDownwardBreachTimeMillis = INVALID_TIMESTAMP_MS;
     }
 
     /**
