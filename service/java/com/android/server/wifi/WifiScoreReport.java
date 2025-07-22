@@ -666,15 +666,14 @@ public class WifiScoreReport {
         }
 
         long millis = mClock.getWallClockMillis();
-        ConnectedScoreResult scoreResult =
-                mVelocityBasedConnectedScore.generateScoreResult(mWifiInfo, null, millis);
+        ConnectedScoreResult scoreResult = mVelocityBasedConnectedScore.generateScoreResult(
+                mWifiInfo, null, millis, isPrimary());
         int score = scoreResult.score();
         int adjustScore = scoreResult.adjustedScore();
 
-        final int transitionScore = isPrimary() ? ConnectedScore.WIFI_TRANSITION_SCORE
-                : ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE;
-        mAospScorerPredictionStatusForEvaluation = convertToPredictionStatusForEvaluation(
-                adjustScore >= transitionScore);
+        mAospScorerPredictionStatusForEvaluation =
+                convertToPredictionStatusForEvaluation(scoreResult.isWifiUsable());
+
         // Bypass AOSP scorer if Wifi connected network scorer is set
         if (mWifiConnectedNetworkScorerHolder != null && !mIsExternalScorerDryRun) {
             return adjustScore;
@@ -771,8 +770,7 @@ public class WifiScoreReport {
             }
             return false;
         }
-        long millis = mClock.getWallClockMillis();
-        long deltaMillis = millis - mLastKnownNudCheckTimeMillis;
+        long deltaMillis = mClock.getWallClockMillis() - mLastKnownNudCheckTimeMillis;
         // Don't ever ask back-to-back - allow at least 5 seconds
         // for the previous one to finish.
         if (deltaMillis < NUD_THROTTLE_MILLIS) {
@@ -791,6 +789,7 @@ public class WifiScoreReport {
         }
         // nextNudBreach is the bar the score needs to cross before we ask for NUD
         double nextNudBreach = ConnectedScore.WIFI_TRANSITION_SCORE;
+        double quotient = deltaMillis / TIME_CONSTANT_MILLIS;
         if (mWifiConnectedNetworkScorerHolder == null) {
             // nud is between 1 and 10 at this point
             double deltaLevel = 11 - nud;
@@ -798,8 +797,8 @@ public class WifiScoreReport {
             // that starts down from there and decays exponentially back up to the steady-state
             // bar. If 5 time constants have passed, we are 99% of the way there, so skip the math.
             if (mLastKnownNudCheckScore < ConnectedScore.WIFI_TRANSITION_SCORE
-                    && deltaMillis < 5.0 * TIME_CONSTANT_MILLIS) {
-                double a = Math.exp(-deltaMillis / TIME_CONSTANT_MILLIS);
+                    && quotient < 5.0) {
+                double a = Math.exp(-quotient);
                 nextNudBreach =
                         a * (mLastKnownNudCheckScore - deltaLevel) + (1.0 - a) * nextNudBreach;
             }
@@ -1244,7 +1243,6 @@ public class WifiScoreReport {
     /** Called when the owner {@link ConcreteClientModeManager}'s role changes. */
     public void onRoleChanged(@Nullable ClientRole role) {
         mCurrentRole = role;
-        if (mVelocityBasedConnectedScore != null) mVelocityBasedConnectedScore.onRoleChanged(role);
         sendNetworkScore();
     }
 

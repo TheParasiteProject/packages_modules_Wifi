@@ -91,7 +91,6 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
         when(mContext.getResources()).thenReturn(mResources);
         mClock = new FakeClock();
         mVelocityBasedConnectedScore = new VelocityBasedConnectedScore(new ScoringParams(mContext));
-        mVelocityBasedConnectedScore.onRoleChanged(ActiveModeManager.ROLE_CLIENT_PRIMARY);
     }
 
     /**
@@ -110,7 +109,7 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
         ConnectedScoreResult scoreResult = null;
         for (int i = 0; i < 10; i++) {
             scoreResult = mVelocityBasedConnectedScore.generateScoreResult(mWifiInfo, null,
-                    mClock.getWallClockMillis());
+                    mClock.getWallClockMillis(), true);
         }
         assertTrue(scoreResult.score() > ConnectedScore.WIFI_TRANSITION_SCORE);
         assertTrue(scoreResult.adjustedScore() > ConnectedScore.WIFI_TRANSITION_SCORE);
@@ -119,7 +118,7 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
         // If we reset, should be below threshold after the first input
         mVelocityBasedConnectedScore.reset();
         scoreResult = mVelocityBasedConnectedScore.generateScoreResult(mWifiInfo, null,
-                mClock.getWallClockMillis());
+                mClock.getWallClockMillis(), true);
         assertTrue(scoreResult.score() < ConnectedScore.WIFI_TRANSITION_SCORE);
         assertTrue(scoreResult.adjustedScore() < ConnectedScore.WIFI_TRANSITION_SCORE);
         assertFalse(scoreResult.isWifiUsable());
@@ -141,10 +140,33 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
         ConnectedScoreResult scoreResult = null;
         for (int i = 0; i < 10; i++) {
             scoreResult = mVelocityBasedConnectedScore.generateScoreResult(mWifiInfo, null,
-                    mClock.getWallClockMillis());
+                    mClock.getWallClockMillis(), true);
         }
         assertTrue(scoreResult.score() < ConnectedScore.WIFI_TRANSITION_SCORE);
         assertTrue(scoreResult.adjustedScore() < ConnectedScore.WIFI_TRANSITION_SCORE);
+        assertFalse(scoreResult.isWifiUsable());
+    }
+
+    /**
+     *
+     * Low RSSI, and almost no data is moving in secondary mode.
+     *
+     * Expect a score below secondary threshold.
+     */
+    @Test
+    public void disallowLowRssiIfDataIsNotMovingInSecondaryMode() throws Exception {
+        mWifiInfo.setRssi(mRssiExitThreshold2GHz - 1);
+        mWifiInfo.setLinkSpeed(6); // Mbps
+        mWifiInfo.setSuccessfulTxPacketsPerSecond(.1); // proportional to pps
+        mWifiInfo.setLostTxPacketsPerSecond(0);
+        mWifiInfo.setSuccessfulRxPacketsPerSecond(.1);
+        ConnectedScoreResult scoreResult = null;
+        for (int i = 0; i < 10; i++) {
+            scoreResult = mVelocityBasedConnectedScore.generateScoreResult(mWifiInfo, null,
+                mClock.getWallClockMillis(), false);
+        }
+        assertTrue(scoreResult.score() < ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE);
+        assertTrue(scoreResult.adjustedScore() < ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE);
         assertFalse(scoreResult.isWifiUsable());
     }
 }

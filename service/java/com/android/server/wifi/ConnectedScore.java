@@ -16,11 +16,9 @@
 
 package com.android.server.wifi;
 
-import android.annotation.Nullable;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiUsabilityStatsEntry;
 
-import com.android.server.wifi.ActiveModeManager.ClientRole;
 /**
  * Base class for connection scoring
  */
@@ -51,30 +49,16 @@ public abstract class ConnectedScore {
     /** This is a typical STD for the connected RSSI for a phone sitting still */
     public double mDefaultRssiStandardDeviation = 2.0;
 
-    /** The current role of the WifiScoreReport owns this scorer. */
-    @Nullable
-    private ClientRole mCurrentRole = null;
-
     /**
      * Generate a {@link ConnectedScoreResult} based on the current state.
      *
      * @return network score - on NetworkAgent scale.
      */
     public abstract ConnectedScoreResult generateScoreResult(WifiInfo wifiInfo,
-            WifiUsabilityStatsEntry stats, long millis);
+            WifiUsabilityStatsEntry stats, long millis, boolean isPrimary);
 
     /**
      * Clears out state associated with the connection
      */
     public abstract void reset();
-
-    /** Called when the owner {@link ConcreteClientModeManager}'s role changes. */
-    public void onRoleChanged(@Nullable ClientRole role) {
-        mCurrentRole = role;
-    }
-
-    /** Returns whether this scores primary network based on the role */
-    protected boolean isPrimary() {
-        return mCurrentRole != null && mCurrentRole == ActiveModeManager.ROLE_CLIENT_PRIMARY;
-    }
 }
