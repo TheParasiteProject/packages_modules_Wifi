@@ -23,7 +23,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.AdditionalAnswers.answerVoid;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -348,21 +347,17 @@ public class WifiScoreReportTest extends WifiBaseTest {
      * @param mode times(n), never(), atLeastOnce(), etc.
      */
     private void verifySentNetworkScore(int score, VerificationMode mode) {
-        if (SdkLevel.isAtLeastS()) {
-            verify(mNetworkAgent, mode).sendNetworkScore(argThat(
-                    // note that a lambda doesn't work here, will cause a crash due to missing
-                    // class `NetworkScore` on R even though this code path is never reached on R.
-                    // Maybe lambdas are eagerly loaded by the classloader, while inner classes
-                    // aren't?
-                    new ArgumentMatcher<NetworkScore>() {
-                        @Override
-                        public boolean matches(NetworkScore networkScore) {
-                            return networkScore.getLegacyInt() == score;
-                        }
-                    }));
-        } else {
-            verify(mNetworkAgent, mode).sendNetworkScore(score);
-        }
+        verify(mNetworkAgent, mode).sendNetworkScore(argThat(
+                // note that a lambda doesn't work here, will cause a crash due to missing
+                // class `NetworkScore` on R even though this code path is never reached on R.
+                // Maybe lambdas are eagerly loaded by the classloader, while inner classes
+                // aren't?
+                new ArgumentMatcher<NetworkScore>() {
+                    @Override
+                    public boolean matches(NetworkScore networkScore) {
+                        return networkScore.getLegacyInt() == score;
+                    }
+                }));
     }
 
     private void verifySentNetworkScore(int score) {
@@ -370,11 +365,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     }
 
     private void verifySentAnyNetworkScore(VerificationMode mode) {
-        if (SdkLevel.isAtLeastS()) {
-            verify(mNetworkAgent, mode).sendNetworkScore(any(NetworkScore.class));
-        } else {
-            verify(mNetworkAgent, mode).sendNetworkScore(anyInt());
-        }
+        verify(mNetworkAgent, mode).sendNetworkScore(any(NetworkScore.class));
     }
 
     private void verifySentAnyNetworkScore() {
@@ -398,6 +389,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void calculateAndReportScoreSucceeds() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
                 .setScore(TEST_SCORE)
                 .setAdjustedScore(ADJUSTED_SCORE)
@@ -422,11 +414,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
                 mWifiScoreReport.getAospScorerPredictionStatusForEvaluation());
         assertEquals(WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_NONE,
                 mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation());
-        if (SdkLevel.isAtLeastS()) {
-            assertEquals(mWifiScoreReport.getScore().getLegacyInt(), ADJUSTED_SCORE);
-        } else {
-            assertEquals(mWifiScoreReport.getLegacyIntScore(), ADJUSTED_SCORE);
-        }
+        assertEquals(ADJUSTED_SCORE, mWifiScoreReport.getScore().getLegacyInt());
     }
 
     /**
@@ -434,6 +422,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void calculateAndReportScore_triggerScanIfNeeded() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         mWifiInfo.setRssi(TEST_RSSI);
         ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
                 .setScore(TEST_SCORE)
@@ -456,6 +445,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     @Test
     public void calculateAndReportScore_adaptiveConnectivityDisabled_notTriggerScan()
             throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         when(mAdaptiveConnectivityEnabledSettingObserver.get()).thenReturn(false);
         mWifiInfo.setRssi(TEST_RSSI);
         ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
@@ -479,6 +469,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     @Test
     public void calculateAndReportScore_scoringDisabled_notTriggerScan()
             throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         when(mWifiSettingsStore.isWifiScoringEnabled()).thenReturn(false);
         mWifiInfo.setRssi(TEST_RSSI);
         ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
@@ -502,6 +493,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     @Test
     public void calculateAndReportScore_cannotRequestSecondary_notTriggerScan()
             throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         when(mActiveModeWarden.canRequestSecondaryTransientClientModeManager()).thenReturn(false);
         mWifiInfo.setRssi(TEST_RSSI);
         ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
@@ -525,6 +517,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     @Test
     public void calculateAndReportScore_triggerScan_timeStampUpdated()
             throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         when(mMockConnectedScorerHelper.triggerScanIfNeeded(anyLong(), anyLong(), anyBoolean()))
                 .thenReturn(true);
         ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
@@ -552,6 +545,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     @Test
     public void calculateAndReportScore_notTriggerScan_timeStampNotUpdated()
             throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         when(mMockConnectedScorerHelper.triggerScanIfNeeded(anyLong(), anyLong(), anyBoolean()))
                 .thenReturn(false);
         ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
@@ -668,7 +662,6 @@ public class WifiScoreReportTest extends WifiBaseTest {
     @Test
     public void testExternalScorerWhileLingering_sendLingeringScore() throws Exception {
         assumeTrue(SdkLevel.isAtLeastS());
-
         mWifiScoreReport.onRoleChanged(ActiveModeManager.ROLE_CLIENT_SECONDARY_LONG_LIVED);
 
         // Register Client for verification.
@@ -721,6 +714,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void calculateAndReportScoreDoesNotReportWhenRssiIsNotValid() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         // initially called once
         verifySentAnyNetworkScore();
 
@@ -739,6 +733,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void networkAgentMayBeNull() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         mWifiInfo.setRssi(-33);
         mWifiScoreReport.enableVerboseLogging(true);
         mWifiScoreReport.setNetworkAgent(null);
@@ -756,6 +751,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void allowLowRssiIfDataIsMoving() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         assumeTrue(mIsPrimary);
         mWifiInfo.setRssi(-80);
         mWifiInfo.setLinkSpeed(6); // Mbps
@@ -779,6 +775,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void giveUpOnBadRssiWhenDataIsNotMoving() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         // initially called once
         verifySentAnyNetworkScore();
 
@@ -793,20 +790,17 @@ public class WifiScoreReportTest extends WifiBaseTest {
         }
         int score = mWifiInfo.getScore();
         assertTrue(score < getTransitionScore());
-        if (SdkLevel.isAtLeastS()) {
-            ArgumentCaptor<NetworkScore> scoreCaptor = ArgumentCaptor.forClass(NetworkScore.class);
-            verify(mNetworkAgent, times(2)).sendNetworkScore(scoreCaptor.capture());
-            NetworkScore ns = scoreCaptor.getValue();
-            assertEquals(score, ns.getLegacyInt());
-            assertTrue(ns.isExiting());
-            if (mIsPrimary) assertTrue(ns.isTransportPrimary());
-        } else {
-            verify(mNetworkAgent).sendNetworkScore(score);
-        }
+        ArgumentCaptor<NetworkScore> scoreCaptor = ArgumentCaptor.forClass(NetworkScore.class);
+        verify(mNetworkAgent, times(2)).sendNetworkScore(scoreCaptor.capture());
+        NetworkScore ns = scoreCaptor.getValue();
+        assertEquals(score, ns.getLegacyInt());
+        assertTrue(ns.isExiting());
+        if (mIsPrimary) assertTrue(ns.isTransportPrimary());
     }
 
     @Test
     public void testAospScoreBreachTriggersScan() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         // initially called once
         verifySentAnyNetworkScore();
 
@@ -852,6 +846,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void testAospScoreBreachNoScanWhenExternalScorerEnabled() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         // register external scorer
         mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer,
                 TEST_UID);
@@ -878,6 +873,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void giveUpOnBadRssiAggressively() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         String oops = "giveUpOnBadRssiAggressively";
         mWifiInfo.setFrequency(5220);
         for (int rssi = -60; rssi >= -83; rssi -= 1) {
@@ -898,6 +894,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void stayOnIfRssiDoesNotGetBelowEntryThreshold() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         assumeTrue(mIsPrimary);
         String oops = "didNotStickLanding";
         int minScore = 100;
@@ -927,6 +924,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void allowTerribleRssiIfDataIsMovingWell() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         assumeTrue(mIsPrimary);
         mWifiInfo.setSuccessfulTxPacketsPerSecond(
                 mScoringParams.getYippeeSkippyPacketsPerSecond() + 0.1);
@@ -971,6 +969,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void testDataLogging() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         for (int i = 0; i < 10; i++) {
             mWifiInfo.setRssi(-65 + i);
             mWifiInfo.setLinkSpeed(300);
@@ -989,6 +988,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     /** Test data logging with MLO */
     @Test
     public void testDataLoggingMlo() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         List<MloLink> mloLinks = new ArrayList<>();
         MloLink link1 = new MloLink();
         link1.setBand(WifiScanner.WIFI_BAND_24_GHZ);
@@ -1048,6 +1048,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void testDataLoggingLimit() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         for (int i = 0; i < 3620; i++) {
             mWifiInfo.setRssi(-65 + i % 20);
             mWifiInfo.setLinkSpeed(300);
@@ -1068,6 +1069,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void stayAtBelowTransitionScoreWithReset() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         mWifiScoreReport.enableVerboseLogging(true);
         mWifiInfo.setFrequency(5220);
 
@@ -1100,6 +1102,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void testClientNotification() throws RemoteException {
+        assumeTrue(SdkLevel.isAtLeastS());
         // Register Client for verification.
         mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer,
                 TEST_UID);
@@ -1112,6 +1115,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void testClearClient() throws RemoteException {
+        assumeTrue(SdkLevel.isAtLeastS());
         // Register Client for verification.
         mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer,
                 TEST_UID);
@@ -1129,6 +1133,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void testAddsForBinderDeathOnSetClient() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer,
                 TEST_UID);
         verify(mExternalScoreUpdateObserverProxy).registerCallback(any());
@@ -1140,6 +1145,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void testAddsScorerFailureOnLinkToDeath() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         doThrow(new RemoteException())
                 .when(mAppBinder).linkToDeath(any(IBinder.DeathRecipient.class), anyInt());
         mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer,
@@ -1156,6 +1162,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void testSessionId() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         assertEquals(-1, WifiScoreReport.sessionIdFromNetId(Integer.MIN_VALUE));
         assertEquals(-1, WifiScoreReport.sessionIdFromNetId(-42));
         assertEquals(-1, WifiScoreReport.sessionIdFromNetId(-1));
@@ -1175,6 +1182,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void testClientGetSessionIdOnStart() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         // Register Client for verification.
         mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer,
                 TEST_UID);
@@ -1191,6 +1199,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void testClientStartOnRegWhileActive() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         when(mNetwork.getNetId()).thenReturn(TEST_NETWORK_ID);
         mWifiScoreReport.startConnectedNetworkScorer(TEST_NETWORK_ID, TEST_USER_SELECTED);
         mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer,
@@ -1206,6 +1215,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void testClientGetSessionIdOnStop() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         // Register Client for verification.
         mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer,
                 TEST_UID);
@@ -1229,80 +1239,13 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void verifyOnlyASingleScorerCanBeRegisteredSuccessively() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
         assertEquals(true, mWifiScoreReport.setWifiConnectedNetworkScorer(
                 mAppBinder, scorerImpl, TEST_UID));
         verify(mExternalScoreUpdateObserverProxy).registerCallback(any());
         assertEquals(false, mWifiScoreReport.setWifiConnectedNetworkScorer(
                 mAppBinder, scorerImpl, TEST_UID));
-    }
-
-    /**
-     * Verify that WifiScoreReport gets updated score when notifyScoreUpdate() is called by apps.
-     */
-    @Test
-    public void testFrameworkGetsUpdatesScore() throws Exception {
-        assumeFalse(SdkLevel.isAtLeastS());
-        // initially called once
-        verifySentNetworkScore(60);
-        WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
-        // Register Client for verification.
-        mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, scorerImpl, TEST_UID);
-        verify(mExternalScoreUpdateObserverProxy).registerCallback(
-                mExternalScoreUpdateObserverCbCaptor.capture());
-        when(mNetwork.getNetId()).thenReturn(TEST_NETWORK_ID);
-        mWifiScoreReport.startConnectedNetworkScorer(TEST_NETWORK_ID, TEST_USER_SELECTED);
-
-        assertEquals(TEST_SESSION_ID, scorerImpl.mSessionId);
-
-        // Invalid session ID
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(-1, 49);
-        if (SdkLevel.isAtLeastS()) {
-            NetworkScore score = mWifiScoreReport.getScore();
-            assertEquals(getMaxScore(), score.getLegacyInt());
-            if (mIsPrimary) assertTrue(score.isTransportPrimary());
-            assertFalse(score.isExiting());
-        } else {
-            assertEquals(getMaxScore(), mWifiScoreReport.getLegacyIntScore());
-        }
-
-        // Incorrect session ID
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId + 10, 49);
-        if (SdkLevel.isAtLeastS()) {
-            NetworkScore score = mWifiScoreReport.getScore();
-            assertEquals(getMaxScore(), score.getLegacyInt());
-            if (mIsPrimary) assertTrue(score.isTransportPrimary());
-            assertFalse(score.isExiting());
-        } else {
-            assertEquals(getMaxScore(), mWifiScoreReport.getLegacyIntScore());
-        }
-
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 49);
-        mLooper.dispatchAll();
-        verifySentNetworkScore(49);
-        if (SdkLevel.isAtLeastS()) {
-            NetworkScore score = mWifiScoreReport.getScore();
-            assertEquals(score.getLegacyInt(), 49);
-            if (mIsPrimary) assertTrue(score.isTransportPrimary());
-            assertTrue(score.isExiting());
-        } else {
-            assertEquals(49, mWifiScoreReport.getLegacyIntScore());
-        }
-
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 59);
-        mLooper.dispatchAll();
-        verifySentNetworkScore(59);
-        if (SdkLevel.isAtLeastS()) {
-            NetworkScore score = mWifiScoreReport.getScore();
-            assertEquals(score.getLegacyInt(), 59);
-            if (mIsPrimary) assertTrue(score.isTransportPrimary());
-            assertFalse(score.isExiting());
-        } else {
-            assertEquals(59, mWifiScoreReport.getLegacyIntScore());
-        }
     }
 
     @Test
@@ -1333,7 +1276,8 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void frameworkIgnoreNotifyScoreUpdateFromDryRunScorer() throws Exception {
-        assertEquals(ConnectedScorer.WIFI_INITIAL_SCORE, mWifiScoreReport.getLegacyIntScore());
+        assumeTrue(SdkLevel.isAtLeastS());
+        assertEquals(ConnectedScorer.WIFI_INITIAL_SCORE, mWifiScoreReport.mLegacyIntScore);
         when(mMockPackageManager.getPackagesForUid(anyInt()))
                 .thenReturn(new String[]{DRY_RUN_SCORER_PKG_NAME});
         WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
@@ -1348,13 +1292,14 @@ public class WifiScoreReportTest extends WifiBaseTest {
                 scorerImpl.mSessionId, ConnectedScorer.WIFI_INITIAL_SCORE - 1);
         mLooper.dispatchAll();
 
-        assertEquals(ConnectedScorer.WIFI_INITIAL_SCORE, mWifiScoreReport.getLegacyIntScore());
+        assertEquals(ConnectedScorer.WIFI_INITIAL_SCORE, mWifiScoreReport.mLegacyIntScore);
         assertFalse(mWifiScoreReport.isExternalScorerActive());
     }
 
     @Test
     public void frameworkIgnoreNotifyStatusUpdateFromDryRunScorer() throws Exception {
-        assertEquals(ConnectedScorer.WIFI_INITIAL_SCORE, mWifiScoreReport.getLegacyIntScore());
+        assumeTrue(SdkLevel.isAtLeastS());
+        assertEquals(ConnectedScorer.WIFI_INITIAL_SCORE, mWifiScoreReport.mLegacyIntScore);
         when(mMockPackageManager.getPackagesForUid(anyInt()))
                 .thenReturn(new String[]{DRY_RUN_SCORER_PKG_NAME});
         WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
@@ -1433,6 +1378,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void testFrameworkTriggersUpdateOfWifiUsabilityStats() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
         // Register Client for verification.
         assertFalse(mWifiScoreReport.isExternalScorerActive());
@@ -1476,6 +1422,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void bssidBlockListDoesnotHappenWhenExitingIsLessThanMinDuration() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
         // Register Client for verification.
         mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, scorerImpl, TEST_UID);
@@ -1500,40 +1447,11 @@ public class WifiScoreReportTest extends WifiBaseTest {
     }
 
     /**
-     * Verify BSSID blocklist happens when score stays below threshold for longer than the
-     * minimum duration
-     */
-    @Test
-    public void bssidBlockListHappensWhenExitingIsLongerThanMinDuration() throws Exception {
-        assumeFalse(SdkLevel.isAtLeastS());
-        WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
-        // Register Client for verification.
-        mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, scorerImpl, TEST_UID);
-        verify(mExternalScoreUpdateObserverProxy).registerCallback(
-                mExternalScoreUpdateObserverCbCaptor.capture());
-        when(mNetwork.getNetId()).thenReturn(TEST_NETWORK_ID);
-        mWifiScoreReport.startConnectedNetworkScorer(TEST_NETWORK_ID, TEST_USER_SELECTED);
-        mClock.mStepMillis = 0;
-
-        mClock.mWallClockMillis = 10;
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 49);
-        mLooper.dispatchAll();
-        mClock.mWallClockMillis = 29011;
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 49);
-        mLooper.dispatchAll();
-        mWifiScoreReport.stopConnectedNetworkScorer();
-        mLooper.dispatchAll();
-        verify(mWifiBlocklistMonitor).handleBssidConnectionFailure(any(), any(),
-                eq(WifiBlocklistMonitor.REASON_FRAMEWORK_DISCONNECT_CONNECTED_SCORE), anyInt());
-    }
-
-    /**
      * Verify BSSID blocklist does not happen when there is score flip flop
      */
     @Test
     public void bssidBlockListDoesnotHappenWhenExitingIsReset() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
         // Register Client for verification.
         mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, scorerImpl, TEST_UID);
@@ -1566,6 +1484,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void testOnStartInitialScoreInWifiInfoIsMaxScore() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         when(mNetwork.getNetId()).thenReturn(TEST_NETWORK_ID);
         mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer,
                 TEST_UID);
@@ -1574,161 +1493,12 @@ public class WifiScoreReportTest extends WifiBaseTest {
     }
 
     /**
-     * Verify confirmation duration is not added when it is not enabled in config overlay by default
-     */
-    @Test
-    public void confirmationDurationIsNotAddedWhenItIsNotEnabledInConfigOverlay() throws Exception {
-        assumeFalse(SdkLevel.isAtLeastS());
-        verifySentAnyNetworkScore();
-        WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
-        // Register Client for verification.
-        mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, scorerImpl, TEST_UID);
-        verify(mExternalScoreUpdateObserverProxy).registerCallback(
-                mExternalScoreUpdateObserverCbCaptor.capture());
-        when(mNetwork.getNetId()).thenReturn(TEST_NETWORK_ID);
-        mWifiScoreReport.startConnectedNetworkScorer(TEST_NETWORK_ID, TEST_USER_SELECTED);
-        mClock.mStepMillis = 0;
-
-        mClock.mWallClockMillis = 10;
-        mWifiInfo.setRssi(-65);
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 49);
-        mLooper.dispatchAll();
-        verifySentAnyNetworkScore(times(2));
-    }
-
-    /**
-     * Verify confirmation duration is not added when there is no score breach
-     */
-    @Test
-    public void confirmationDurationIsNotAddedWhenThereIsNoScoreBreach() throws Exception {
-        assumeFalse(SdkLevel.isAtLeastS());
-        // initially sent score = 60
-        verifySentNetworkScore(60);
-        WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
-        // Register Client for verification.
-        mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, scorerImpl, TEST_UID);
-        verify(mExternalScoreUpdateObserverProxy).registerCallback(
-                mExternalScoreUpdateObserverCbCaptor.capture());
-        when(mNetwork.getNetId()).thenReturn(TEST_NETWORK_ID);
-        mWifiScoreReport.startConnectedNetworkScorer(TEST_NETWORK_ID, TEST_USER_SELECTED);
-        mClock.mStepMillis = 0;
-        when(mContext.getResources().getBoolean(
-            R.bool.config_wifiMinConfirmationDurationSendNetworkScoreEnabled)).thenReturn(true);
-
-        mClock.mWallClockMillis = 10;
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 60);
-        mWifiInfo.setRssi(-70);
-        mLooper.dispatchAll();
-        verifySentNetworkScore(60, times(2));
-        mClock.mWallClockMillis = 3010;
-        mWifiInfo.setRssi(-65);
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 59);
-        mLooper.dispatchAll();
-        verifySentNetworkScore(59);
-        mClock.mWallClockMillis = 6010;
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 58);
-        mLooper.dispatchAll();
-        verifySentNetworkScore(58);
-    }
-
-    /**
-     * Verify confirmation duration and RSSI check is added for reporting low score when it is
-     * enabled in config overlay
-     */
-    @Test
-    public void confirmationDurationAndRssiCheckIsAddedForSendingLowScore() throws Exception {
-        assumeFalse(SdkLevel.isAtLeastS());
-        // initially called once
-        verifySentAnyNetworkScore();
-        WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
-        // Register Client for verification.
-        mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, scorerImpl, TEST_UID);
-        verify(mExternalScoreUpdateObserverProxy).registerCallback(
-                mExternalScoreUpdateObserverCbCaptor.capture());
-        when(mNetwork.getNetId()).thenReturn(TEST_NETWORK_ID);
-        mWifiScoreReport.startConnectedNetworkScorer(TEST_NETWORK_ID, TEST_USER_SELECTED);
-        mClock.mStepMillis = 0;
-        when(mContext.getResources().getBoolean(
-                R.bool.config_wifiMinConfirmationDurationSendNetworkScoreEnabled)).thenReturn(true);
-
-        mClock.mWallClockMillis = 10;
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 49);
-        mLooper.dispatchAll();
-        // still only called once
-        verifySentAnyNetworkScore();
-        mClock.mWallClockMillis = 10
-                + mDeviceConfigFacade.DEFAULT_MIN_CONFIRMATION_DURATION_SEND_LOW_SCORE_MS - 1;
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 48);
-        mLooper.dispatchAll();
-        // still only called once
-        verifySentAnyNetworkScore();
-        mClock.mWallClockMillis = 10
-                + mDeviceConfigFacade.DEFAULT_MIN_CONFIRMATION_DURATION_SEND_LOW_SCORE_MS;
-        mWifiInfo.setRssi(-65);
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 47);
-        mLooper.dispatchAll();
-        verifySentNetworkScore(47, never());
-        mClock.mWallClockMillis = 10
-                + mDeviceConfigFacade.DEFAULT_MIN_CONFIRMATION_DURATION_SEND_LOW_SCORE_MS + 3000;
-        mWifiInfo.setRssi(-68);
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 46);
-        mLooper.dispatchAll();
-        verifySentNetworkScore(46);
-    }
-
-    /**
-     * Verify confirmation duration is not added for reporting high score with default zero value
-     */
-    @Test
-    public void confirmationDurationIsNotAddedForSendingHighScore() throws Exception {
-        assumeFalse(SdkLevel.isAtLeastS());
-        // initially called once
-        verifySentAnyNetworkScore();
-        WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
-        // Register Client for verification.
-        mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, scorerImpl, TEST_UID);
-        verify(mExternalScoreUpdateObserverProxy).registerCallback(
-                mExternalScoreUpdateObserverCbCaptor.capture());
-        when(mNetwork.getNetId()).thenReturn(TEST_NETWORK_ID);
-        mWifiScoreReport.startConnectedNetworkScorer(TEST_NETWORK_ID, TEST_USER_SELECTED);
-        mClock.mStepMillis = 0;
-        when(mContext.getResources().getBoolean(
-                R.bool.config_wifiMinConfirmationDurationSendNetworkScoreEnabled)).thenReturn(true);
-
-        mClock.mWallClockMillis = 10;
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 49);
-        mLooper.dispatchAll();
-        // still only called once
-        verifySentAnyNetworkScore();
-        mClock.mWallClockMillis = 3000;
-        mWifiInfo.setRssi(-70);
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 51);
-        mLooper.dispatchAll();
-        verifySentNetworkScore(51);
-        mClock.mWallClockMillis = 6000;
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 52);
-        mLooper.dispatchAll();
-        verifySentNetworkScore(52);
-
-    }
-
-    /**
      * Verify NUD check is not recommended and the score of 51 is sent to connectivity service
      * when adaptive connectivity is disabled for AOSP scorer.
      */
     @Test
     public void verifyScoreIfToggleOffForAospScorer() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         // initially called once
         verifySentAnyNetworkScore();
 
@@ -1738,20 +1508,17 @@ public class WifiScoreReportTest extends WifiBaseTest {
 
         mWifiScoreReport.calculateAndReportScore();
 
-        if (SdkLevel.isAtLeastS()) {
-            ArgumentCaptor<NetworkScore> scoreCaptor = ArgumentCaptor.forClass(NetworkScore.class);
-            verify(mNetworkAgent, times(2)).sendNetworkScore(scoreCaptor.capture());
-            NetworkScore ns = scoreCaptor.getValue();
-            assertEquals(51, ns.getLegacyInt());
-            assertFalse(ns.isExiting());
-            if (mIsPrimary) assertTrue(ns.isTransportPrimary());
-        } else {
-            verify(mNetworkAgent).sendNetworkScore(51);
-        }
+        ArgumentCaptor<NetworkScore> scoreCaptor = ArgumentCaptor.forClass(NetworkScore.class);
+        verify(mNetworkAgent, times(2)).sendNetworkScore(scoreCaptor.capture());
+        NetworkScore ns = scoreCaptor.getValue();
+        assertEquals(51, ns.getLegacyInt());
+        assertFalse(ns.isExiting());
+        if (mIsPrimary) assertTrue(ns.isTransportPrimary());
     }
 
     @Test
     public void verifyNudCheckIfToggleOffForAospScorer() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         when(mAdaptiveConnectivityEnabledSettingObserver.get()).thenReturn(false);
         ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
                 .setScore(TEST_SCORE)
@@ -1774,6 +1541,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void verifyScoreIfScoringDisabledForAospScorer() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         // initially called once
         verifySentAnyNetworkScore();
         mWifiInfo.setFrequency(5220);
@@ -1781,16 +1549,12 @@ public class WifiScoreReportTest extends WifiBaseTest {
         when(mWifiSettingsStore.isWifiScoringEnabled()).thenReturn(false);
         mWifiScoreReport.calculateAndReportScore();
 
-        if (SdkLevel.isAtLeastS()) {
-            ArgumentCaptor<NetworkScore> scoreCaptor = ArgumentCaptor.forClass(NetworkScore.class);
-            verify(mNetworkAgent, times(2)).sendNetworkScore(scoreCaptor.capture());
-            NetworkScore ns = scoreCaptor.getValue();
-            assertEquals(51, ns.getLegacyInt());
-            assertFalse(ns.isExiting());
-            if (mIsPrimary) assertTrue(ns.isTransportPrimary());
-        } else {
-            verify(mNetworkAgent).sendNetworkScore(51);
-        }
+        ArgumentCaptor<NetworkScore> scoreCaptor = ArgumentCaptor.forClass(NetworkScore.class);
+        verify(mNetworkAgent, times(2)).sendNetworkScore(scoreCaptor.capture());
+        NetworkScore ns = scoreCaptor.getValue();
+        assertEquals(51, ns.getLegacyInt());
+        assertFalse(ns.isExiting());
+        if (mIsPrimary) assertTrue(ns.isTransportPrimary());
     }
 
     /**
@@ -1799,6 +1563,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void verifyNudCheckIfScoringDisabledForAospScorer() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         when(mWifiSettingsStore.isWifiScoringEnabled()).thenReturn(false);
         ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
                 .setScore(TEST_SCORE)
@@ -1957,6 +1722,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
 
     @Test
     public void testClientNotNotifiedForLocalOnlyConnection() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
         when(mNetworkAgent.getCurrentNetworkCapabilities()).thenReturn(
                 new NetworkCapabilities.Builder()
                         // no internet
@@ -2011,30 +1777,5 @@ public class WifiScoreReportTest extends WifiBaseTest {
         when(mNetwork.getNetId()).thenReturn(TEST_NETWORK_ID);
         mWifiScoreReport.startConnectedNetworkScorer(TEST_NETWORK_ID, TEST_USER_SELECTED);
         verify(mWifiConnectedNetworkScorer, never()).onStart(any());
-    }
-
-    /**
-     * Verify BSSID is added onto blocklist when the score value of -2 is sent from external Wi-Fi
-     * scorer.
-     */
-    @Test
-    public void verifyBssidBlocklistWithScoreValueOfMinus2() throws Exception {
-        assumeFalse(SdkLevel.isAtLeastS());
-        WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
-        // Register Client for verification.
-        mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, scorerImpl, TEST_UID);
-        verify(mExternalScoreUpdateObserverProxy).registerCallback(
-                mExternalScoreUpdateObserverCbCaptor.capture());
-        when(mNetwork.getNetId()).thenReturn(TEST_NETWORK_ID);
-        mWifiScoreReport.startConnectedNetworkScorer(TEST_NETWORK_ID, TEST_USER_SELECTED);
-        assertEquals(TEST_SESSION_ID, scorerImpl.mSessionId);
-        mExternalScoreUpdateObserverCbCaptor.getValue()
-                .notifyScoreUpdate(scorerImpl.mSessionId, -2);
-        mClock.mStepMillis = 0;
-        mClock.mWallClockMillis = 10;
-        mWifiInfo.setRssi(-65);
-        mLooper.dispatchAll();
-        verify(mWifiBlocklistMonitor).handleBssidConnectionFailure(any(), any(),
-                eq(WifiBlocklistMonitor.REASON_FRAMEWORK_DISCONNECT_CONNECTED_SCORE), anyInt());
     }
 }
