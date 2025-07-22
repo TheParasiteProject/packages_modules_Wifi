@@ -137,6 +137,7 @@ import com.android.server.wifi.coex.CoexManager;
 import com.android.server.wifi.coex.CoexUtils;
 import com.android.server.wifi.hal.WifiChip;
 import com.android.server.wifi.hotspot2.NetworkDetail;
+import com.android.server.wifi.nl80211.Nl80211Native;
 import com.android.server.wifi.util.ApConfigUtil;
 import com.android.server.wifi.util.ArrayUtils;
 
@@ -216,6 +217,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
             "get-wifi-supported-features",
             "get-overlay-config-values",
             "get-carrier-network-offload",
+            "list-interface-names",
     };
 
     private static final Map<String, Pair<NetworkRequest, ConnectivityManager.NetworkCallback>>
@@ -249,6 +251,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
     private final DeviceConfigFacade mDeviceConfig;
     private final AfcManager mAfcManager;
     private final WifiInjector mWifiInjector;
+    private final Nl80211Native mNl80211Native;
     private static final int[] OP_MODE_LIST = {
             WifiAvailableChannel.OP_MODE_STA,
             WifiAvailableChannel.OP_MODE_SAP,
@@ -507,6 +510,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         mWifiDiagnostics = wifiInjector.getWifiDiagnostics();
         mDeviceConfig = wifiInjector.getDeviceConfigFacade();
         mAfcManager = wifiInjector.getAfcManager();
+        mNl80211Native = wifiInjector.getNl80211Native();
         mWifiAwareManager = context.getSystemService(WifiAwareManager.class);
     }
 
@@ -2705,6 +2709,16 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     enabled = mWifiCarrierInfoManager.isCarrierNetworkOffloadEnabled(subId, false);
                     pw.println("not merged network offload:" + (enabled ? "enabled" : "disabled"));
                     return 0;
+                case "list-interface-names":
+                    List<String> interfaceNames = mNl80211Native.getInterfaceNames();
+                    if (interfaceNames == null) {
+                        pw.println("Failed to get interface names");
+                        return -1;
+                    }
+                    for (String interfaceName : interfaceNames) {
+                        pw.println(interfaceName);
+                    }
+                    return 0;
                 default:
                     return handleDefaultCommands(cmd);
             }
@@ -3554,6 +3568,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    Gets the features supported by WifiManager");
         pw.println("  get-carrier-network-offload <subId>");
         pw.println("    Gets whether the carrier network offload is enabled or not for this subId");
+        pw.println("  list-interface-names");
+        pw.println("    Lists all available wifi interfaces names.");
     }
 
     private void onHelpPrivileged(PrintWriter pw) {

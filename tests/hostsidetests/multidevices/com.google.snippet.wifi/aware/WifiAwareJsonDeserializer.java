@@ -99,7 +99,7 @@ public class WifiAwareJsonDeserializer {
     // JSON Keys for WifiNetworkSuggestion
     private static final String IS_HIDDEN_SSID = "is_hidden_ssid";
     private static final String IS_METERED = "is_metered";
-    private static final String PRIORITY = "priority";
+    private static final String IS_APP_INTERACTION_REQUIRED = "is_app_interaction_required";
     //WifiAwareDataPathSecurityConfig specific
     private static final String CIPHER_SUITE = "cipher_suite";
     private static final String SECURITY_CONFIG_PMK = "pmk";
@@ -393,14 +393,17 @@ public class WifiAwareJsonDeserializer {
                     + e.getMessage());
             }
         }
+        if (jsonObject.has(IS_APP_INTERACTION_REQUIRED)) {
+            builder.setIsAppInteractionRequired(jsonObject.getBoolean(IS_APP_INTERACTION_REQUIRED));
+        }
         if (jsonObject.has(PSK)) {
             builder.setWpa2Passphrase(jsonObject.getString(PSK));
         }
         if (jsonObject.has(IS_HIDDEN_SSID)) {
             builder.setIsHiddenSsid(jsonObject.getBoolean(IS_HIDDEN_SSID));
         }
-        if (jsonObject.has(PRIORITY)) {
-            builder.setPriority(jsonObject.getInt(PRIORITY));
+        if (jsonObject.has(IS_METERED)) {
+            builder.setIsMetered(jsonObject.getBoolean(IS_METERED));
         }
 
         return builder.build();

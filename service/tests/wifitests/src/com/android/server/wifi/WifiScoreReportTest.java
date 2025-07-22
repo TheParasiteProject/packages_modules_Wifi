@@ -28,6 +28,7 @@ import static org.mockito.AdditionalAnswers.answerVoid;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.argThat;
@@ -361,7 +362,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
                 .setAdjustedScore(ADJUSTED_SCORE)
                 .setIsWifiUsable(true)
                 .build();
-        when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong()))
+        when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
                 .thenReturn(scoreResult);
         mWifiScoreReport.mVelocityBasedConnectedScore = mMockVelocityScorer;
         // initially called once

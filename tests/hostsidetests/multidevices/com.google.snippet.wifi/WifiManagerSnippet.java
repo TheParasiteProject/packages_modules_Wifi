@@ -359,17 +359,11 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
                 Log.d(TAG, "Received ACTION_WIFI_NETWORK_SUGGESTION_POST_CONNECTION broadcast.");
                 SnippetEvent event = new SnippetEvent(mCallbackId, action);
                 NetworkInfo networkInfo = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
-                WifiInfo wifiInfo = intent.getParcelableExtra(WifiManager.EXTRA_WIFI_INFO);
 
                 if (networkInfo != null) {
                     event.getData().putString("networkInfoDetailedState",
                             networkInfo.getDetailedState().name());
                     event.getData().putString("networkInfoState", networkInfo.getState().name());
-                }
-                if (wifiInfo != null) {
-                    event.getData().putString("ssid",
-                            WifiJsonConverter.trimQuotationMarks(wifiInfo.getSSID()));
-                    event.getData().putString("bssid", wifiInfo.getBSSID());
                 }
                 mEventCache.postEvent(event);
             }
@@ -761,7 +755,7 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
                         Log.d(TAG, "debug> NetworkCallback State changed called for " + eventName);
                     } else if (nInfo.getDetailedState().equals(DetailedState.CONNECTED)) {
                         String eventName = "WifiNetworkConnected";
-                        WifiInfo currentConnectionInfo = getConnectionInfo();
+                        WifiInfo currentConnectionInfo = wifiGetCurrentConnectionInfo();
                         SnippetEvent event = new SnippetEvent(mCallbackId, eventName);
                         event.getData().putString("SSID",
                                 WifiJsonConverter.trimQuotationMarks(
@@ -794,7 +788,13 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
         }
     }
 
-    private WifiInfo getConnectionInfo() {
+    /**
+     * Gets the current connected Wi-Fi information
+     *
+     * @return WifiInfo
+     */
+    @Rpc(description = "Gets the current connected Wi-Fi connection information.")
+    public WifiInfo wifiGetCurrentConnectionInfo() {
         return executeWithShellPermission(mWifiManager::getConnectionInfo);
     }
 
@@ -990,7 +990,7 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
         Log.d(TAG, "Got network config: " + jsonConfig);
         WifiConfiguration wifiConfig = JsonDeserializer.jsonToWifiConfig(jsonConfig);
         CountDownLatch latch = new CountDownLatch(1);
-        WifiInfo connectionInfo = getConnectionInfo();
+        WifiInfo connectionInfo = wifiGetCurrentConnectionInfo();
         if (connectionInfo.getNetworkId() != -1
                 && connectionInfo.getSSID().equals(wifiConfig.SSID)
                 && connectionInfo.getSupplicantState().equals(SupplicantState.COMPLETED)) {
@@ -1024,7 +1024,7 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
 
         if (!Utils.waitUntil(
                 () -> {
-                    WifiInfo currentConnectionInfo = getConnectionInfo();
+                    WifiInfo currentConnectionInfo = wifiGetCurrentConnectionInfo();
                     return currentConnectionInfo.getNetworkId() != -1
                         && currentConnectionInfo.getSSID().equals(wifiConfig.SSID)
                         && currentConnectionInfo.getSupplicantState().equals(
@@ -1035,7 +1035,7 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
                 "Failed to connect to '"
                     + jsonConfig
                     + "', timeout! Current connection: '"
-                    + getConnectionInfo().getSSID()
+                    + wifiGetCurrentConnectionInfo().getSSID()
                     + "'",
                 null);
         }
