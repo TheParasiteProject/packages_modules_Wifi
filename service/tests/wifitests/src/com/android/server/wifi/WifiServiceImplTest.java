@@ -140,6 +140,7 @@ import android.content.res.Resources;
 import android.hardware.wifi.WifiStatusCode;
 import android.location.Location;
 import android.location.LocationManager;
+import android.multiuser.Flags;
 import android.net.DhcpInfo;
 import android.net.DhcpOption;
 import android.net.DhcpResultsParcelable;
@@ -537,6 +538,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mSession = mockitoSession()
                 .mockStatic(SubscriptionManager.class)
                 .mockStatic(CompatChanges.class)
+                .mockStatic(Flags.class)
                 .startMocking();
 
         mLog = spy(new LogcatLog(TAG));
@@ -13858,6 +13860,57 @@ public class WifiServiceImplTest extends WifiBaseTest {
         verify(mContext, never()).registerReceiver(any(BroadcastReceiver.class),
                 any(IntentFilter.class),
                 any(), any());
+    }
+
+    /**
+     * Verify that add, update or remove a private / shared networks is not allowed when
+     * DISALLOW_CONFIG_WIFI_PRIVATE or DISALLOW_CONFIG_WIFI_SHARED user restriction is set.
+     */
+    @Test
+    public void testAddOrUpdateOrRemoveNetworkIsNotAllowedForDisallowConfigPrivateSharedWifi()
+            throws Exception {
+        when(Flags.userRestrictionConfigWifiSharedPrivate()).thenReturn(true);
+        when(mContext.checkPermission(eq(android.Manifest.permission.NETWORK_SETTINGS),
+            anyInt(), anyInt())).thenReturn(PackageManager.PERMISSION_GRANTED);
+        when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(true);
+        doReturn(AppOpsManager.MODE_ALLOWED).when(mAppOpsManager)
+                .noteOp(AppOpsManager.OPSTR_CHANGE_WIFI_STATE, Process.myUid(), TEST_PACKAGE_NAME);
+        when(mWifiPermissionsUtil.isSystem(anyString(), anyInt())).thenReturn(true);
+        when(mWifiPermissionsUtil.checkCameraPermission(Binder.getCallingUid())).thenReturn(true);
+        when(mWifiPermissionsUtil.isAdmin(Binder.getCallingUid(), TEST_PACKAGE_NAME))
+                .thenReturn(false);
+        when(mWifiConfigManager.addOrUpdateNetwork(any(),  anyInt(), any(), eq(false))).thenReturn(
+                new NetworkUpdateResult(0));
+        when(mUserManager.hasUserRestrictionForUser(eq(UserManager.DISALLOW_CONFIG_WIFI_SHARED),
+                any())).thenReturn(true);
+        when(mUserManager.hasUserRestrictionForUser(eq(UserManager.DISALLOW_CONFIG_WIFI_PRIVATE),
+                any())).thenReturn(true);
+
+        WifiConfiguration config = WifiConfigurationTestUtil.createOpenNetwork();
+        mLooper.startAutoDispatch();
+        // Shared network is disallowed to add or update
+        assertEquals(-1,
+                mWifiServiceImpl.addOrUpdateNetwork(config, TEST_PACKAGE_NAME, mAttribution));
+
+        verify(mWifiConfigManager, never()).addOrUpdateNetwork(any(),  anyInt(), any(), eq(false));
+        verify(mWifiMetrics, never()).incrementNumAddOrUpdateNetworkCalls();
+
+        // Shared network is disallowed to remove
+        when(mWifiConfigManager.getConfiguredNetwork(TEST_NETWORK_ID)).thenReturn(config);
+        mWifiServiceImpl.forget(TEST_NETWORK_ID, mock(IActionListener.class));
+        verify(mWifiConfigManager, never()).removeNetwork(anyInt(), anyInt(), anyString());
+
+        // Private network is disallowed to add or update
+        WifiConfiguration privateConfig = WifiConfigurationTestUtil.createOpenNetwork();
+        privateConfig.shared = false;
+        // Shared network is disallowed
+        assertEquals(-1,
+                mWifiServiceImpl.addOrUpdateNetwork(privateConfig, TEST_PACKAGE_NAME,
+                mAttribution));
+
+        verify(mWifiConfigManager, never()).addOrUpdateNetwork(any(),  anyInt(), any(), eq(false));
+        verify(mWifiMetrics, never()).incrementNumAddOrUpdateNetworkCalls();
+        mLooper.stopAutoDispatchAndIgnoreExceptions();
     }
 
     @Test
