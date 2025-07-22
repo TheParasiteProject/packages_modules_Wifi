@@ -17,6 +17,7 @@
 package com.android.server.wifi;
 
 import static com.android.server.wifi.ClientModeImpl.WIFI_WORK_SOURCE;
+import static com.android.server.wifi.Clock.INVALID_TIMESTAMP_MS;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -118,11 +119,13 @@ public class WifiScoreReportTest extends WifiBaseTest {
     private static final int TEST_UID = 435546654;
     private static final String EXTERNAL_SCORER_PKG_NAME = "com.google.android.carrier.carrierwifi";
     private static final String DRY_RUN_SCORER_PKG_NAME = "com.example.xxx";
+    private static final int TEST_RSSI = -67;
     private static final int TEST_SCORE = 55;
     private static final int ADJUSTED_SCORE = 50;
 
     FakeClock mClock;
     WifiScoreReport mWifiScoreReport;
+    WifiScoreReport mWifiScoreReportWithMockHelper;
     ExtendedWifiInfo mWifiInfo;
     ScoringParams mScoringParams;
     @Mock WifiNetworkAgent mNetworkAgent;
@@ -148,6 +151,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     @Mock WifiConnectivityManager mWifiConnectivityManager;
     @Mock WifiConfigManager mWifiConfigManager;
     @Mock VelocityBasedConnectedScore mMockVelocityScorer;
+    @Mock ConnectedScorerHelper mMockConnectedScorerHelper;
     @Captor ArgumentCaptor<WifiManager.ScoreUpdateObserver> mExternalScoreUpdateObserverCbCaptor;
     private TestLooper mLooper;
 
@@ -270,15 +274,35 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mScoringParams = new ScoringParams();
         mWifiThreadRunner = new WifiThreadRunner(new Handler(mLooper.getLooper()));
         when(mAdaptiveConnectivityEnabledSettingObserver.get()).thenReturn(true);
+
+        /*
+         * This mWifiScoreReport is used for the legacy tests which test the code logic in both
+         * WifiScoreReport and ConnectedScorerHelper.
+         */
         mWifiScoreReport = new WifiScoreReport(mScoringParams, mClock, mWifiMetrics, mWifiInfo,
                 mWifiNative, mWifiBlocklistMonitor, mWifiThreadRunner, mWifiScoreCard,
                 mDeviceConfigFacade, mContext,
                 mAdaptiveConnectivityEnabledSettingObserver, TEST_IFACE_NAME,
                 mExternalScoreUpdateObserverProxy, mWifiSettingsStore,
-                mWifiGlobals, mActiveModeWarden, mWifiConnectivityManager, mWifiConfigManager);
+                mWifiGlobals, mActiveModeWarden, mWifiConnectivityManager, mWifiConfigManager,
+                new ConnectedScorerHelper(mScoringParams, mWifiGlobals, mWifiConnectivityManager));
         mWifiScoreReport.onRoleChanged(mIsPrimary ? ActiveModeManager.ROLE_CLIENT_PRIMARY
                 : ActiveModeManager.ROLE_CLIENT_SECONDARY_LONG_LIVED);
         mWifiScoreReport.setNetworkAgent(mNetworkAgent);
+
+        /* This mWifiScoreReportWithMockHelper is used for new tests which only test the code logic
+         * in WifiScoreReport.
+         */
+        mWifiScoreReportWithMockHelper = new WifiScoreReport(mScoringParams, mClock, mWifiMetrics,
+            mWifiInfo,
+            mWifiNative, mWifiBlocklistMonitor, mWifiThreadRunner, mWifiScoreCard,
+            mDeviceConfigFacade, mContext,
+            mAdaptiveConnectivityEnabledSettingObserver, TEST_IFACE_NAME,
+            mExternalScoreUpdateObserverProxy, mWifiSettingsStore,
+            mWifiGlobals, mActiveModeWarden, mWifiConnectivityManager, mWifiConfigManager,
+            mMockConnectedScorerHelper);
+        mWifiScoreReportWithMockHelper.mVelocityBasedConnectedScore = mMockVelocityScorer;
+
         when(mDeviceConfigFacade.getMinConfirmationDurationSendLowScoreMs()).thenReturn(
                 DeviceConfigFacade.DEFAULT_MIN_CONFIRMATION_DURATION_SEND_LOW_SCORE_MS);
         when(mDeviceConfigFacade.getMinConfirmationDurationSendHighScoreMs()).thenReturn(
@@ -388,6 +412,149 @@ public class WifiScoreReportTest extends WifiBaseTest {
         }
     }
 
+    /**
+     * Make sure that ConnectedScorerHelper.triggerScanIfNeeded() is called with correct parameters.
+     */
+    @Test
+    public void calculateAndReportScore_triggerScanIfNeeded() throws Exception {
+        mWifiInfo.setRssi(TEST_RSSI);
+        ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
+                .setScore(TEST_SCORE)
+                .setAdjustedScore(ADJUSTED_SCORE)
+                .setIsWifiUsable(true)
+                .setShouldTriggerScan(true)
+                .build();
+        when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
+                .thenReturn(scoreResult);
+
+        assertEquals(mWifiScoreReportWithMockHelper.calculateAndReportScore(), ADJUSTED_SCORE);
+        verify(mMockConnectedScorerHelper).triggerScanIfNeeded(eq(INVALID_TIMESTAMP_MS),
+                eq(mClock.mElapsedSinceBootMillis), eq(true));
+    }
+
+    /**
+     * Make sure that ConnectedScorerHelper.triggerScanIfNeeded() is not called if
+     * AdaptiveConnectivitiy is disabled.
+     */
+    @Test
+    public void calculateAndReportScore_adaptiveConnectivityDisabled_notTriggerScan()
+            throws Exception {
+        when(mAdaptiveConnectivityEnabledSettingObserver.get()).thenReturn(false);
+        mWifiInfo.setRssi(TEST_RSSI);
+        ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
+                .setScore(TEST_SCORE)
+                .setAdjustedScore(ADJUSTED_SCORE)
+                .setIsWifiUsable(true)
+                .setShouldTriggerScan(true)
+                .build();
+        when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
+                .thenReturn(scoreResult);
+
+        assertEquals(ADJUSTED_SCORE, mWifiScoreReportWithMockHelper.calculateAndReportScore());
+        verify(mMockConnectedScorerHelper, never())
+                .triggerScanIfNeeded(anyLong(), anyLong(), anyBoolean());
+    }
+
+    /**
+     * Make sure that ConnectedScorerHelper.triggerScanIfNeeded() is not called if scoring is
+     * disabled.
+     */
+    @Test
+    public void calculateAndReportScore_scoringDisabled_notTriggerScan()
+            throws Exception {
+        when(mWifiSettingsStore.isWifiScoringEnabled()).thenReturn(false);
+        mWifiInfo.setRssi(TEST_RSSI);
+        ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
+                .setScore(TEST_SCORE)
+                .setAdjustedScore(ADJUSTED_SCORE)
+                .setIsWifiUsable(true)
+                .setShouldTriggerScan(true)
+                .build();
+        when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
+                .thenReturn(scoreResult);
+
+        assertEquals(ADJUSTED_SCORE, mWifiScoreReportWithMockHelper.calculateAndReportScore());
+        verify(mMockConnectedScorerHelper, never())
+                .triggerScanIfNeeded(anyLong(), anyLong(), anyBoolean());
+    }
+
+    /**
+     * Make sure that ConnectedScorerHelper.triggerScanIfNeeded() is not called if
+     * it can't request secondary transient client mode manager.
+     */
+    @Test
+    public void calculateAndReportScore_cannotRequestSecondary_notTriggerScan()
+            throws Exception {
+        when(mActiveModeWarden.canRequestSecondaryTransientClientModeManager()).thenReturn(false);
+        mWifiInfo.setRssi(TEST_RSSI);
+        ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
+                .setScore(TEST_SCORE)
+                .setAdjustedScore(ADJUSTED_SCORE)
+                .setIsWifiUsable(true)
+                .setShouldTriggerScan(true)
+                .build();
+        when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
+                .thenReturn(scoreResult);
+
+        assertEquals(ADJUSTED_SCORE, mWifiScoreReportWithMockHelper.calculateAndReportScore());
+        verify(mMockConnectedScorerHelper, never())
+                .triggerScanIfNeeded(anyLong(), anyLong(), anyBoolean());
+    }
+
+    /**
+     * Make sure that WifiScoreReport.mLastLowScoreScanTimestampMs is updated after
+     * ConnectedScorerHelper.triggerScanIfNeeded() returns true;
+     */
+    @Test
+    public void calculateAndReportScore_triggerScan_timeStampUpdated()
+            throws Exception {
+        when(mMockConnectedScorerHelper.triggerScanIfNeeded(anyLong(), anyLong(), anyBoolean()))
+                .thenReturn(true);
+        ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
+                .setScore(TEST_SCORE)
+                .setAdjustedScore(ADJUSTED_SCORE)
+                .setIsWifiUsable(true)
+                .setShouldTriggerScan(true)
+                .build();
+        when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
+                .thenReturn(scoreResult);
+        mWifiInfo.setRssi(TEST_RSSI);
+        assertNotEquals(mClock.mElapsedSinceBootMillis,
+                mWifiScoreReportWithMockHelper.mLastLowScoreScanTimestampMs);
+
+        mWifiScoreReportWithMockHelper.calculateAndReportScore();
+
+        assertEquals(mClock.mElapsedSinceBootMillis,
+                mWifiScoreReportWithMockHelper.mLastLowScoreScanTimestampMs);
+    }
+
+    /**
+     * Make sure that WifiScoreReport.mLastLowScoreScanTimestampMs is not updated after
+     * ConnectedScorerHelper.triggerScanIfNeeded() returns false;
+     */
+    @Test
+    public void calculateAndReportScore_notTriggerScan_timeStampNotUpdated()
+            throws Exception {
+        when(mMockConnectedScorerHelper.triggerScanIfNeeded(anyLong(), anyLong(), anyBoolean()))
+                .thenReturn(false);
+        ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
+                .setScore(TEST_SCORE)
+                .setAdjustedScore(ADJUSTED_SCORE)
+                .setIsWifiUsable(true)
+                .setShouldTriggerScan(true)
+                .build();
+        when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
+                .thenReturn(scoreResult);
+        mWifiInfo.setRssi(TEST_RSSI);
+        assertNotEquals(mClock.mElapsedSinceBootMillis,
+                mWifiScoreReportWithMockHelper.mLastLowScoreScanTimestampMs);
+
+        mWifiScoreReportWithMockHelper.calculateAndReportScore();
+
+        assertNotEquals(mClock.mElapsedSinceBootMillis,
+                mWifiScoreReportWithMockHelper.mLastLowScoreScanTimestampMs);
+    }
+
     @Test
     public void mbbNetworkForceKeepUp() throws Exception {
         assumeTrue(SdkLevel.isAtLeastS());
@@ -426,6 +593,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     @Test
     public void calculateAndReportScoreWhileLingering_sendLingeringScore() throws Exception {
         assumeTrue(SdkLevel.isAtLeastS());
+        mWifiScoreReport.enableVerboseLogging(true);
         reset(mNetworkAgent);
 
         ArgumentCaptor<NetworkScore> networkScoreCaptor =

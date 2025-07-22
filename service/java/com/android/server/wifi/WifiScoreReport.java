@@ -18,7 +18,6 @@ package com.android.server.wifi;
 
 import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_INVALID;
 
-import static com.android.server.wifi.ClientModeImpl.WIFI_WORK_SOURCE;
 import static com.android.server.wifi.Clock.INVALID_TIMESTAMP_MS;
 
 import android.annotation.Nullable;
@@ -132,8 +131,10 @@ public class WifiScoreReport {
     private final ActiveModeWarden mActiveModeWarden;
     private final WifiConnectivityManager mWifiConnectivityManager;
     private final WifiConfigManager mWifiConfigManager;
-    private long mLastLowScoreScanTimestampMs = INVALID_TIMESTAMP_MS;
+    @VisibleForTesting
+    long mLastLowScoreScanTimestampMs = INVALID_TIMESTAMP_MS;
     private WifiConfiguration mCurrentWifiConfiguration;
+    private final ConnectedScorerHelper mConnectedScorerHelper;
 
     /**
      * Callback from {@link ExternalScoreUpdateObserverProxy}
@@ -590,11 +591,13 @@ public class WifiScoreReport {
             WifiGlobals wifiGlobals,
             ActiveModeWarden activeModeWarden,
             WifiConnectivityManager wifiConnectivityManager,
-            WifiConfigManager wifiConfigManager) {
+            WifiConfigManager wifiConfigManager,
+            ConnectedScorerHelper connectedScorerHelper) {
         mScoringParams = scoringParams;
         mClock = clock;
         mAdaptiveConnectivityEnabledSettingObserver = adaptiveConnectivityEnabledSettingObserver;
-        mVelocityBasedConnectedScore = new VelocityBasedConnectedScore(scoringParams);
+        mVelocityBasedConnectedScore = new VelocityBasedConnectedScore(scoringParams, wifiGlobals,
+                connectedScorerHelper);
         mWifiMetrics = wifiMetrics;
         mWifiInfo = wifiInfo;
         mWifiNative = wifiNative;
@@ -611,6 +614,7 @@ public class WifiScoreReport {
         mActiveModeWarden = activeModeWarden;
         mWifiConnectivityManager = wifiConnectivityManager;
         mWifiConfigManager = wifiConfigManager;
+        mConnectedScorerHelper = connectedScorerHelper;
         mWifiMetrics.setIsExternalWifiScorerOn(false, Process.WIFI_UID);
         mWifiMetrics.setScorerPredictedWifiUsabilityState(mInterfaceName,
                 WifiMetrics.WifiUsabilityState.UNKNOWN);
@@ -669,28 +673,32 @@ public class WifiScoreReport {
         ConnectedScoreResult scoreResult = mVelocityBasedConnectedScore.generateScoreResult(
                 mWifiInfo, null, millis, isPrimary());
         int score = scoreResult.score();
-        int adjustScore = scoreResult.adjustedScore();
+        int adjustedScore = scoreResult.adjustedScore();
 
         mAospScorerPredictionStatusForEvaluation =
                 convertToPredictionStatusForEvaluation(scoreResult.isWifiUsable());
 
         // Bypass AOSP scorer if Wifi connected network scorer is set
         if (mWifiConnectedNetworkScorerHolder != null && !mIsExternalScorerDryRun) {
-            return adjustScore;
+            return adjustedScore;
         }
 
-        if (adjustScore < mWifiGlobals.getWifiLowConnectedScoreThresholdToTriggerScanForMbb()
-                && enoughTimePassedSinceLastLowConnectedScoreScan()
-                && mActiveModeWarden.canRequestSecondaryTransientClientModeManager()) {
-            mLastLowScoreScanTimestampMs = mClock.getElapsedSinceBootMillis();
-            mWifiConnectivityManager.forceConnectivityScan(WIFI_WORK_SOURCE);
+        if (mAdaptiveConnectivityEnabledSettingObserver.get()
+                && mWifiSettingsStore.isWifiScoringEnabled()) {
+            // Trigger Wi-Fi scan
+            if (mActiveModeWarden.canRequestSecondaryTransientClientModeManager()) {
+                if (mConnectedScorerHelper.triggerScanIfNeeded(mLastLowScoreScanTimestampMs,
+                        mClock.getElapsedSinceBootMillis(), scoreResult.shouldTriggerScan())) {
+                    mLastLowScoreScanTimestampMs = mClock.getElapsedSinceBootMillis();
+                }
+            }
         }
 
         // report score
-        mLegacyIntScore = adjustScore;
+        mLegacyIntScore = adjustedScore;
         reportNetworkScoreToConnectivityServiceIfNecessary();
         updateWifiMetrics(millis, score);
-        return adjustScore;
+        return adjustedScore;
     }
 
     private boolean enoughTimePassedSinceLastLowConnectedScoreScan() {

@@ -18,6 +18,10 @@ package com.android.server.wifi;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyDouble;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
@@ -40,7 +44,7 @@ import org.mockito.Spy;
  */
 @SmallTest
 public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
-
+    private static final int WIFI_LOW_CONNECTED_SCORE_THRESHOLD_TO_TRIGGER_SCAN_FOR_MBB = 55;
 
     class FakeClock extends Clock {
         long mWallClockMillis = 1500000000000L;
@@ -55,11 +59,15 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
 
     FakeClock mClock;
     VelocityBasedConnectedScore mVelocityBasedConnectedScore;
+    VelocityBasedConnectedScore mVelocityBasedConnectedScoreWithMockHelper;
     ScanDetailCache mScanDetailCache;
     WifiInfo mWifiInfo;
     int mRssiExitThreshold2GHz;
     int mRssiExitThreshold5GHz;
     @Mock Context mContext;
+    @Mock WifiGlobals mMockWifiGlobals;
+    @Mock ConnectedScorerHelper mMockConnectedScorerHelper;
+    @Mock WifiConnectivityManager mMockWifiConnectivityManager;
     @Spy private MockResources mResources = new MockResources();
 
     private int setupIntegerResource(int resourceName, int value) {
@@ -90,7 +98,15 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
         mWifiInfo.setFrequency(2412);
         when(mContext.getResources()).thenReturn(mResources);
         mClock = new FakeClock();
-        mVelocityBasedConnectedScore = new VelocityBasedConnectedScore(new ScoringParams(mContext));
+        when(mMockWifiGlobals.getWifiLowConnectedScoreThresholdToTriggerScanForMbb()).thenReturn(
+                WIFI_LOW_CONNECTED_SCORE_THRESHOLD_TO_TRIGGER_SCAN_FOR_MBB);
+        ScoringParams scoringParams = new ScoringParams(mContext);
+        mVelocityBasedConnectedScore = new VelocityBasedConnectedScore(scoringParams,
+                mMockWifiGlobals,
+                new ConnectedScorerHelper(scoringParams, mMockWifiGlobals,
+                        mMockWifiConnectivityManager));
+        mVelocityBasedConnectedScoreWithMockHelper = new VelocityBasedConnectedScore(
+            scoringParams, mMockWifiGlobals, mMockConnectedScorerHelper);
     }
 
     /**
@@ -168,5 +184,35 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
         assertTrue(scoreResult.score() < ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE);
         assertTrue(scoreResult.adjustedScore() < ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE);
         assertFalse(scoreResult.isWifiUsable());
+    }
+
+    @Test
+    public void generateScoreResult_highScore_shouldTriggerScanTrue() {
+        when(mMockConnectedScorerHelper.adjustScore(any(WifiInfo.class), anyDouble(), anyLong(),
+                anyLong(), anyInt(), anyInt())).thenReturn(
+                        WIFI_LOW_CONNECTED_SCORE_THRESHOLD_TO_TRIGGER_SCAN_FOR_MBB - 1);
+
+        assertTrue(mVelocityBasedConnectedScoreWithMockHelper.generateScoreResult(mWifiInfo, null,
+                mClock.getWallClockMillis(), false).shouldTriggerScan());
+    }
+
+    @Test
+    public void generateScoreResult_scoreAtThreshold_shouldTriggerScanFalse() {
+        when(mMockConnectedScorerHelper.adjustScore(any(WifiInfo.class), anyDouble(), anyLong(),
+                anyLong(), anyInt(), anyInt())).thenReturn(
+                        WIFI_LOW_CONNECTED_SCORE_THRESHOLD_TO_TRIGGER_SCAN_FOR_MBB);
+
+        assertFalse(mVelocityBasedConnectedScoreWithMockHelper.generateScoreResult(mWifiInfo, null,
+                mClock.getWallClockMillis(), false).shouldTriggerScan());
+    }
+
+    @Test
+    public void generateScoreResult_lowScore_shouldTriggerScanFalse() {
+        when(mMockConnectedScorerHelper.adjustScore(any(WifiInfo.class), anyDouble(), anyLong(),
+                anyLong(), anyInt(), anyInt())).thenReturn(
+                        WIFI_LOW_CONNECTED_SCORE_THRESHOLD_TO_TRIGGER_SCAN_FOR_MBB + 1);
+
+        assertFalse(mVelocityBasedConnectedScoreWithMockHelper.generateScoreResult(mWifiInfo, null,
+                mClock.getWallClockMillis(), false).shouldTriggerScan());
     }
 }
