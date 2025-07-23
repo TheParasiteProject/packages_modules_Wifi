@@ -695,9 +695,14 @@ public class WifiConnectivityManager {
                 mOemPaidConnectionAllowed, mOemPrivateConnectionAllowed,
                 mRestrictedConnectionAllowedUids, skipSufficiencyCheck,
                 mAutojoinDisallowedSecurityTypes);
-        // Filter candidates before caching to avoid reconnecting on failure
-        candidates = filterDelayedCarrierSelectionCandidates(candidates, listenerName,
-                isFullScan);
+        // Filter carrier candidates before caching to avoid reconnecting on failure. The mobility
+        // based logic will run by default if the delay-based overlay is empty.
+        if (mDelayedSelectionCarrierIds.isEmpty()) {
+            candidates = filterCarrierCandidatesWhileInMotion(candidates);
+        } else {
+            candidates = filterDelayedCarrierSelectionCandidates(candidates, listenerName,
+                    isFullScan);
+        }
         mLatestCandidates = candidates;
         mLatestCandidatesTimestampMs = mClock.getElapsedSinceBootMillis();
 
@@ -928,6 +933,34 @@ public class WifiConnectivityManager {
         }
         mWifiMetrics.incrementNumHighMovementConnectionSkipped();
         return null;
+    }
+
+    private List<WifiCandidates.Candidate> filterCarrierCandidatesWhileInMotion(
+            List<WifiCandidates.Candidate> candidates) {
+        boolean deviceIsMoving = mDeviceMobilityState == WifiManager.DEVICE_MOBILITY_STATE_LOW_MVMT
+                || mDeviceMobilityState == WifiManager.DEVICE_MOBILITY_STATE_HIGH_MVMT;
+        if (!Flags.filterCarrierNetworksWhileInMotion() || !deviceIsMoving) {
+            return candidates;
+        }
+        if (candidates == null || candidates.isEmpty()) {
+            return candidates;
+        }
+
+        int numCarrierCandidates = 0;
+        List<WifiCandidates.Candidate> filteredCandidates = new ArrayList<>();
+        for (WifiCandidates.Candidate candidate : candidates) {
+            // Carrier networks are associated with a valid carrier ID
+            WifiConfiguration configuration =
+                    mConfigManager.getConfiguredNetwork(candidate.getNetworkConfigId());
+            if (configuration != null && !configuration.carrierMerged
+                    && configuration.carrierId != TelephonyManager.UNKNOWN_CARRIER_ID) {
+                numCarrierCandidates++;
+            } else {
+                filteredCandidates.add(candidate);
+            }
+        }
+        Log.i(TAG, "Filtered " + numCarrierCandidates + " carrier candidates while in motion");
+        return filteredCandidates;
     }
 
     /**

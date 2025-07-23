@@ -424,3 +424,10 @@ flag {
     description: "Allow the Nl80211 proxy to be initialized"
     bug: "344891670"
 }
+
+flag {
+    name: "filter_carrier_networks_while_in_motion"
+    namespace: "wifi"
+    description: "Filters carrier networks from the connection candidate list while the device is in motion"
+    bug: "409851656"
+}
