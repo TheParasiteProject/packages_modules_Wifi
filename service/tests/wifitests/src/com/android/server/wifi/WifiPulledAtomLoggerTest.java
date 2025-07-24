@@ -30,6 +30,7 @@ import android.app.StatsManager;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.res.Resources;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiNetworkSuggestion;
@@ -69,6 +70,7 @@ public class WifiPulledAtomLoggerTest extends WifiBaseTest {
     private TestLooper mLooper;
     @Mock private StatsManager mStatsManager;
     @Mock private Context mContext;
+    @Mock private Resources mResources;
     @Mock private WifiInjector mWifiInjector;
     @Mock private PackageManager mPackageManager;
     @Mock private WifiSettingsStore mWifiSettingsStore;
@@ -84,6 +86,7 @@ public class WifiPulledAtomLoggerTest extends WifiBaseTest {
         MockitoAnnotations.initMocks(this);
         mLooper = new TestLooper();
         when(mContext.getPackageManager()).thenReturn(mPackageManager);
+        when(mContext.getResources()).thenReturn(mResources);
         when(mWifiInjector.getWifiSettingsStore()).thenReturn(mWifiSettingsStore);
         mWifiPulledAtomLogger = new WifiPulledAtomLogger(mStatsManager,
                 new Handler(mLooper.getLooper()), mContext, mWifiInjector);
@@ -190,7 +193,7 @@ public class WifiPulledAtomLoggerTest extends WifiBaseTest {
         List<StatsEvent> data = new ArrayList<>();
         assertEquals(StatsManager.PULL_SUCCESS, mPullAtomCallbackArgumentCaptor.getValue()
                 .onPullAtom(WifiStatsLog.WIFI_SETTING_INFO, data));
-        assertEquals(9, data.size());
+        assertEquals(11, data.size());
     }
 
     @Test
