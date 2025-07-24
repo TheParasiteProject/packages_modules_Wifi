@@ -2117,7 +2117,7 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
                 .thenReturn(wcmNetwork);
         mWifiNetworkFactory.releaseNetworkFor(mNetworkRequest);
         // Verify that we triggered a disconnect.
-        verify(mClientModeManager, times(2)).disconnect();
+        verify(mClientModeManager).disconnect();
         verify(mWifiConfigManager).removeNetwork(
                 TEST_NETWORK_ID_1, TEST_UID_1, TEST_PACKAGE_NAME_1);
         // Re-enable connectivity manager .
@@ -2158,7 +2158,7 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
                 .thenReturn(wcmNetwork);
         mWifiNetworkFactory.releaseNetworkFor(mNetworkRequest);
         // Verify that we triggered a disconnect.
-        verify(mClientModeManager, times(2)).disconnect();
+        verify(mClientModeManager).disconnect();
         verify(mWifiConfigManager).removeNetwork(
                 TEST_NETWORK_ID_1, TEST_UID_1, TEST_PACKAGE_NAME_1);
         // Re-enable connectivity manager .
@@ -2202,7 +2202,7 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
                 .thenReturn(wcmNetwork);
         mWifiNetworkFactory.releaseNetworkFor(mNetworkRequest);
         // Verify that we triggered a disconnect.
-        verify(mClientModeManager, times(2)).disconnect();
+        verify(mClientModeManager).disconnect();
         verify(mWifiConfigManager).removeNetwork(
                 TEST_NETWORK_ID_1, TEST_UID_1, TEST_PACKAGE_NAME_1);
         // Re-enable connectivity manager .
@@ -2291,7 +2291,7 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
                 .thenReturn(wcmNetwork);
         mWifiNetworkFactory.releaseNetworkFor(mNetworkRequest);
         // Verify that we triggered a disconnect.
-        verify(mClientModeManager, times(2)).disconnect();
+        verify(mClientModeManager).disconnect();
         verify(mWifiConfigManager).removeNetwork(
                 TEST_NETWORK_ID_1, TEST_UID_1, TEST_PACKAGE_NAME_1);
         // Re-enable connectivity manager .
@@ -2560,7 +2560,7 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
 
         // Remove the connected request1 & ensure we disconnect.
         mWifiNetworkFactory.releaseNetworkFor(oldRequest);
-        verify(mClientModeManager, times(2)).disconnect();
+        verify(mClientModeManager).disconnect();
         verify(mClientModeManager, times(3)).getRole();
 
         verifyNoMoreInteractions(mWifiConnectivityManager, mWifiScanner, mClientModeManager,
@@ -2636,10 +2636,9 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         verifyNoMoreInteractions(mWifiConnectivityManager, mWifiScanner, mClientModeManager,
                 mAlarmManager);
 
-        // Now remove the rejected request2, ensure we disconnect & re-enable auto-join.
+        // Now remove the rejected request2, ensure we re-enable auto-join.
         mNetworkRequest.networkCapabilities.setNetworkSpecifier(specifier2);
         mWifiNetworkFactory.releaseNetworkFor(mNetworkRequest);
-        verify(mClientModeManager, times(3)).disconnect();
         verify(mClientModeManager, times(6)).getRole();
         verify(mWifiConnectivityManager).setSpecificNetworkRequestInProgress(false);
         verify(mActiveModeWarden).removeClientModeManager(any());
@@ -2679,7 +2678,7 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         // Remove the connected request1 & ensure we disconnect & ensure auto-join is re-enabled.
         mNetworkRequest.networkCapabilities.setNetworkSpecifier(specifier1);
         mWifiNetworkFactory.releaseNetworkFor(mNetworkRequest);
-        verify(mClientModeManager, times(2)).disconnect();
+        verify(mClientModeManager).disconnect();
         verify(mClientModeManager, times(3)).getRole();
         verify(mWifiConnectivityManager).setSpecificNetworkRequestInProgress(false);
         verify(mActiveModeWarden).removeClientModeManager(any());
