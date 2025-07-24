@@ -234,6 +234,7 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         when(mDialogBuilder.setMessageUrl(any(), anyInt(), anyInt())).thenReturn(mDialogBuilder);
         when(mDialogBuilder.setCallback(any(), any())).thenReturn(mDialogBuilder);
         when(mDialogBuilder.build()).thenReturn(mDialogHandle);
+        when(Flags.filterCarrierNetworksWhileInMotion()).thenReturn(true);
     }
 
     private void setUpResources(MockResources resources) {
@@ -276,10 +277,7 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         resources.setInteger(R.integer.config_wifiPnoScanIterations, EXPECTED_PNO_ITERATIONS);
         resources.setInteger(R.integer.config_wifiPnoScanIntervalMultiplier,
                 EXPECTED_PNO_MULTIPLIER);
-        resources.setIntArray(R.array.config_wifiDelayedSelectionCarrierIds,
-                DELAYED_SELECTION_CARRIER_IDS);
-        resources.setInteger(R.integer.config_wifiDelayedCarrierSelectionTimeMs,
-                DELAYED_CARRIER_SELECTION_TIME_MS);
+        resources.setIntArray(R.array.config_wifiDelayedSelectionCarrierIds, new int[0]);
     }
 
     /**
@@ -2327,12 +2325,28 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         }
     }
 
-    private void setAllScanCandidatesToDelayedCarrierCandidates() {
-        WifiConfiguration delayedCarrierSelectionConfig =
-                getTestWifiConfig(CANDIDATE_NETWORK_ID, "DelayedSelectionCarrier");
-        delayedCarrierSelectionConfig.carrierId = DELAYED_SELECTION_CARRIER_IDS[0];
-        when(mWifiConfigManager.getConfiguredNetwork(anyInt()))
-                .thenReturn(delayedCarrierSelectionConfig);
+    private void setAllScanCandidatesToCarrierCandidates() {
+        WifiConfiguration carrierNetworkConfig =
+                getTestWifiConfig(CANDIDATE_NETWORK_ID, "CarrierNetwork");
+        // Any non-default carrier ID indicates that this is a carrier network. Use a delayed
+        // selection carrier ID for compatibility with the delay-based unit tests.
+        carrierNetworkConfig.carrierId = DELAYED_SELECTION_CARRIER_IDS[0];
+        when(mWifiConfigManager.getConfiguredNetwork(anyInt())).thenReturn(carrierNetworkConfig);
+    }
+
+    /**
+     * Initialize the overlays for the delay-based carrier network optimization. When this overlay
+     * has a value, the delay-based optimization overrides the default mobility-based one.
+     */
+    private void initializeDelayedCarrierSelectionOverlays() {
+        mResources.setIntArray(R.array.config_wifiDelayedSelectionCarrierIds,
+                DELAYED_SELECTION_CARRIER_IDS);
+        mResources.setInteger(R.integer.config_wifiDelayedCarrierSelectionTimeMs,
+                DELAYED_CARRIER_SELECTION_TIME_MS);
+        // Reinitialize the test instance since the overlay values are retrieved during construction
+        mWifiConnectivityManager = createConnectivityManager();
+        mWifiConnectivityManager.setTrustedConnectionAllowed(true);
+        setWifiEnabled(true);
     }
 
     /**
@@ -2341,8 +2355,9 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
      */
     @Test
     public void testDelayedCarrierCandidateSelection() {
+        initializeDelayedCarrierSelectionOverlays();
         ScanData[] scanDatas = new ScanData[]{mScanData};
-        setAllScanCandidatesToDelayedCarrierCandidates();
+        setAllScanCandidatesToCarrierCandidates();
 
         // Produce results for the initial scan. Expect no connection,
         // since this is the first time we're seeing the carrier network.
@@ -2373,8 +2388,9 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
      */
     @Test
     public void testDelayedCarrierSelectionEmptyPartialScan() {
+        initializeDelayedCarrierSelectionOverlays();
         ScanData[] scanDatas = new ScanData[]{mScanData};
-        setAllScanCandidatesToDelayedCarrierCandidates();
+        setAllScanCandidatesToCarrierCandidates();
 
         // Issue a full scan to add the carrier candidate to the cache.
         when(mClock.getElapsedSinceBootMillis()).thenReturn(0L);
@@ -2413,8 +2429,9 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
      */
     @Test
     public void testDelayedCarrierSelectionSchedulePartialScan() {
+        initializeDelayedCarrierSelectionOverlays();
         ScanData[] scanDatas = new ScanData[]{mScanData};
-        setAllScanCandidatesToDelayedCarrierCandidates();
+        setAllScanCandidatesToCarrierCandidates();
 
         // Initial full scan with a delayed carrier candidate should schedule a partial scan.
         when(mClock.getElapsedSinceBootMillis()).thenReturn(0L);
@@ -2434,8 +2451,9 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
      */
     @Test
     public void testDelayedCarrierSelectionCancelPartialScan() {
+        initializeDelayedCarrierSelectionOverlays();
         ScanData[] scanDatas = new ScanData[]{mScanData};
-        setAllScanCandidatesToDelayedCarrierCandidates();
+        setAllScanCandidatesToCarrierCandidates();
 
         // Initial full scan with a delayed carrier candidate should schedule a partial scan.
         when(mClock.getElapsedSinceBootMillis()).thenReturn(0L);
@@ -2450,6 +2468,34 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verify(mWifiScanner, never()).startScan(
                 (ScanSettings) argThat(new WifiPartialScanSettingMatcher()), any());
+    }
+
+    /**
+     * Test that carrier network candidates are filtered from the list of connection candidates
+     * when the device is in the High or Low Mobility states.
+     */
+    @Test
+    public void testCarrierCandidatesFilteredWhileDeviceInMotion() {
+        ScanData[] scanDatas = new ScanData[]{mScanData};
+        setAllScanCandidatesToCarrierCandidates();
+
+        mWifiConnectivityManager.setDeviceMobilityState(
+                WifiManager.DEVICE_MOBILITY_STATE_HIGH_MVMT);
+        mAllSingleScanListenerCaptor.getValue().getWifiScannerListener().onResults(scanDatas);
+        verify(mPrimaryClientModeManager, never()).startConnectToNetwork(
+                CANDIDATE_NETWORK_ID, Process.WIFI_UID, CANDIDATE_BSSID);
+
+        mWifiConnectivityManager.setDeviceMobilityState(
+                WifiManager.DEVICE_MOBILITY_STATE_LOW_MVMT);
+        mAllSingleScanListenerCaptor.getValue().getWifiScannerListener().onResults(scanDatas);
+        verify(mPrimaryClientModeManager, never()).startConnectToNetwork(
+                CANDIDATE_NETWORK_ID, Process.WIFI_UID, CANDIDATE_BSSID);
+
+        mWifiConnectivityManager.setDeviceMobilityState(
+                WifiManager.DEVICE_MOBILITY_STATE_STATIONARY);
+        mAllSingleScanListenerCaptor.getValue().getWifiScannerListener().onResults(scanDatas);
+        verify(mPrimaryClientModeManager).startConnectToNetwork(
+                CANDIDATE_NETWORK_ID, Process.WIFI_UID, CANDIDATE_BSSID);
     }
 
     /**
