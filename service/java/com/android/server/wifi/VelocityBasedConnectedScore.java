@@ -23,6 +23,7 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiUsabilityStatsEntry;
 import android.util.Log;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.wifi.util.KalmanFilter;
 import com.android.server.wifi.util.Matrix;
 
@@ -31,15 +32,18 @@ import com.android.server.wifi.util.Matrix;
  * network agent.
  */
 public class VelocityBasedConnectedScore extends ConnectedScore {
-
     public static final String TAG = "VelocityBasedConnectedScore";
-    private final ScoringParams mScoringParams;
 
+    private final ScoringParams mScoringParams;
     private int mFrequency = ScanResult.BAND_5_GHZ_START_FREQ_MHZ;
     private double mThresholdAdjustment;
     private final KalmanFilter mFilter;
     private long mLastMillis;
     private long mLastDownwardBreachTimeMs = INVALID_TIMESTAMP_MS;
+    @VisibleForTesting
+    long mLastNudCheckTimeMs = INVALID_TIMESTAMP_MS;
+    @VisibleForTesting
+    int mLastNudCheckScore;
     private final WifiGlobals mWifiGlobals;
     private final ConnectedScorerHelper mConnectedScorerHelper;
 
@@ -217,12 +221,20 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
             mLastDownwardBreachTimeMs = millis;
         }
 
+        boolean shouldCheckNud = mConnectedScorerHelper.shouldCheckNud(mLastNudCheckTimeMs, millis,
+                transitionScore, mLastNudCheckScore, adjustedScore);
+        if (shouldCheckNud) {
+            mLastNudCheckTimeMs = millis;
+            mLastNudCheckScore = adjustedScore;
+        }
+
         return ConnectedScoreResult.builder()
             .setScore(score)
             .setAdjustedScore(adjustedScore)
             .setIsWifiUsable(adjustedScore >= transitionScore)
             .setShouldTriggerScan(adjustedScore
                     < mWifiGlobals.getWifiLowConnectedScoreThresholdToTriggerScanForMbb())
+            .setShouldCheckNud(shouldCheckNud)
             .build();
     }
 }

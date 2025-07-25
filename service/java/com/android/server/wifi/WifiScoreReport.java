@@ -25,6 +25,7 @@ import android.content.Context;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkScore;
+import android.net.ip.IpClientManager;
 import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.MloLink;
 import android.net.wifi.ScanResult;
@@ -101,6 +102,11 @@ public class WifiScoreReport {
     @Nullable
     private ClientRole mCurrentRole = null;
 
+    /** The IpClientManager from ClientMode */
+    @Nullable
+    private IpClientManager mIpClientManager = null;
+
+
     private final ScoringParams mScoringParams;
     private final Clock mClock;
     private int mSessionNumber = 0; // not to be confused with sessionid, this just counts resets
@@ -133,6 +139,10 @@ public class WifiScoreReport {
     private final WifiConfigManager mWifiConfigManager;
     @VisibleForTesting
     long mLastLowScoreScanTimestampMs = INVALID_TIMESTAMP_MS;
+    @VisibleForTesting
+    long mLastNudCheckTimeMs = INVALID_TIMESTAMP_MS;
+    private int mNudYes = 0;    // Counts when we voted for a NUD
+    private int mNudCount = 0;  // Counts when we were told a NUD was sent
     private WifiConfiguration mCurrentWifiConfiguration;
     private final ConnectedScorerHelper mConnectedScorerHelper;
 
@@ -340,7 +350,11 @@ public class WifiScoreReport {
                 }
                 return;
             }
-            mWifiConnectedNetworkScorerHolder.setShouldCheckIpLayerOnce(true);
+            mNudYes++;
+            if (mConnectedScorerHelper.checkNudIfNeeded(mIpClientManager, mLastNudCheckTimeMs,
+                    mClock.getWallClockMillis())) {
+                noteNudCheck();
+            }
         }
 
         @Override
@@ -636,14 +650,13 @@ public class WifiScoreReport {
         mIsUsable = true;
         mWifiMetrics.setScorerPredictedWifiUsabilityState(mInterfaceName,
                 WifiMetrics.WifiUsabilityState.UNKNOWN);
-        mLastKnownNudCheckScore = isPrimary() ? ConnectedScore.WIFI_TRANSITION_SCORE
-                : ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE;
         if (mVelocityBasedConnectedScore != null) {
             mVelocityBasedConnectedScore.reset();
         }
         mLastScoreBreachLowTimeMillis = INVALID_TIMESTAMP_MS;
         mLastScoreBreachHighTimeMillis = INVALID_TIMESTAMP_MS;
         mLastLowScoreScanTimestampMs = INVALID_TIMESTAMP_MS;
+        mLastNudCheckTimeMs = INVALID_TIMESTAMP_MS;
         if (mVerboseLoggingEnabled) Log.d(TAG, "reset");
     }
 
@@ -690,6 +703,14 @@ public class WifiScoreReport {
                 if (mConnectedScorerHelper.triggerScanIfNeeded(mLastLowScoreScanTimestampMs,
                         mClock.getElapsedSinceBootMillis(), scoreResult.shouldTriggerScan())) {
                     mLastLowScoreScanTimestampMs = mClock.getElapsedSinceBootMillis();
+                }
+            }
+            // Check NUD
+            if (scoreResult.shouldCheckNud()) {
+                mNudYes++;
+                if (mConnectedScorerHelper.checkNudIfNeeded(mIpClientManager,
+                        mLastNudCheckTimeMs, mClock.getWallClockMillis())) {
+                    noteNudCheck();
                 }
             }
         }
@@ -754,68 +775,9 @@ public class WifiScoreReport {
         mWifiMetrics.incrementWifiScoreCount(mInterfaceName, mLegacyIntScore);
     }
 
-    private static final double TIME_CONSTANT_MILLIS = 30.0e+3;
-    private static final long NUD_THROTTLE_MILLIS = 5000;
-    private long mLastKnownNudCheckTimeMillis = 0;
-    private int mLastKnownNudCheckScore = ConnectedScore.WIFI_TRANSITION_SCORE;
-    private int mNudYes = 0;    // Counts when we voted for a NUD
-    private int mNudCount = 0;  // Counts when we were told a NUD was sent
-
-    /**
-     * Recommends that a layer 3 check be done
-     *
-     * The caller can use this to (help) decide that an IP reachability check
-     * is desirable. The check is not done here; that is the caller's responsibility.
-     *
-     * @return true to indicate that an IP reachability check is recommended
-     */
-    public boolean shouldCheckIpLayer() {
-        // Don't recommend if adaptive connectivity is disabled.
-        if (!mAdaptiveConnectivityEnabledSettingObserver.get()
-                || !mWifiSettingsStore.isWifiScoringEnabled()) {
-            if (mVerboseLoggingEnabled) {
-                Log.d(TAG, "Wifi scoring disabled - Don't check IP layer");
-            }
-            return false;
-        }
-        long deltaMillis = mClock.getWallClockMillis() - mLastKnownNudCheckTimeMillis;
-        // Don't ever ask back-to-back - allow at least 5 seconds
-        // for the previous one to finish.
-        if (deltaMillis < NUD_THROTTLE_MILLIS) {
-            return false;
-        }
-        if (SdkLevel.isAtLeastS() && mWifiConnectedNetworkScorerHolder != null) {
-            if (!mWifiConnectedNetworkScorerHolder.getShouldCheckIpLayerOnce()) {
-                return false;
-            }
-            mNudYes++;
-            return true;
-        }
-        int nud = mScoringParams.getNudKnob();
-        if (nud == 0) {
-            return false;
-        }
-        // nextNudBreach is the bar the score needs to cross before we ask for NUD
-        double nextNudBreach = ConnectedScore.WIFI_TRANSITION_SCORE;
-        double quotient = deltaMillis / TIME_CONSTANT_MILLIS;
-        if (mWifiConnectedNetworkScorerHolder == null) {
-            // nud is between 1 and 10 at this point
-            double deltaLevel = 11 - nud;
-            // If we were below threshold the last time we checked, then compute a new bar
-            // that starts down from there and decays exponentially back up to the steady-state
-            // bar. If 5 time constants have passed, we are 99% of the way there, so skip the math.
-            if (mLastKnownNudCheckScore < ConnectedScore.WIFI_TRANSITION_SCORE
-                    && quotient < 5.0) {
-                double a = Math.exp(-quotient);
-                nextNudBreach =
-                        a * (mLastKnownNudCheckScore - deltaLevel) + (1.0 - a) * nextNudBreach;
-            }
-        }
-        if (mLegacyIntScore >= nextNudBreach) {
-            return false;
-        }
-        mNudYes++;
-        return true;
+    /** Called when the IpClientManager is changed. */
+    public void setIpClientManager(@Nullable IpClientManager ipClientManager) {
+        mIpClientManager = ipClientManager;
     }
 
     /**
@@ -824,15 +786,9 @@ public class WifiScoreReport {
      * When the caller has requested an IP reachability check, calling this will
      * help to rate-limit requests via shouldCheckIpLayer()
      */
-    public void noteIpCheck() {
-        long millis = mClock.getWallClockMillis();
-        mLastKnownNudCheckTimeMillis = millis;
-        mLastKnownNudCheckScore = mLegacyIntScore;
+    public void noteNudCheck() {
+        mLastNudCheckTimeMs = mClock.getWallClockMillis();
         mNudCount++;
-        // Make sure that only one NUD operation can be triggered.
-        if (mWifiConnectedNetworkScorerHolder != null) {
-            mWifiConnectedNetworkScorerHolder.setShouldCheckIpLayerOnce(false);
-        }
     }
 
     /**
