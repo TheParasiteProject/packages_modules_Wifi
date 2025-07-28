@@ -33,17 +33,21 @@ import com.android.server.wifi.util.Matrix;
 public class VelocityBasedConnectedScore extends ConnectedScore {
 
     public static final String TAG = "VelocityBasedConnectedScore";
-    private static final long MIN_TIME_TO_KEEP_BELOW_TRANSITION_SCORE_MILLIS = 9000;
     private final ScoringParams mScoringParams;
 
     private int mFrequency = ScanResult.BAND_5_GHZ_START_FREQ_MHZ;
     private double mThresholdAdjustment;
     private final KalmanFilter mFilter;
     private long mLastMillis;
-    private long mLastDownwardBreachTimeMillis = INVALID_TIMESTAMP_MS;
+    private long mLastDownwardBreachTimeMs = INVALID_TIMESTAMP_MS;
+    private final WifiGlobals mWifiGlobals;
+    private final ConnectedScorerHelper mConnectedScorerHelper;
 
-    public VelocityBasedConnectedScore(ScoringParams scoringParams) {
+    public VelocityBasedConnectedScore(ScoringParams scoringParams, WifiGlobals wifiGlobals,
+            ConnectedScorerHelper connectedScorerHelper) {
         mScoringParams = scoringParams;
+        mWifiGlobals = wifiGlobals;
+        mConnectedScorerHelper = connectedScorerHelper;
         mFilter = new KalmanFilter();
         mFilter.mH = new Matrix(2, new double[]{1.0, 0.0});
         mFilter.mR = new Matrix(1, new double[]{1.0});
@@ -71,7 +75,7 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
         mLastMillis = 0;
         mThresholdAdjustment = 0;
         mFilter.mx = null;
-        mLastDownwardBreachTimeMillis = INVALID_TIMESTAMP_MS;
+        mLastDownwardBreachTimeMs = INVALID_TIMESTAMP_MS;
     }
 
     /**
@@ -196,54 +200,6 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
     }
 
     /**
-     * Adjust the score.
-     */
-    private int adjustScore(WifiInfo wifiInfo, long millis, int transitionScore, int maxScore,
-            int score) {
-        int adjustedScore = score;
-        if (wifiInfo.getScore() > transitionScore && adjustedScore <= transitionScore
-                && wifiInfo.getSuccessfulTxPacketsPerSecond()
-                        >= mScoringParams.getYippeeSkippyPacketsPerSecond()
-                && wifiInfo.getSuccessfulRxPacketsPerSecond()
-                        >= mScoringParams.getYippeeSkippyPacketsPerSecond()
-        ) {
-            adjustedScore = transitionScore + 1;
-        }
-
-        if (wifiInfo.getScore() > transitionScore && adjustedScore <= transitionScore) {
-            // We don't want to trigger a downward breach unless the rssi is
-            // below the entry threshold.  There is noise in the measured rssi, and
-            // the kalman-filtered rssi is affected by the trend, so check them both.
-            // TODO(b/74613347) skip this if there are other indications to support the low score
-            int entry = mScoringParams.getEntryRssi(wifiInfo.getFrequency());
-            if (getFilteredRssi() >= entry
-                    || wifiInfo.getRssi() >= entry) {
-                // Stay a notch above the transition score to reduce ambiguity.
-                adjustedScore = transitionScore + 1;
-            }
-        }
-        if (wifiInfo.getScore() >= transitionScore && adjustedScore < transitionScore) {
-            mLastDownwardBreachTimeMillis = millis;
-        } else if (wifiInfo.getScore() < transitionScore && adjustedScore >= transitionScore) {
-            // Staying at below transition score for a certain period of time
-            // to prevent going back to wifi network again in a short time.
-            long elapsedMillis = millis - mLastDownwardBreachTimeMillis;
-            if (elapsedMillis < MIN_TIME_TO_KEEP_BELOW_TRANSITION_SCORE_MILLIS) {
-                adjustedScore = wifiInfo.getScore();
-            }
-        }
-
-        //sanitize boundaries
-        if (adjustedScore > maxScore) {
-            adjustedScore = maxScore;
-        }
-        if (adjustedScore < 0) {
-            adjustedScore = 0;
-        }
-        return adjustedScore;
-    }
-
-    /**
      * Generate a {@link ConnectedScoreResult} based on history input data.
      */
     @Override
@@ -254,11 +210,19 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
         final int maxScore =
                 isPrimary ? WIFI_MAX_SCORE : WIFI_MAX_SCORE - WIFI_SECONDARY_DELTA_SCORE;
         int score = generateScore(wifiInfo, millis, transitionScore);
-        int adjustedScore = adjustScore(wifiInfo, millis, transitionScore, maxScore, score);
+
+        int adjustedScore = mConnectedScorerHelper.adjustScore(wifiInfo, getFilteredRssi(),
+                mLastDownwardBreachTimeMs, millis, transitionScore, score);
+        if (wifiInfo.getScore() >= transitionScore && adjustedScore < transitionScore) {
+            mLastDownwardBreachTimeMs = millis;
+        }
+
         return ConnectedScoreResult.builder()
             .setScore(score)
             .setAdjustedScore(adjustedScore)
             .setIsWifiUsable(adjustedScore >= transitionScore)
+            .setShouldTriggerScan(adjustedScore
+                    < mWifiGlobals.getWifiLowConnectedScoreThresholdToTriggerScanForMbb())
             .build();
     }
 }
