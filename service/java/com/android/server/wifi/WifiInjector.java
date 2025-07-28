@@ -245,6 +245,7 @@ public class WifiInjector {
     private final SettingsMigrationDataHolder mSettingsMigrationDataHolder;
     private final LruConnectionTracker mLruConnectionTracker;
     private final WifiConnectivityManager mWifiConnectivityManager;
+    private final ConnectedScorerHelper mConnectedScorerHelper;
     private final ExternalPnoScanRequestManager mExternalPnoScanRequestManager;
     private final ConnectHelper mConnectHelper;
     private final ConnectionFailureNotifier mConnectionFailureNotifier;
@@ -557,6 +558,8 @@ public class WifiInjector {
                 mExternalPnoScanRequestManager, mSsidTranslator, mWifiPermissionsUtil,
                 mWifiCarrierInfoManager, mCountryCode, mWifiDialogManager,
                 mWifiDeviceStateChangeManager);
+        mConnectedScorerHelper = new ConnectedScorerHelper(mScoringParams, mWifiGlobals,
+            mWifiConnectivityManager);
         mMboOceController = new MboOceController(makeTelephonyManager(), mActiveModeWarden,
                 mWifiThreadRunner);
         mConnectionFailureNotifier = new ConnectionFailureNotifier(
@@ -923,7 +926,8 @@ public class WifiInjector {
                         mWifiNative, mWifiBlocklistMonitor, mWifiThreadRunner, mWifiScoreCard,
                         mDeviceConfigFacade, mContext, mAdaptiveConnectivityEnabledSettingObserver,
                         ifaceName, mExternalScoreUpdateObserverProxy, mSettingsStore, mWifiGlobals,
-                        mActiveModeWarden, mWifiConnectivityManager, mWifiConfigManager),
+                        mActiveModeWarden, mWifiConnectivityManager, mWifiConfigManager,
+                        mConnectedScorerHelper),
                 mWifiP2pConnection, mWifiGlobals, ifaceName, clientModeManager,
                 mCmiMonitor, mBroadcastQueue, mWifiNetworkSelector, makeTelephonyManager(),
                 this, mSettingsConfigStore, verboseLoggingEnabled, mWifiNotificationManager,
