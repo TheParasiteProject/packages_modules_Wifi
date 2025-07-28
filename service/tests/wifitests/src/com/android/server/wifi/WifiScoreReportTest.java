@@ -1420,6 +1420,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verify(mWifiNative, never()).getWifiLinkLayerStats(TEST_IFACE_NAME);
         verify(mWifiNative, never()).signalPoll(TEST_IFACE_NAME);
+        assertFalse(mWifiScoreReport.isExternalScorerActive());
     }
 
     /**
@@ -1443,6 +1444,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mLooper.dispatchAll();
 
         assertEquals(ConnectedScore.WIFI_INITIAL_SCORE, mWifiScoreReport.getLegacyIntScore());
+        assertFalse(mWifiScoreReport.isExternalScorerActive());
     }
 
     @Test
@@ -1466,6 +1468,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
                 scorerImpl.mSessionId, false);
         mLooper.dispatchAll();
         assertTrue(mWifiInfo.isUsable());
+        assertFalse(mWifiScoreReport.isExternalScorerActive());
     }
 
     /**
@@ -1491,6 +1494,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mLooper.dispatchAll();
         assertFalse(mWifiScoreReport.shouldCheckIpLayer());
         assertEquals(0, mWifiScoreReport.getNudYes());
+        assertFalse(mWifiScoreReport.isExternalScorerActive());
     }
 
     @Test
@@ -1512,6 +1516,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verify(mWifiBlocklistMonitor, never())
                 .handleBssidConnectionFailure(any(), any(), anyInt(), anyInt());
+        assertFalse(mWifiScoreReport.isExternalScorerActive());
     }
 
     /**
@@ -1521,9 +1526,11 @@ public class WifiScoreReportTest extends WifiBaseTest {
     public void testFrameworkTriggersUpdateOfWifiUsabilityStats() throws Exception {
         WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
         // Register Client for verification.
+        assertFalse(mWifiScoreReport.isExternalScorerActive());
         mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, scorerImpl, TEST_UID);
         verify(mExternalScoreUpdateObserverProxy).registerCallback(
                 mExternalScoreUpdateObserverCbCaptor.capture());
+        assertTrue(mWifiScoreReport.isExternalScorerActive());
         when(mNetwork.getNetId()).thenReturn(TEST_NETWORK_ID);
 
         WifiSignalPollResults signalPollResults = new WifiSignalPollResults();

@@ -50,18 +50,6 @@ import static com.android.server.wifi.proto.WifiStatsLog.WIFI_IS_UNUSABLE_REPORT
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_UNKNOWN;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE;
 import static com.android.server.wifi.proto.nano.WifiMetricsProto.StaEvent.TYPE_LINK_PROBE;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__TRUE;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__FALSE;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__TRUE;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__FALSE;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__TRUE;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__FALSE;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__UNKNOWN;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__TRUE;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__FALSE;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__UNUSABLE_EVENT__EVENT_FRAMEWORK_DATA_STALL;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__UNUSABLE_EVENT__EVENT_FIRMWARE_ALERT;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__UNUSABLE_EVENT__EVENT_IP_REACHABILITY_LOST;
@@ -225,6 +213,10 @@ public class WifiMetricsTest extends WifiBaseTest {
     private static final int INTERNAL_SCORER_TYPE_1 = SCORER_TYPE_VELOCITY;
     private static final int INTERNAL_SCORE_2 = 60;
     private static final int INTERNAL_SCORER_TYPE_2 = SCORER_TYPE_ML;
+    // matching definition in frameworks/proto_logging/stats/enums/wifi/enums.proto
+    private static final int WIFI_STATS_LOG_TRI_STATE_UNKNOWN = 0;
+    private static final int WIFI_STATS_LOG_TRI_STATE_TRUE = 1;
+    private static final int WIFI_STATS_LOG_TRI_STATE_FALSE = 2;
     private MockitoSession mSession;
     @Mock Context mContext;
     MockResources mResources;
@@ -7444,82 +7436,64 @@ public class WifiMetricsTest extends WifiBaseTest {
         speeds.DownstreamKbps = WifiMetrics.INVALID_SPEED;
         speeds.UpstreamKbps = WifiMetrics.INVALID_SPEED;
         speedSufficient = mWifiMetrics.calcSpeedSufficientNetworkCapabilities(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_UNKNOWN, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_UNKNOWN, speedSufficient.Upstream);
 
         // Low / invalid
         speeds.DownstreamKbps = 0;
         speeds.UpstreamKbps = WifiMetrics.INVALID_SPEED;
         speedSufficient = mWifiMetrics.calcSpeedSufficientNetworkCapabilities(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__FALSE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_FALSE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_UNKNOWN, speedSufficient.Upstream);
 
         // Barely bad / invalid
         speeds.DownstreamKbps = 999;
         speeds.UpstreamKbps = WifiMetrics.INVALID_SPEED;
         speedSufficient = mWifiMetrics.calcSpeedSufficientNetworkCapabilities(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__FALSE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_FALSE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_UNKNOWN, speedSufficient.Upstream);
 
         // Barely good / invalid
         speeds.DownstreamKbps = 1000;
         speeds.UpstreamKbps = WifiMetrics.INVALID_SPEED;
         speedSufficient = mWifiMetrics.calcSpeedSufficientNetworkCapabilities(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__TRUE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_UNKNOWN, speedSufficient.Upstream);
 
         // Good / invalid
         speeds.DownstreamKbps = 2000;
         speeds.UpstreamKbps = WifiMetrics.INVALID_SPEED;
         speedSufficient = mWifiMetrics.calcSpeedSufficientNetworkCapabilities(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__TRUE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_UNKNOWN, speedSufficient.Upstream);
 
         // Good / low
         speeds.DownstreamKbps = 2000;
         speeds.UpstreamKbps = 0;
         speedSufficient = mWifiMetrics.calcSpeedSufficientNetworkCapabilities(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__TRUE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__FALSE,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_FALSE, speedSufficient.Upstream);
 
         // Good / Barely bad
         speeds.DownstreamKbps = 2000;
         speeds.UpstreamKbps = 999;
         speedSufficient = mWifiMetrics.calcSpeedSufficientNetworkCapabilities(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__TRUE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__FALSE,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_FALSE, speedSufficient.Upstream);
 
         // Good / Barely good
         speeds.DownstreamKbps = 2000;
         speeds.UpstreamKbps = 1000;
         speedSufficient = mWifiMetrics.calcSpeedSufficientNetworkCapabilities(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__TRUE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__TRUE,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Upstream);
 
         // Good / Good
         speeds.DownstreamKbps = 2000;
         speeds.UpstreamKbps = 2000;
         speedSufficient = mWifiMetrics.calcSpeedSufficientNetworkCapabilities(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__TRUE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__TRUE,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Upstream);
 
     }
 
@@ -7532,82 +7506,64 @@ public class WifiMetricsTest extends WifiBaseTest {
         speeds.DownstreamKbps = WifiMetrics.INVALID_SPEED;
         speeds.UpstreamKbps = WifiMetrics.INVALID_SPEED;
         speedSufficient = mWifiMetrics.calcSpeedSufficientThroughputPredictor(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__UNKNOWN,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_UNKNOWN, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_UNKNOWN, speedSufficient.Upstream);
 
         // Low / invalid
         speeds.DownstreamKbps = 0;
         speeds.UpstreamKbps = WifiMetrics.INVALID_SPEED;
         speedSufficient = mWifiMetrics.calcSpeedSufficientThroughputPredictor(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__FALSE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__UNKNOWN,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_FALSE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_UNKNOWN, speedSufficient.Upstream);
 
         // Barely bad / invalid
         speeds.DownstreamKbps = 999;
         speeds.UpstreamKbps = WifiMetrics.INVALID_SPEED;
         speedSufficient = mWifiMetrics.calcSpeedSufficientThroughputPredictor(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__FALSE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__UNKNOWN,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_FALSE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_UNKNOWN, speedSufficient.Upstream);
 
         // Barely good / invalid
         speeds.DownstreamKbps = 1000;
         speeds.UpstreamKbps = WifiMetrics.INVALID_SPEED;
         speedSufficient = mWifiMetrics.calcSpeedSufficientThroughputPredictor(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__TRUE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__UNKNOWN,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_UNKNOWN, speedSufficient.Upstream);
 
         // Good / invalid
         speeds.DownstreamKbps = 2000;
         speeds.UpstreamKbps = WifiMetrics.INVALID_SPEED;
         speedSufficient = mWifiMetrics.calcSpeedSufficientThroughputPredictor(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__TRUE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__UNKNOWN,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_UNKNOWN, speedSufficient.Upstream);
 
         // Good / low
         speeds.DownstreamKbps = 2000;
         speeds.UpstreamKbps = 0;
         speedSufficient = mWifiMetrics.calcSpeedSufficientThroughputPredictor(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__TRUE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__FALSE,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_FALSE, speedSufficient.Upstream);
 
         // Good / Barely bad
         speeds.DownstreamKbps = 2000;
         speeds.UpstreamKbps = 999;
         speedSufficient = mWifiMetrics.calcSpeedSufficientThroughputPredictor(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__TRUE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__FALSE,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_FALSE, speedSufficient.Upstream);
 
         // Good / Barely good
         speeds.DownstreamKbps = 2000;
         speeds.UpstreamKbps = 1000;
         speedSufficient = mWifiMetrics.calcSpeedSufficientThroughputPredictor(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__TRUE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__TRUE,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Upstream);
 
         // Good / Good
         speeds.DownstreamKbps = 2000;
         speeds.UpstreamKbps = 2000;
         speedSufficient = mWifiMetrics.calcSpeedSufficientThroughputPredictor(speeds);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__TRUE,
-                speedSufficient.Downstream);
-        assertEquals(SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__TRUE,
-                speedSufficient.Upstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Downstream);
+        assertEquals(WIFI_STATS_LOG_TRI_STATE_TRUE, speedSufficient.Upstream);
 
     }
 
@@ -7622,7 +7578,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.updateWiFiEvaluationAndScorerStats(true, null, null);
         mWifiMetrics.logScorerPredictionResult(false, false, false, POLLING_INTERVAL_DEFAULT,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
-                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE);
+                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE, false);
 
         ExtendedMockito.verify(() -> WifiStatsLog.write_non_chained(
                 SCORER_PREDICTION_RESULT_REPORTED,
@@ -7633,10 +7589,11 @@ public class WifiMetricsTest extends WifiBaseTest {
                 SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_NO_CELLULAR_MODEM,
                 POLLING_INTERVAL_DEFAULT,
                 SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__UNKNOWN
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_TRUE
         ));
     }
 
@@ -7651,7 +7608,8 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.updateWiFiEvaluationAndScorerStats(true, null, null);
         mWifiMetrics.logScorerPredictionResult(false, false, false, POLLING_INTERVAL_DEFAULT,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
-                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE);
+                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
+                true);
 
         ExtendedMockito.verify(() -> WifiStatsLog.write_non_chained(
                 SCORER_PREDICTION_RESULT_REPORTED,
@@ -7662,10 +7620,11 @@ public class WifiMetricsTest extends WifiBaseTest {
                 SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_NO_CELLULAR_MODEM,
                 POLLING_INTERVAL_DEFAULT,
                 SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__UNKNOWN
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_FALSE
         ));
         ExtendedMockito.verify(() -> WifiStatsLog.write_non_chained(
                 SCORER_PREDICTION_RESULT_REPORTED,
@@ -7676,10 +7635,11 @@ public class WifiMetricsTest extends WifiBaseTest {
                 SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_NO_CELLULAR_MODEM,
                 POLLING_INTERVAL_DEFAULT,
                 SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__UNKNOWN
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_TRUE
         ));
     }
 
@@ -7693,7 +7653,8 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.updateWiFiEvaluationAndScorerStats(true, null, null);
         mWifiMetrics.logScorerPredictionResult(false, false, false, POLLING_INTERVAL_NOT_DEFAULT,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
-                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE);
+                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
+                false);
 
         ExtendedMockito.verify(() -> WifiStatsLog.write_non_chained(
                 SCORER_PREDICTION_RESULT_REPORTED,
@@ -7704,10 +7665,11 @@ public class WifiMetricsTest extends WifiBaseTest {
                 SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_NO_CELLULAR_MODEM,
                 POLLING_INTERVAL_NOT_DEFAULT,
                 SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__UNKNOWN
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_TRUE
         ));
     }
 
@@ -7723,7 +7685,8 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.updateWiFiEvaluationAndScorerStats(true, null, null);
         mWifiMetrics.logScorerPredictionResult(false, false, false, POLLING_INTERVAL_DEFAULT,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
-                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE);
+                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
+                false);
 
         ExtendedMockito.verify(() -> WifiStatsLog.write_non_chained(
                 SCORER_PREDICTION_RESULT_REPORTED,
@@ -7734,10 +7697,11 @@ public class WifiMetricsTest extends WifiBaseTest {
                 SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_NO_CELLULAR_MODEM,
                 POLLING_INTERVAL_DEFAULT,
                 SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__UNKNOWN
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_TRUE
         ));
     }
 
@@ -7751,7 +7715,8 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.updateWiFiEvaluationAndScorerStats(true, null, null);
         mWifiMetrics.logScorerPredictionResult(false, false, false, POLLING_INTERVAL_DEFAULT,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
-                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE);
+                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
+                false);
 
         ExtendedMockito.verify(() -> WifiStatsLog.write_non_chained(
                 SCORER_PREDICTION_RESULT_REPORTED,
@@ -7762,10 +7727,11 @@ public class WifiMetricsTest extends WifiBaseTest {
                 SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_NO_CELLULAR_MODEM,
                 POLLING_INTERVAL_DEFAULT,
                 SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN,
-                SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_US__UNKNOWN
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_UNKNOWN,
+                WIFI_STATS_LOG_TRI_STATE_TRUE
         ));
     }
 

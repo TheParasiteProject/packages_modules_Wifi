@@ -26,6 +26,8 @@ import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESUL
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_NO_SIM_INSERTED;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_OTHERS;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_SCORING_DISABLED;
+import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__IS_ACTIVE_SCORER__FALSE;
+import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__IS_ACTIVE_SCORER__TRUE;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__FALSE;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__TRUE;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__FALSE;
@@ -9813,7 +9815,8 @@ public class WifiMetrics {
             boolean isMobileDataEnabled,
             int pollingIntervalMs,
             int aospScorerPrediction,
-            int externalScorerPrediction
+            int externalScorerPrediction,
+            boolean isExternalScorerActive
     ) {
         boolean isCellularDataAvailable = mWifiDataStall.isCellularDataAvailable();
         boolean isThroughputSufficient = mWifiDataStall.isThroughputSufficient();
@@ -9822,17 +9825,18 @@ public class WifiMetrics {
                 hasActiveSubInfo, isMobileDataEnabled, isCellularDataAvailable,
                 mAdaptiveConnectivityEnabled);
         int scorerUnusableEvent = convertWifiUnusableTypeForScorer(mUnusableEventType);
-
         WifiStatsLog.write_non_chained(SCORER_PREDICTION_RESULT_REPORTED,
-                    Process.WIFI_UID,
-                    null,
-                    aospScorerPrediction,
-                    scorerUnusableEvent,
-                    isThroughputSufficient, deviceState, pollingIntervalMs,
-                    mWifiFrameworkState, mSpeedSufficientNetworkCapabilities.Downstream,
-                    mSpeedSufficientNetworkCapabilities.Upstream,
-                    mSpeedSufficientThroughputPredictor.Downstream,
-                    mSpeedSufficientThroughputPredictor.Upstream);
+                Process.WIFI_UID,
+                null,
+                aospScorerPrediction,
+                scorerUnusableEvent,
+                isThroughputSufficient, deviceState, pollingIntervalMs,
+                mWifiFrameworkState, mSpeedSufficientNetworkCapabilities.Downstream,
+                mSpeedSufficientNetworkCapabilities.Upstream,
+                mSpeedSufficientThroughputPredictor.Downstream,
+                mSpeedSufficientThroughputPredictor.Upstream,
+                isExternalScorerActive ? SCORER_PREDICTION_RESULT_REPORTED__IS_ACTIVE_SCORER__FALSE
+                        : SCORER_PREDICTION_RESULT_REPORTED__IS_ACTIVE_SCORER__TRUE);
         if (mScorerUid != Process.WIFI_UID) {
             WifiStatsLog.write_non_chained(SCORER_PREDICTION_RESULT_REPORTED,
                     mScorerUid,
@@ -9843,7 +9847,10 @@ public class WifiMetrics {
                     mWifiFrameworkState, mSpeedSufficientNetworkCapabilities.Downstream,
                     mSpeedSufficientNetworkCapabilities.Upstream,
                     mSpeedSufficientThroughputPredictor.Downstream,
-                    mSpeedSufficientThroughputPredictor.Upstream);
+                    mSpeedSufficientThroughputPredictor.Upstream,
+                    isExternalScorerActive
+                            ? SCORER_PREDICTION_RESULT_REPORTED__IS_ACTIVE_SCORER__TRUE
+                            : SCORER_PREDICTION_RESULT_REPORTED__IS_ACTIVE_SCORER__FALSE);
         }
 
         // We'd better reset to TYPE_NONE if it is defined in the future.
