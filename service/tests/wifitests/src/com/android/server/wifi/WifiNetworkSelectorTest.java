@@ -2768,8 +2768,10 @@ public class WifiNetworkSelectorTest extends WifiBaseTest {
     }
 
     /**
-     * New network selection is not performed if the currently connected network on secondary and
-     * primary CMM has good RSSI.
+     * When the currently connected network on secondary and primary CMM has good RSSI:
+     * - If no connect choice exists, network selection is skipped.
+     * - If connect choice exists, network selection is performed on the current network and it's
+     *   connect choice.
      *
      * Primary ClientModeImpl is connected to a good RSSI 5GHz network.
      * Secondary ClientModeImpl is connected to a good RSSI 5GHz network.
@@ -2779,22 +2781,26 @@ public class WifiNetworkSelectorTest extends WifiBaseTest {
      */
     @Test
     public void networkSelectionNotPerformedWhenAllCmmIsSufficient() {
-        String[] ssids = {"\"test1\""};
-        String[] bssids = {"6c:f3:7f:ae:8c:f3"};
-        int[] freqs = {5180};
-        String[] caps = {"[WPA2-PSK][ESS]"};
-        int[] levels = {mThresholdQualifiedRssi5G + 2};
-        int[] securities = {SECURITY_PSK};
-
+        // ssid[0] = current connected network
+        // ssid[1] = connect choice network
+        String[] ssids = {"\"test1\"", "\"test2\""};
+        String[] bssids = {"6c:f3:7f:ae:8c:f3", "6c:f3:7f:ae:8c:f4"};
+        int[] freqs = {5180, 2412};
+        String[] caps = {"[WPA2-PSK][ESS]", "[WPA2-EAP/SHA1-CCMP][ESS]"};
+        int[] levels = {mThresholdQualifiedRssi5G + 2, mThresholdMinimumRssi2G + 1};
+        int[] securities = {SECURITY_PSK, SECURITY_EAP};
         ScanDetailsAndWifiConfigs scanDetailsAndConfigs =
                 WifiNetworkSelectorTestUtil.setupScanDetailsAndConfigStore(ssids, bssids,
                         freqs, caps, levels, securities, mWifiConfigManager, mClock);
         List<ScanDetail> scanDetails = scanDetailsAndConfigs.getScanDetails();
         HashSet<String> blocklist = new HashSet<String>();
+        mWifiNetworkSelector.registerNetworkNominator(
+                new AllNetworkNominator(scanDetailsAndConfigs));
 
         // primary STA is connected and above threshold.
+        int primaryNetworkId = 0;
         when(mWifiInfo.getSupplicantState()).thenReturn(SupplicantState.COMPLETED);
-        when(mWifiInfo.getNetworkId()).thenReturn(0);
+        when(mWifiInfo.getNetworkId()).thenReturn(primaryNetworkId);
         when(mWifiInfo.getBSSID()).thenReturn(bssids[0]);
         when(mWifiInfo.is24GHz()).thenReturn(false);
         when(mWifiInfo.is5GHz()).thenReturn(true);
@@ -2806,7 +2812,7 @@ public class WifiNetworkSelectorTest extends WifiBaseTest {
 
         // Secondary STA is connected and above threshold.
         when(mSecondaryWifiInfo.getSupplicantState()).thenReturn(SupplicantState.COMPLETED);
-        when(mSecondaryWifiInfo.getNetworkId()).thenReturn(0);
+        when(mSecondaryWifiInfo.getNetworkId()).thenReturn(primaryNetworkId);
         when(mSecondaryWifiInfo.getBSSID()).thenReturn(bssids[0]);
         when(mSecondaryWifiInfo.is24GHz()).thenReturn(false);
         when(mSecondaryWifiInfo.is5GHz()).thenReturn(true);
@@ -2832,20 +2838,26 @@ public class WifiNetworkSelectorTest extends WifiBaseTest {
                 false, 0);
         assertNull(candidates);
 
-        // Mock that the primary connection has a user connect choice pointing something
-        // Verify candidate return is not null in this case
-        WifiConfiguration primaryConfig = mock(WifiConfiguration.class);
-        WifiConfiguration.NetworkSelectionStatus networkSelectionStatus = mock(
-                WifiConfiguration.NetworkSelectionStatus.class);
-        when(networkSelectionStatus.getConnectChoice()).thenReturn("\"ConnectChoiceTest\"NONE");
-        when(primaryConfig.getNetworkSelectionStatus()).thenReturn(networkSelectionStatus);
+        // Mock that the primary connection as config[0], having a user connect choice pointing to
+        // config[1].
+        // Verify candidate returned contains both networks
+        WifiConfiguration primaryConfig = scanDetailsAndConfigs.getWifiConfigs()[0];
+        primaryConfig.getNetworkSelectionStatus().setConnectChoice(
+                scanDetailsAndConfigs.getWifiConfigs()[1].getProfileKey());
+        primaryConfig.getNetworkSelectionStatus().setLastUsedSecurityParams(
+                primaryConfig.getDefaultSecurityParams());
         when(mWifiConfigManager.getConfiguredNetwork(mWifiInfo.getNetworkId())).thenReturn(
                 primaryConfig);
         candidates = mWifiNetworkSelector.getCandidatesFromScan(
                 scanDetails, blocklist, cmmStates, false, true, true, Collections.emptySet(),
                 false, 0);
-        // Candidate should not be null
-        assertNotNull(candidates);
+        // There should be 2 candidates
+        assertEquals(2, candidates.size());
+        // 0-th element is the current network
+        assertEquals(primaryConfig.networkId, candidates.get(0).getNetworkConfigId());
+        // 1-th element is the connect choice network
+        assertEquals(scanDetailsAndConfigs.getWifiConfigs()[1].networkId,
+                candidates.get(1).getNetworkConfigId());
 
         // disable associated network selection and verify no candidate is returned now
         doReturn(false).when(mResource).getBoolean(
