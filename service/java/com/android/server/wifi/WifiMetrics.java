@@ -9174,7 +9174,7 @@ public class WifiMetrics {
         // since these fields don't apply to multicast locks
         writeWifiLockActiveSession(
                 WifiStatsLog.WIFI_LOCK_DEACTIVATED__MODE__WIFI_MODE_MULTICAST_FILTERING_DISABLED,
-                new int[0], new String[0], duration, false, false, false);
+                new int[]{0}, new String[]{""}, duration, false, false, false);
     }
 
     private void writeWifiLockActiveSession(int lockMode, int[] attrUids, String[] attrTags,
