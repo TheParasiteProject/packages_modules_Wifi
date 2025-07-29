@@ -1218,10 +1218,10 @@ public class WifiScoreReport {
     }
 
     /**
-     * Get whether an external scorer is registered.
+     * Get whether an external scorer is active for scoring.
      */
-    public boolean isExternalScorerRegistered() {
-        return mWifiConnectedNetworkScorerHolder != null;
+    public boolean isExternalScorerActive() {
+        return mWifiConnectedNetworkScorerHolder != null && !mIsExternalScorerDryRun;
     }
 
     /**
