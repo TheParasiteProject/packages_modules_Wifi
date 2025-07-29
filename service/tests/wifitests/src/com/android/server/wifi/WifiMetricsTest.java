@@ -1530,20 +1530,20 @@ public class WifiMetricsTest extends WifiBaseTest {
         assertTrue(sb_wifi_score.toString(), (mDecodedProto.wifiScoreCount.length
                 <= (WIFI_SCORE_RANGE_MAX - WIFI_SCORE_RANGE_MIN + 1)));
         StringBuilder sb_wifi_limits = new StringBuilder();
-        sb_wifi_limits.append("Wifi Score limit is " +  ConnectedScore.WIFI_MAX_SCORE
+        sb_wifi_limits.append("Wifi Score limit is " +  ConnectedScorer.WIFI_MAX_SCORE
                 + ">= " + WIFI_SCORE_RANGE_MAX);
         assertTrue(sb_wifi_limits.toString(),
-                ConnectedScore.WIFI_MAX_SCORE <= WIFI_SCORE_RANGE_MAX);
+                ConnectedScorer.WIFI_MAX_SCORE <= WIFI_SCORE_RANGE_MAX);
         StringBuilder sb_wifi_usability_score = new StringBuilder();
         sb_wifi_usability_score.append("Number of wifi_usability_scores = "
                 + mDecodedProto.wifiUsabilityScoreCount.length);
         assertTrue(sb_wifi_usability_score.toString(), (mDecodedProto.wifiUsabilityScoreCount.length
                 <= (WIFI_SCORE_RANGE_MAX - WIFI_SCORE_RANGE_MIN + 1)));
         StringBuilder sb_wifi_usablity_limits = new StringBuilder();
-        sb_wifi_limits.append("Wifi Usability Score limit is " +  ConnectedScore.WIFI_MAX_SCORE
+        sb_wifi_limits.append("Wifi Usability Score limit is " +  ConnectedScorer.WIFI_MAX_SCORE
                 + ">= " + WIFI_SCORE_RANGE_MAX);
         assertTrue(sb_wifi_limits.toString(),
-                ConnectedScore.WIFI_MAX_SCORE <= WIFI_SCORE_RANGE_MAX);
+                ConnectedScorer.WIFI_MAX_SCORE <= WIFI_SCORE_RANGE_MAX);
         assertEquals(MAX_NUM_SOFTAP_RETURN_CODES, mDecodedProto.softApReturnCode.length);
         assertEquals(WifiMetricsProto.SoftApReturnCodeCount.SOFT_AP_STARTED_SUCCESSFULLY,
                      mDecodedProto.softApReturnCode[0].startResult);

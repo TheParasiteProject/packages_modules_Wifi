@@ -47,7 +47,7 @@ public class ConnectedScorerHelper {
     }
 
    /**
-    * Adjust the score from VelocityBasedConnectedScore.
+    * Adjust the score from VelocityBasedConnectedScorer.
     *
     * @param wifiInfo used to adjust the score
     * @param filteredRssi kalman-filtered rssi used to adjust the score
@@ -117,7 +117,7 @@ public class ConnectedScorerHelper {
     }
 
     /**
-     * Return whether to check NUD. Used by {@link VelocityBasedConnectedScore}.
+     * Return whether to check NUD. Used by {@link VelocityBasedConnectedScorer}.
      *
      * @param lastNudRequestTimeMs last time in milliseconds to request NUD check
      * @param currentTimeMs current time in milliseconds
@@ -146,7 +146,7 @@ public class ConnectedScorerHelper {
         // If we were below threshold the last time we checked, then compute a new bar
         // that starts down from there and decays exponentially back up to the steady-state
         // bar. If 5 time constants have passed, we are 99% of the way there, so skip the math.
-        if (lastNudRequestScore < ConnectedScore.WIFI_TRANSITION_SCORE && quotient < 5.0) {
+        if (lastNudRequestScore < ConnectedScorer.WIFI_TRANSITION_SCORE && quotient < 5.0) {
             double a = Math.exp(-quotient);
             nextNudBreach = a * (lastNudRequestScore - deltaLevel) + (1.0 - a) * transitionScore;
         } else {

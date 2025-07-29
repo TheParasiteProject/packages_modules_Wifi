@@ -223,7 +223,7 @@ public class WifiMetrics {
     // Time period to attribute a disconnect to firmware alert
     public static final long FIRMWARE_ALERT_DISCONNECT_MILLIS = 1000;
     private static final int MIN_WIFI_SCORE = 0;
-    private static final int MAX_WIFI_SCORE = ConnectedScore.WIFI_MAX_SCORE;
+    private static final int MAX_WIFI_SCORE = ConnectedScorer.WIFI_MAX_SCORE;
     private static final int MIN_WIFI_USABILITY_SCORE = 0; // inclusive
     private static final int MAX_WIFI_USABILITY_SCORE = 100; // inclusive
     @VisibleForTesting

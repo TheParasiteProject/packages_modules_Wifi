@@ -31,8 +31,8 @@ import com.android.server.wifi.util.Matrix;
  * Class used to calculate scores for connected wifi networks and report it to the associated
  * network agent.
  */
-public class VelocityBasedConnectedScore extends ConnectedScore {
-    public static final String TAG = "VelocityBasedConnectedScore";
+public class VelocityBasedConnectedScorer extends ConnectedScorer {
+    public static final String TAG = "VelocityBasedConnectedScorer";
 
     private final ScoringParams mScoringParams;
     private int mFrequency = ScanResult.BAND_5_GHZ_START_FREQ_MHZ;
@@ -47,7 +47,7 @@ public class VelocityBasedConnectedScore extends ConnectedScore {
     private final WifiGlobals mWifiGlobals;
     private final ConnectedScorerHelper mConnectedScorerHelper;
 
-    public VelocityBasedConnectedScore(ScoringParams scoringParams, WifiGlobals wifiGlobals,
+    public VelocityBasedConnectedScorer(ScoringParams scoringParams, WifiGlobals wifiGlobals,
             ConnectedScorerHelper connectedScorerHelper) {
         mScoringParams = scoringParams;
         mWifiGlobals = wifiGlobals;
