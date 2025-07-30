@@ -25,10 +25,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.argThat;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,6 +52,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -88,24 +92,38 @@ public class WifiDeviceStateChangeManagerTest extends WifiBaseTest {
         mLooper = new TestLooper();
         Handler handler = new Handler(mLooper.getLooper());
         mWifiTheadRunner = new WifiThreadRunner(handler);
+        mWifiTheadRunner = spy(mWifiTheadRunner);
         mWifiDeviceStateChangeManager = new WifiDeviceStateChangeManagerSpy();
     }
 
     @Test
     public void testRegisterBeforeBootCompleted() {
+        final InOrder inOrder = inOrder(mWifiTheadRunner);
         mWifiDeviceStateChangeManager.registerStateChangeCallback(mStateChangeCallback);
         // Should be no callback event before the boot completed
         verify(mStateChangeCallback, never()).onScreenStateChanged(anyBoolean());
         verify(mStateChangeCallback, never()).onAdvancedProtectionModeStateChanged(anyBoolean());
+        inOrder.verify(mWifiTheadRunner, never()).postDelayed(any(), anyLong(), any(), any());
         mWifiDeviceStateChangeManager.handleBootCompleted();
         verify(mContext, atLeastOnce())
                 .registerReceiver(mBroadcastReceiverCaptor.capture(), any());
         verify(mStateChangeCallback).onScreenStateChanged(true);
+        inOrder.verify(mWifiTheadRunner).removeCallbacks(any());
+        inOrder.verify(mWifiTheadRunner).postDelayed(any(),
+                eq(WifiDeviceStateChangeManager.SCREEN_STATE_CHANGE_ACTIVE_QUERY_INTERVAL_MS),
+                any(), any());
         reset(mStateChangeCallback);
         setScreenState(true);
         verify(mStateChangeCallback).onScreenStateChanged(true);
+        inOrder.verify(mWifiTheadRunner).removeCallbacks(any());
+        inOrder.verify(mWifiTheadRunner).postDelayed(any(),
+                eq(WifiDeviceStateChangeManager.SCREEN_STATE_CHANGE_ACTIVE_QUERY_INTERVAL_MS),
+                any(), any());
+
         setScreenState(false);
         verify(mStateChangeCallback).onScreenStateChanged(false);
+        inOrder.verify(mWifiTheadRunner).removeCallbacks(any());
+        inOrder.verifyNoMoreInteractions();
         reset(mStateChangeCallback);
         mWifiDeviceStateChangeManager.unregisterStateChangeCallback(mStateChangeCallback);
         setScreenState(true);
@@ -122,6 +140,41 @@ public class WifiDeviceStateChangeManagerTest extends WifiBaseTest {
         verify(mStateChangeCallback).onScreenStateChanged(true);
         // No Advance protection manager, should false.
         verify(mStateChangeCallback).onAdvancedProtectionModeStateChanged(false);
+    }
+
+    @Test
+    public void testScheduleScreenStateQuery() {
+        final InOrder inOrder = inOrder(mWifiTheadRunner, mStateChangeCallback);
+        mWifiDeviceStateChangeManager.registerStateChangeCallback(mStateChangeCallback);
+        // Should be no callback event before the boot completed
+        inOrder.verify(mStateChangeCallback, never()).onScreenStateChanged(anyBoolean());
+        inOrder.verify(mStateChangeCallback, never())
+                .onAdvancedProtectionModeStateChanged(anyBoolean());
+        inOrder.verify(mWifiTheadRunner, never()).postDelayed(any(), anyLong(), any(), any());
+        mWifiDeviceStateChangeManager.handleBootCompleted();
+        verify(mContext, atLeastOnce())
+                .registerReceiver(mBroadcastReceiverCaptor.capture(), any());
+        inOrder.verify(mStateChangeCallback).onScreenStateChanged(true);
+        inOrder.verify(mWifiTheadRunner).removeCallbacks(any());
+        inOrder.verify(mWifiTheadRunner).postDelayed(any(),
+                eq(WifiDeviceStateChangeManager.SCREEN_STATE_CHANGE_ACTIVE_QUERY_INTERVAL_MS),
+                any(), any());
+
+        // mock the delayed query running and scheduling the next one
+        when(mPowerManager.isInteractive()).thenReturn(true);
+        mWifiDeviceStateChangeManager.mQueryScreenStateIfNeededRunnable.run();
+        inOrder.verify(mWifiTheadRunner).removeCallbacks(any());
+        inOrder.verify(mWifiTheadRunner).postDelayed(any(),
+                eq(WifiDeviceStateChangeManager.SCREEN_STATE_CHANGE_ACTIVE_QUERY_INTERVAL_MS),
+                any(), any());
+
+        // mock the delayed query getting screen off, and verify this trigger callbacks
+        when(mPowerManager.isInteractive()).thenReturn(false);
+        mWifiDeviceStateChangeManager.mQueryScreenStateIfNeededRunnable.run();
+        inOrder.verify(mStateChangeCallback).onScreenStateChanged(false);
+        inOrder.verify(mWifiTheadRunner).removeCallbacks(any());
+        inOrder.verifyNoMoreInteractions();
+
     }
 
     private void setScreenState(boolean screenOn) {

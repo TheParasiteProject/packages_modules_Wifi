@@ -6248,6 +6248,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 pw.println("SupportedFeatures: " + getSupportedFeaturesString());
                 pw.println("SettingsStore:");
                 mSettingsStore.dump(fd, pw, args);
+                mWifiInjector.getWifiDeviceStateChangeManager().dump(fd, pw, args);
                 mActiveModeWarden.dump(fd, pw, args);
                 mMakeBeforeBreakManager.dump(fd, pw, args);
                 pw.println();
