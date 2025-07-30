@@ -93,7 +93,7 @@ public class WifiNetworkSelector {
      * as unconnected when filtering scan results.
      */
     @VisibleForTesting
-    public static final int WIFI_POOR_SCORE = ConnectedScore.WIFI_TRANSITION_SCORE - 10;
+    public static final int WIFI_POOR_SCORE = ConnectedScorer.WIFI_TRANSITION_SCORE - 10;
 
     /**
      * The identifier string of the CandidateScorer to use (in the absence of overrides).

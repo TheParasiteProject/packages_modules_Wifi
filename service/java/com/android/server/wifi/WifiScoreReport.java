@@ -25,6 +25,7 @@ import android.content.Context;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkScore;
+import android.net.ip.IpClientManager;
 import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.MloLink;
 import android.net.wifi.ScanResult;
@@ -82,7 +83,7 @@ public class WifiScoreReport {
     static final int LINGERING_SCORE = 1;
 
     // Cache of the last score
-    private int mLegacyIntScore = ConnectedScore.WIFI_INITIAL_SCORE;
+    private int mLegacyIntScore = ConnectedScorer.WIFI_INITIAL_SCORE;
     // Cache of the last usability status
     private boolean mIsUsable = true;
     private int mExternalScorerPredictionStatusForEvaluation =
@@ -101,6 +102,11 @@ public class WifiScoreReport {
     @Nullable
     private ClientRole mCurrentRole = null;
 
+    /** The IpClientManager from ClientMode */
+    @Nullable
+    private IpClientManager mIpClientManager = null;
+
+
     private final ScoringParams mScoringParams;
     private final Clock mClock;
     private int mSessionNumber = 0; // not to be confused with sessionid, this just counts resets
@@ -112,7 +118,7 @@ public class WifiScoreReport {
     private long mLastScoreBreachHighTimeMillis = INVALID_TIMESTAMP_MS;
 
     @VisibleForTesting
-    VelocityBasedConnectedScore mVelocityBasedConnectedScore;
+    VelocityBasedConnectedScorer mVelocityBasedConnectedScorer;
     private final WifiSettingsStore mWifiSettingsStore;
     private int mSessionIdNoReset = INVALID_SESSION_ID;
     // Indicate whether current network is selected by the user
@@ -133,6 +139,10 @@ public class WifiScoreReport {
     private final WifiConfigManager mWifiConfigManager;
     @VisibleForTesting
     long mLastLowScoreScanTimestampMs = INVALID_TIMESTAMP_MS;
+    @VisibleForTesting
+    long mLastNudCheckTimeMs = INVALID_TIMESTAMP_MS;
+    private int mNudYes = 0;    // Counts when we voted for a NUD
+    private int mNudCount = 0;  // Counts when we were told a NUD was sent
     private WifiConfiguration mCurrentWifiConfiguration;
     private final ConnectedScorerHelper mConnectedScorerHelper;
 
@@ -173,20 +183,20 @@ public class WifiScoreReport {
                         mWifiInfoNoReset.getRssi());
                 return;
             }
-            if (score > ConnectedScore.WIFI_MAX_SCORE
-                    || score < ConnectedScore.WIFI_MIN_SCORE) {
+            if (score > ConnectedScorer.WIFI_MAX_SCORE
+                    || score < ConnectedScorer.WIFI_MIN_SCORE) {
                 Log.e(TAG, "Invalid score value from external scorer: " + score);
                 return;
             }
-            if (score < ConnectedScore.WIFI_TRANSITION_SCORE) {
-                if (mLegacyIntScore >= ConnectedScore.WIFI_TRANSITION_SCORE) {
+            if (score < ConnectedScorer.WIFI_TRANSITION_SCORE) {
+                if (mLegacyIntScore >= ConnectedScorer.WIFI_TRANSITION_SCORE) {
                     mLastScoreBreachLowTimeMillis = millis;
                 }
             } else {
                 mLastScoreBreachLowTimeMillis = INVALID_TIMESTAMP_MS;
             }
-            if (score > ConnectedScore.WIFI_TRANSITION_SCORE) {
-                if (mLegacyIntScore <= ConnectedScore.WIFI_TRANSITION_SCORE) {
+            if (score > ConnectedScorer.WIFI_TRANSITION_SCORE) {
+                if (mLegacyIntScore <= ConnectedScorer.WIFI_TRANSITION_SCORE) {
                     mLastScoreBreachHighTimeMillis = millis;
                 }
             } else {
@@ -311,8 +321,8 @@ public class WifiScoreReport {
                     Log.d(TAG, "Wifi is set to exiting by the external scorer");
                 }
             } else  {
-                mNetworkAgent.sendNetworkScore(mIsUsable ? ConnectedScore.WIFI_TRANSITION_SCORE + 1
-                        : ConnectedScore.WIFI_TRANSITION_SCORE - 1);
+                mNetworkAgent.sendNetworkScore(mIsUsable ? ConnectedScorer.WIFI_TRANSITION_SCORE + 1
+                        : ConnectedScorer.WIFI_TRANSITION_SCORE - 1);
             }
             mWifiInfo.setUsable(mIsUsable);
             mWifiMetrics.setScorerPredictedWifiUsabilityState(mInterfaceName,
@@ -340,7 +350,11 @@ public class WifiScoreReport {
                 }
                 return;
             }
-            mWifiConnectedNetworkScorerHolder.setShouldCheckIpLayerOnce(true);
+            mNudYes++;
+            if (mConnectedScorerHelper.checkNudIfNeeded(mIpClientManager, mLastNudCheckTimeMs,
+                    mClock.getWallClockMillis())) {
+                noteNudCheck();
+            }
         }
 
         @Override
@@ -435,13 +449,13 @@ public class WifiScoreReport {
         }
         // Set the usability prediction for the AOSP scorer.
         mWifiMetrics.setScorerPredictedWifiUsabilityState(mInterfaceName,
-                (mLegacyIntScore < ConnectedScore.WIFI_TRANSITION_SCORE)
+                (mLegacyIntScore < ConnectedScorer.WIFI_TRANSITION_SCORE)
                         ? WifiMetrics.WifiUsabilityState.UNUSABLE
                         : WifiMetrics.WifiUsabilityState.USABLE);
         // Stay a notch above the transition score if adaptive connectivity is disabled.
         if (!mAdaptiveConnectivityEnabledSettingObserver.get()
                 || !mWifiSettingsStore.isWifiScoringEnabled()) {
-            mLegacyIntScore = ConnectedScore.WIFI_TRANSITION_SCORE + 1;
+            mLegacyIntScore = ConnectedScorer.WIFI_TRANSITION_SCORE + 1;
             if (mVerboseLoggingEnabled) {
                 Log.d(TAG, "Wifi scoring disabled - Stay a notch above the transition score");
             }
@@ -596,7 +610,7 @@ public class WifiScoreReport {
         mScoringParams = scoringParams;
         mClock = clock;
         mAdaptiveConnectivityEnabledSettingObserver = adaptiveConnectivityEnabledSettingObserver;
-        mVelocityBasedConnectedScore = new VelocityBasedConnectedScore(scoringParams, wifiGlobals,
+        mVelocityBasedConnectedScorer = new VelocityBasedConnectedScorer(scoringParams, wifiGlobals,
                 connectedScorerHelper);
         mWifiMetrics = wifiMetrics;
         mWifiInfo = wifiInfo;
@@ -631,19 +645,18 @@ public class WifiScoreReport {
     public void reset() {
         mSessionNumber++;
         clearScorerPredictionStatusForEvaluation();
-        mLegacyIntScore = isPrimary() ? ConnectedScore.WIFI_INITIAL_SCORE
-                : ConnectedScore.WIFI_SECONDARY_INITIAL_SCORE;
+        mLegacyIntScore = isPrimary() ? ConnectedScorer.WIFI_INITIAL_SCORE
+                : ConnectedScorer.WIFI_SECONDARY_INITIAL_SCORE;
         mIsUsable = true;
         mWifiMetrics.setScorerPredictedWifiUsabilityState(mInterfaceName,
                 WifiMetrics.WifiUsabilityState.UNKNOWN);
-        mLastKnownNudCheckScore = isPrimary() ? ConnectedScore.WIFI_TRANSITION_SCORE
-                : ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE;
-        if (mVelocityBasedConnectedScore != null) {
-            mVelocityBasedConnectedScore.reset();
+        if (mVelocityBasedConnectedScorer != null) {
+            mVelocityBasedConnectedScorer.reset();
         }
         mLastScoreBreachLowTimeMillis = INVALID_TIMESTAMP_MS;
         mLastScoreBreachHighTimeMillis = INVALID_TIMESTAMP_MS;
         mLastLowScoreScanTimestampMs = INVALID_TIMESTAMP_MS;
+        mLastNudCheckTimeMs = INVALID_TIMESTAMP_MS;
         if (mVerboseLoggingEnabled) Log.d(TAG, "reset");
     }
 
@@ -658,7 +671,7 @@ public class WifiScoreReport {
      * Calculate the new wifi network score based on updated link layer stats.
      *
      * Called periodically (POLL_RSSI_INTERVAL_MSECS) about every 3 seconds.
-     * @return scorer from the VelocityBasedConnectedScore.
+     * @return scorer from the VelocityBasedConnectedScorer.
      * Note: This function will only notify connectivity services of the updated route if we are NOT
      * using a connected external WiFi scorer.
      *
@@ -670,7 +683,7 @@ public class WifiScoreReport {
         }
 
         long millis = mClock.getWallClockMillis();
-        ConnectedScoreResult scoreResult = mVelocityBasedConnectedScore.generateScoreResult(
+        ConnectedScoreResult scoreResult = mVelocityBasedConnectedScorer.generateScoreResult(
                 mWifiInfo, null, millis, isPrimary());
         int score = scoreResult.score();
         int adjustedScore = scoreResult.adjustedScore();
@@ -690,6 +703,14 @@ public class WifiScoreReport {
                 if (mConnectedScorerHelper.triggerScanIfNeeded(mLastLowScoreScanTimestampMs,
                         mClock.getElapsedSinceBootMillis(), scoreResult.shouldTriggerScan())) {
                     mLastLowScoreScanTimestampMs = mClock.getElapsedSinceBootMillis();
+                }
+            }
+            // Check NUD
+            if (scoreResult.shouldCheckNud()) {
+                mNudYes++;
+                if (mConnectedScorerHelper.checkNudIfNeeded(mIpClientManager,
+                        mLastNudCheckTimeMs, mClock.getWallClockMillis())) {
+                    noteNudCheck();
                 }
             }
         }
@@ -754,68 +775,9 @@ public class WifiScoreReport {
         mWifiMetrics.incrementWifiScoreCount(mInterfaceName, mLegacyIntScore);
     }
 
-    private static final double TIME_CONSTANT_MILLIS = 30.0e+3;
-    private static final long NUD_THROTTLE_MILLIS = 5000;
-    private long mLastKnownNudCheckTimeMillis = 0;
-    private int mLastKnownNudCheckScore = ConnectedScore.WIFI_TRANSITION_SCORE;
-    private int mNudYes = 0;    // Counts when we voted for a NUD
-    private int mNudCount = 0;  // Counts when we were told a NUD was sent
-
-    /**
-     * Recommends that a layer 3 check be done
-     *
-     * The caller can use this to (help) decide that an IP reachability check
-     * is desirable. The check is not done here; that is the caller's responsibility.
-     *
-     * @return true to indicate that an IP reachability check is recommended
-     */
-    public boolean shouldCheckIpLayer() {
-        // Don't recommend if adaptive connectivity is disabled.
-        if (!mAdaptiveConnectivityEnabledSettingObserver.get()
-                || !mWifiSettingsStore.isWifiScoringEnabled()) {
-            if (mVerboseLoggingEnabled) {
-                Log.d(TAG, "Wifi scoring disabled - Don't check IP layer");
-            }
-            return false;
-        }
-        long deltaMillis = mClock.getWallClockMillis() - mLastKnownNudCheckTimeMillis;
-        // Don't ever ask back-to-back - allow at least 5 seconds
-        // for the previous one to finish.
-        if (deltaMillis < NUD_THROTTLE_MILLIS) {
-            return false;
-        }
-        if (SdkLevel.isAtLeastS() && mWifiConnectedNetworkScorerHolder != null) {
-            if (!mWifiConnectedNetworkScorerHolder.getShouldCheckIpLayerOnce()) {
-                return false;
-            }
-            mNudYes++;
-            return true;
-        }
-        int nud = mScoringParams.getNudKnob();
-        if (nud == 0) {
-            return false;
-        }
-        // nextNudBreach is the bar the score needs to cross before we ask for NUD
-        double nextNudBreach = ConnectedScore.WIFI_TRANSITION_SCORE;
-        double quotient = deltaMillis / TIME_CONSTANT_MILLIS;
-        if (mWifiConnectedNetworkScorerHolder == null) {
-            // nud is between 1 and 10 at this point
-            double deltaLevel = 11 - nud;
-            // If we were below threshold the last time we checked, then compute a new bar
-            // that starts down from there and decays exponentially back up to the steady-state
-            // bar. If 5 time constants have passed, we are 99% of the way there, so skip the math.
-            if (mLastKnownNudCheckScore < ConnectedScore.WIFI_TRANSITION_SCORE
-                    && quotient < 5.0) {
-                double a = Math.exp(-quotient);
-                nextNudBreach =
-                        a * (mLastKnownNudCheckScore - deltaLevel) + (1.0 - a) * nextNudBreach;
-            }
-        }
-        if (mLegacyIntScore >= nextNudBreach) {
-            return false;
-        }
-        mNudYes++;
-        return true;
+    /** Called when the IpClientManager is changed. */
+    public void setIpClientManager(@Nullable IpClientManager ipClientManager) {
+        mIpClientManager = ipClientManager;
     }
 
     /**
@@ -824,15 +786,9 @@ public class WifiScoreReport {
      * When the caller has requested an IP reachability check, calling this will
      * help to rate-limit requests via shouldCheckIpLayer()
      */
-    public void noteIpCheck() {
-        long millis = mClock.getWallClockMillis();
-        mLastKnownNudCheckTimeMillis = millis;
-        mLastKnownNudCheckScore = mLegacyIntScore;
+    public void noteNudCheck() {
+        mLastNudCheckTimeMs = mClock.getWallClockMillis();
         mNudCount++;
-        // Make sure that only one NUD operation can be triggered.
-        if (mWifiConnectedNetworkScorerHolder != null) {
-            mWifiConnectedNetworkScorerHolder.setShouldCheckIpLayerOnce(false);
-        }
     }
 
     /**
@@ -850,8 +806,8 @@ public class WifiScoreReport {
         double filteredRssi = -1;
         double rssiThreshold = -1;
         if (mWifiConnectedNetworkScorerHolder == null) {
-            filteredRssi = mVelocityBasedConnectedScore.getFilteredRssi();
-            rssiThreshold = mVelocityBasedConnectedScore.getAdjustedRssiThreshold();
+            filteredRssi = mVelocityBasedConnectedScorer.getFilteredRssi();
+            rssiThreshold = mVelocityBasedConnectedScorer.getAdjustedRssiThreshold();
         }
         WifiScoreCard.PerNetwork network = mWifiScoreCard.lookupNetwork(mWifiInfo.getSSID());
         StringJoiner stats = new StringJoiner(",");
@@ -1095,8 +1051,8 @@ public class WifiScoreReport {
         }
         mCurrentWifiConfiguration = mWifiConfigManager.getConfiguredNetwork(
                 mWifiInfo.getNetworkId());
-        mWifiInfo.setScore(isPrimary() ? ConnectedScore.WIFI_MAX_SCORE
-                : ConnectedScore.WIFI_SECONDARY_MAX_SCORE);
+        mWifiInfo.setScore(isPrimary() ? ConnectedScorer.WIFI_MAX_SCORE
+                : ConnectedScorer.WIFI_SECONDARY_MAX_SCORE);
         mWifiConnectedNetworkScorerHolder.startSession(sessionId, mIsUserSelected);
         mWifiInfoNoReset.setBSSID(mWifiInfo.getBSSID());
         mWifiInfoNoReset.setSSID(mWifiInfo.getWifiSsid());
@@ -1159,7 +1115,7 @@ public class WifiScoreReport {
                         ? NetworkScore.KEEP_CONNECTED_FOR_HANDOVER
                         : NetworkScore.KEEP_CONNECTED_NONE;
         boolean exiting = (SdkLevel.isAtLeastS() && mWifiConnectedNetworkScorerHolder != null)
-                ? !mIsUsable : mLegacyIntScore < ConnectedScore.WIFI_TRANSITION_SCORE;
+                ? !mIsUsable : mLegacyIntScore < ConnectedScorer.WIFI_TRANSITION_SCORE;
         return new NetworkScore.Builder()
                 .setLegacyInt(mShouldReduceNetworkScore ? LINGERING_SCORE : mLegacyIntScore)
                 .setTransportPrimary(mCurrentRole == ActiveModeManager.ROLE_CLIENT_PRIMARY)
@@ -1187,7 +1143,7 @@ public class WifiScoreReport {
     }
 
     private void revertToDefaultConnectedScorer() {
-        Log.d(TAG, "Using VelocityBasedConnectedScore");
+        Log.d(TAG, "Using VelocityBasedConnectedScorer");
         mWifiConnectedNetworkScorerHolder = null;
         mDeviceConfigFacade.setDryRunScorerPkgNameChangedListener(null);
         mWifiGlobals.setUsingExternalScorer(false);
@@ -1260,6 +1216,6 @@ public class WifiScoreReport {
     public boolean getLingering() {
         return (SdkLevel.isAtLeastS() && mWifiConnectedNetworkScorerHolder != null
                 && !mIsExternalScorerDryRun)
-                ? !mIsUsable : mLegacyIntScore < ConnectedScore.WIFI_TRANSITION_SCORE;
+                ? !mIsUsable : mLegacyIntScore < ConnectedScorer.WIFI_TRANSITION_SCORE;
     }
 }
