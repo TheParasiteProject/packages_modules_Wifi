@@ -158,7 +158,7 @@ public class WifiNetworkSelectorTest extends WifiBaseTest {
         when(mWifiInjector.getActiveModeWarden()).thenReturn(mActiveModeWarden);
         when(mWifiInjector.getWifiGlobals()).thenReturn(mWifiGlobals);
         when(mWifiGlobals.getWifiLowConnectedScoreThresholdToTriggerScanForMbb()).thenReturn(
-                ConnectedScore.WIFI_TRANSITION_SCORE);
+                ConnectedScorer.WIFI_TRANSITION_SCORE);
         when(mClientModeManager.getSupportedFeaturesBitSet()).thenReturn(new BitSet());
         when(mActiveModeWarden.getPrimaryClientModeManager()).thenReturn(mClientModeManager);
         if (WifiNetworkSelector.PRESET_CANDIDATE_SCORER_NAME.equals(
@@ -386,7 +386,7 @@ public class WifiNetworkSelectorTest extends WifiBaseTest {
         when(mWifiInfo.getNetworkId()).thenReturn(WifiConfiguration.INVALID_NETWORK_ID);
         when(mWifiInfo.getBSSID()).thenReturn(null);
         when(mWifiInfo.isUsable()).thenReturn(true);
-        when(mWifiInfo.getScore()).thenReturn(ConnectedScore.WIFI_INITIAL_SCORE);
+        when(mWifiInfo.getScore()).thenReturn(ConnectedScorer.WIFI_INITIAL_SCORE);
         when(mSecondaryWifiInfo.isUsable()).thenReturn(true);
     }
 
@@ -469,7 +469,7 @@ public class WifiNetworkSelectorTest extends WifiBaseTest {
         when(mWifiInfo.getSupplicantState()).thenReturn(SupplicantState.COMPLETED);
         when(mWifiConfigManager.getConfiguredNetwork(anyInt()))
                 .thenReturn(testConfig);
-        when(mWifiInfo.getScore()).thenReturn(ConnectedScore.WIFI_TRANSITION_SCORE);
+        when(mWifiInfo.getScore()).thenReturn(ConnectedScorer.WIFI_TRANSITION_SCORE);
         if (SdkLevel.isAtLeastS()) {
             when(mWifiInfo.isPrimary()).thenReturn(true);
         }
@@ -480,7 +480,7 @@ public class WifiNetworkSelectorTest extends WifiBaseTest {
 
         // verify the current network is no longer sufficient after the score drops below
         // WIFI_TRANSITION_SCORE.
-        when(mWifiInfo.getScore()).thenReturn(ConnectedScore.WIFI_TRANSITION_SCORE - 1);
+        when(mWifiInfo.getScore()).thenReturn(ConnectedScorer.WIFI_TRANSITION_SCORE - 1);
         assertFalse(mWifiNetworkSelector.isNetworkSufficient(mWifiInfo));
 
         if (SdkLevel.isAtLeastS()) {
@@ -1288,7 +1288,7 @@ public class WifiNetworkSelectorTest extends WifiBaseTest {
         when(mWifiInfo.getNetworkId()).thenReturn(0);
         when(mWifiInfo.getBSSID()).thenReturn(bssids[0]);
         when(mWifiInfo.is24GHz()).thenReturn(true);
-        when(mWifiInfo.getScore()).thenReturn(ConnectedScore.WIFI_TRANSITION_SCORE);
+        when(mWifiInfo.getScore()).thenReturn(ConnectedScorer.WIFI_TRANSITION_SCORE);
         when(mWifiInfo.is5GHz()).thenReturn(false);
         when(mWifiInfo.getFrequency()).thenReturn(2400);
         when(mWifiInfo.getRssi()).thenReturn(levels[0]);
@@ -1356,7 +1356,7 @@ public class WifiNetworkSelectorTest extends WifiBaseTest {
         when(mWifiInfo.getNetworkId()).thenReturn(0); // 0 is current network
         when(mWifiInfo.getBSSID()).thenReturn(bssids[0]);
         when(mWifiInfo.is24GHz()).thenReturn(true);
-        when(mWifiInfo.getScore()).thenReturn(ConnectedScore.WIFI_TRANSITION_SCORE);
+        when(mWifiInfo.getScore()).thenReturn(ConnectedScorer.WIFI_TRANSITION_SCORE);
         when(mWifiInfo.is5GHz()).thenReturn(false);
         when(mWifiInfo.getFrequency()).thenReturn(2400);
         when(mWifiInfo.getRssi()).thenReturn(mThresholdMinimumRssi2G - 1);
@@ -2800,7 +2800,7 @@ public class WifiNetworkSelectorTest extends WifiBaseTest {
         when(mWifiInfo.is5GHz()).thenReturn(true);
         when(mWifiInfo.getFrequency()).thenReturn(5000);
         when(mWifiInfo.getRssi()).thenReturn(mThresholdQualifiedRssi5G + 2);
-        when(mWifiInfo.getScore()).thenReturn(ConnectedScore.WIFI_MAX_SCORE);
+        when(mWifiInfo.getScore()).thenReturn(ConnectedScorer.WIFI_MAX_SCORE);
         when(mWifiInfo.getSuccessfulRxPacketsPerSecond())
                 .thenReturn(mMinPacketRateActiveTraffic + 1.0);
 
@@ -2812,7 +2812,7 @@ public class WifiNetworkSelectorTest extends WifiBaseTest {
         when(mSecondaryWifiInfo.is5GHz()).thenReturn(true);
         when(mSecondaryWifiInfo.getFrequency()).thenReturn(5000);
         when(mSecondaryWifiInfo.getRssi()).thenReturn(mThresholdQualifiedRssi5G + 2);
-        when(mSecondaryWifiInfo.getScore()).thenReturn(ConnectedScore.WIFI_MAX_SCORE);
+        when(mSecondaryWifiInfo.getScore()).thenReturn(ConnectedScorer.WIFI_MAX_SCORE);
         when(mSecondaryWifiInfo.getSuccessfulRxPacketsPerSecond())
                 .thenReturn(mMinPacketRateActiveTraffic + 1.0);
 

@@ -21,7 +21,7 @@ import static com.android.server.wifi.Clock.INVALID_TIMESTAMP_MS;
 import static com.android.server.wifi.ConnectedScorerHelper.MIN_TIME_TO_KEEP_BELOW_TRANSITION_SCORE_MS;
 import static com.android.server.wifi.ConnectedScorerHelper.NUD_THROTTLE_MS;
 import static com.android.server.wifi.ConnectedScorerHelper.TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE;
-import static com.android.server.wifi.ConnectedScore.WIFI_TRANSITION_SCORE;
+import static com.android.server.wifi.ConnectedScorer.WIFI_TRANSITION_SCORE;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -88,7 +88,7 @@ public class ConnectedScorerHelperTest extends WifiBaseTest {
                 TEST_ENTRY_RSSI,
                 INVALID_TIMESTAMP_MS,
                 Instant.now().toEpochMilli(),
-                ConnectedScore.WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE,
                 currentScore);
 
         assertEquals(currentScore, adjustScore);
@@ -103,7 +103,7 @@ public class ConnectedScorerHelperTest extends WifiBaseTest {
                 TEST_ENTRY_RSSI,
                 INVALID_TIMESTAMP_MS,
                 Instant.now().toEpochMilli(),
-                ConnectedScore.WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE,
                 currentScore);
 
         assertEquals(currentScore, adjustScore);
@@ -190,7 +190,7 @@ public class ConnectedScorerHelperTest extends WifiBaseTest {
                 TEST_ENTRY_RSSI,
                 TEST_TIMESTAMP_MS,
                 TEST_TIMESTAMP_MS + MIN_TIME_TO_KEEP_BELOW_TRANSITION_SCORE_MS,
-                ConnectedScore.WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE,
                 currentScore);
 
         assertEquals(currentScore, adjustScore);
@@ -205,7 +205,7 @@ public class ConnectedScorerHelperTest extends WifiBaseTest {
                 TEST_ENTRY_RSSI,
                 TEST_TIMESTAMP_MS,
                 TEST_TIMESTAMP_MS + MIN_TIME_TO_KEEP_BELOW_TRANSITION_SCORE_MS - 1,
-                ConnectedScore.WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE,
                 WIFI_TRANSITION_SCORE + 10);
 
         assertEquals(previousScore, adjustScore);

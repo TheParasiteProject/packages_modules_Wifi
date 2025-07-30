@@ -156,7 +156,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     @Mock ActiveModeWarden mActiveModeWarden;
     @Mock WifiConnectivityManager mWifiConnectivityManager;
     @Mock WifiConfigManager mWifiConfigManager;
-    @Mock VelocityBasedConnectedScore mMockVelocityScorer;
+    @Mock VelocityBasedConnectedScorer mMockVelocityScorer;
     @Mock ConnectedScorerHelper mMockConnectedScorerHelper;
     @Mock IpClientManager mMockIpClientManager;
     @Captor ArgumentCaptor<WifiManager.ScoreUpdateObserver> mExternalScoreUpdateObserverCbCaptor;
@@ -318,7 +318,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
             mExternalScoreUpdateObserverProxy, mWifiSettingsStore,
             mWifiGlobals, mActiveModeWarden, mWifiConnectivityManager, mWifiConfigManager,
             mMockConnectedScorerHelper);
-        mWifiScoreReportWithMockHelper.mVelocityBasedConnectedScore = mMockVelocityScorer;
+        mWifiScoreReportWithMockHelper.mVelocityBasedConnectedScorer = mMockVelocityScorer;
         mWifiScoreReportWithMockHelper.setNetworkAgent(mMockNetworkAgent);
         mWifiScoreReportWithMockHelper.setIpClientManager(mMockIpClientManager);
 
@@ -384,13 +384,13 @@ public class WifiScoreReportTest extends WifiBaseTest {
     }
 
     private int getTransitionScore() {
-        return mIsPrimary ? ConnectedScore.WIFI_TRANSITION_SCORE
-                : ConnectedScore.WIFI_SECONDARY_TRANSITION_SCORE;
+        return mIsPrimary ? ConnectedScorer.WIFI_TRANSITION_SCORE
+                : ConnectedScorer.WIFI_SECONDARY_TRANSITION_SCORE;
     }
 
     private int getMaxScore() {
-        return mIsPrimary ? ConnectedScore.WIFI_MAX_SCORE
-                : ConnectedScore.WIFI_SECONDARY_MAX_SCORE;
+        return mIsPrimary ? ConnectedScorer.WIFI_MAX_SCORE
+                : ConnectedScorer.WIFI_SECONDARY_MAX_SCORE;
     }
 
     /**
@@ -407,7 +407,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
                 .build();
         when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
                 .thenReturn(scoreResult);
-        mWifiScoreReport.mVelocityBasedConnectedScore = mMockVelocityScorer;
+        mWifiScoreReport.mVelocityBasedConnectedScorer = mMockVelocityScorer;
         // initially called once
         verifySentAnyNetworkScore();
 
@@ -1335,7 +1335,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
      */
     @Test
     public void frameworkIgnoreNotifyScoreUpdateFromDryRunScorer() throws Exception {
-        assertEquals(ConnectedScore.WIFI_INITIAL_SCORE, mWifiScoreReport.getLegacyIntScore());
+        assertEquals(ConnectedScorer.WIFI_INITIAL_SCORE, mWifiScoreReport.getLegacyIntScore());
         when(mMockPackageManager.getPackagesForUid(anyInt()))
                 .thenReturn(new String[]{DRY_RUN_SCORER_PKG_NAME});
         WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
@@ -1347,16 +1347,16 @@ public class WifiScoreReportTest extends WifiBaseTest {
         assertEquals(TEST_SESSION_ID, scorerImpl.mSessionId);
 
         mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, ConnectedScore.WIFI_INITIAL_SCORE - 1);
+                scorerImpl.mSessionId, ConnectedScorer.WIFI_INITIAL_SCORE - 1);
         mLooper.dispatchAll();
 
-        assertEquals(ConnectedScore.WIFI_INITIAL_SCORE, mWifiScoreReport.getLegacyIntScore());
+        assertEquals(ConnectedScorer.WIFI_INITIAL_SCORE, mWifiScoreReport.getLegacyIntScore());
         assertFalse(mWifiScoreReport.isExternalScorerActive());
     }
 
     @Test
     public void frameworkIgnoreNotifyStatusUpdateFromDryRunScorer() throws Exception {
-        assertEquals(ConnectedScore.WIFI_INITIAL_SCORE, mWifiScoreReport.getLegacyIntScore());
+        assertEquals(ConnectedScorer.WIFI_INITIAL_SCORE, mWifiScoreReport.getLegacyIntScore());
         when(mMockPackageManager.getPackagesForUid(anyInt()))
                 .thenReturn(new String[]{DRY_RUN_SCORER_PKG_NAME});
         WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
