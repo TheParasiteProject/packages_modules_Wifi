@@ -1481,22 +1481,15 @@ public class WifiServiceImpl extends IWifiManager.Stub {
      */
     @CheckResult
     private int enforceChangePermission(String callingPackage) {
-        int callingUid = Binder.getCallingUid();
-        // Should be current user.
-        if (mFeatureFlags.multiUserWifiEnhancement() && Environment.isSdkAtLeastB()
-                && !mWifiPermissionsUtil.isTargetSdkLessThan(
-                        callingPackage, 37 /* Android B */, callingUid)) {
-            enforceValidCallingUser();
-        }
-        mAppOps.checkPackage(callingUid, callingPackage);
-        if (checkNetworkSettingsPermission(Binder.getCallingPid(), callingUid)) {
+        mAppOps.checkPackage(Binder.getCallingUid(), callingPackage);
+        if (checkNetworkSettingsPermission(Binder.getCallingPid(), Binder.getCallingUid())) {
             return MODE_ALLOWED;
         }
         mContext.enforceCallingOrSelfPermission(android.Manifest.permission.CHANGE_WIFI_STATE,
                 "WifiService");
 
         return mAppOps.noteOp(
-                AppOpsManager.OPSTR_CHANGE_WIFI_STATE, callingUid, callingPackage);
+                AppOpsManager.OPSTR_CHANGE_WIFI_STATE, Binder.getCallingUid(), callingPackage);
     }
 
     private void enforceReadCredentialPermission() {
@@ -1557,9 +1550,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         // but it is a hidden API. We rely on FEATURE_AUTOMOTIVE only, because we cannot access
         // the RRO config for R.bool.config_multiuserVisibleBackgroundUsers.
         if (!mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)) {
-            if (!mFeatureFlags.multiUserWifiEnhancement() || !Environment.isSdkAtLeastB()) {
-                return true;
-            }
+            return true;
         }
         UserHandle callingUser = Binder.getCallingUserHandle();
 
@@ -1567,7 +1558,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         try {
             UserHandle currentUser =
                     UserHandle.of(mWifiInjector.getWifiPermissionsWrapper().getCurrentUser());
-            if (UserHandle.SYSTEM.getIdentifier() == callingUser.getIdentifier()
+            if (UserHandle.SYSTEM.equals(callingUser)
                     || callingUser.equals(currentUser)
                     || mUserManager.isSameProfileGroup(callingUser, currentUser)) {
                 return true;
@@ -1575,6 +1566,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         } finally {
             Binder.restoreCallingIdentity(ident);
         }
+
         return false;
     }
 
@@ -4572,9 +4564,6 @@ public class WifiServiceImpl extends IWifiManager.Stub {
     private @NonNull AddNetworkResult addOrUpdateNetworkInternal(WifiConfiguration config,
             String packageName, int attributedCreatorUid, String attributedCreatorPackage,
             boolean overrideCreator) {
-        if (mFeatureFlags.multiUserWifiEnhancement() && Environment.isSdkAtLeastB()) {
-            enforceValidCallingUser();
-        }
         if (config == null) {
             Log.e(TAG, "bad network configuration");
             return new AddNetworkResult(
