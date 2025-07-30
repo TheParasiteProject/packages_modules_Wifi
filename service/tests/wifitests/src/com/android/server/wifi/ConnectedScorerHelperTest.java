@@ -19,6 +19,8 @@ package com.android.server.wifi;
 import static com.android.server.wifi.ClientModeImpl.WIFI_WORK_SOURCE;
 import static com.android.server.wifi.Clock.INVALID_TIMESTAMP_MS;
 import static com.android.server.wifi.ConnectedScorerHelper.MIN_TIME_TO_KEEP_BELOW_TRANSITION_SCORE_MS;
+import static com.android.server.wifi.ConnectedScorerHelper.NUD_THROTTLE_MS;
+import static com.android.server.wifi.ConnectedScorerHelper.TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE;
 import static com.android.server.wifi.ConnectedScore.WIFI_TRANSITION_SCORE;
 
 import static org.junit.Assert.assertEquals;
@@ -26,9 +28,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import android.net.ip.IpClientManager;
 import android.net.wifi.WifiInfo;
 
 import androidx.test.filters.SmallTest;
@@ -56,6 +60,7 @@ public class ConnectedScorerHelperTest extends WifiBaseTest {
     @Mock WifiGlobals mMockWifiGlobals;
     @Mock WifiConnectivityManager mMockWifiConnectivityManager;
     @Mock WifiInfo mMockWifiInfo;
+    @Mock IpClientManager mMockIpClientManager;
     private ConnectedScorerHelper mConnectedScorerHelper;
 
     /**
@@ -69,6 +74,7 @@ public class ConnectedScorerHelperTest extends WifiBaseTest {
         when(mMockScoringParams.getEntryRssi(anyInt())).thenReturn(TEST_ENTRY_RSSI);
         when(mMockScoringParams.getYippeeSkippyPacketsPerSecond())
                 .thenReturn(TEST_YIPPEE_SKIPPY_PACKETS_PER_SECOND);
+        when(mMockScoringParams.getNudKnob()).thenReturn(5);
         when(mMockWifiGlobals.getWifiLowConnectedScoreScanPeriodSeconds())
                 .thenReturn(LOW_CONNECTED_SCORE_SCAN_PERIOD_SECONDS);
     }
@@ -241,5 +247,163 @@ public class ConnectedScorerHelperTest extends WifiBaseTest {
                 TEST_TIMESTAMP_MS - LOW_CONNECTED_SCORE_SCAN_PERIOD_MS - 1,
                 TEST_TIMESTAMP_MS,
                 false));
+    }
+
+    @Test
+    public void shouldCheckNud_zeroNubKnob_returnFalse() {
+        when(mMockScoringParams.getNudKnob()).thenReturn(0);
+
+        assertFalse(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 10,
+                WIFI_TRANSITION_SCORE - 20));
+    }
+
+    @Test
+    public void shouldCheckNud_invalidLastNudRequestTimeHighAdjustedScore_returnFalse() {
+        assertFalse(mConnectedScorerHelper.shouldCheckNud(INVALID_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 10,
+                WIFI_TRANSITION_SCORE));
+
+        assertFalse(mConnectedScorerHelper.shouldCheckNud(INVALID_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 10,
+                WIFI_TRANSITION_SCORE + 1));
+    }
+
+    @Test
+    public void shouldCheckNud_invalidLastNudRequestTimeLowAdjustedScore_returnTrue() {
+        assertTrue(mConnectedScorerHelper.shouldCheckNud(INVALID_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 10,
+                WIFI_TRANSITION_SCORE - 1));
+    }
+
+    @Test
+    public void shouldCheckNud_longEnoughFromLastNudRequest_nextNudBreachScoreIsTransitionScore() {
+        assertFalse(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE * 5,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 10,
+                WIFI_TRANSITION_SCORE));
+
+        assertFalse(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE * 5,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 10,
+                WIFI_TRANSITION_SCORE + 1));
+
+        assertTrue(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE * 5,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 10,
+                WIFI_TRANSITION_SCORE - 1));
+    }
+
+    @Test
+    public void shouldCheckNud_lastNudScoreIsTransitionScore_nudBreachScoreIsTransitionScoreToo() {
+        assertFalse(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE));
+
+        assertFalse(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE + 1));
+
+        assertTrue(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 1));
+    }
+
+    @Test
+    public void shouldCheckNud_theHigherNudKnob_theEasierToCheckNud() {
+        when(mMockScoringParams.getNudKnob()).thenReturn(10);
+
+        assertTrue(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 1,
+                WIFI_TRANSITION_SCORE - 2));
+        assertTrue(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 1,
+                WIFI_TRANSITION_SCORE - 11));
+    }
+
+    @Test
+    public void shouldCheckNud_theLowerNudKnob_theHarderToCheckNud() {
+        when(mMockScoringParams.getNudKnob()).thenReturn(1);
+
+        assertFalse(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 1,
+                WIFI_TRANSITION_SCORE - 2));
+        assertTrue(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 1,
+                WIFI_TRANSITION_SCORE - 11));
+    }
+
+    @Test
+    public void shouldCheckNud_theLongerFromLastNudRequest_theEasierToCheckNud() {
+        assertTrue(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE * 4,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 1,
+                WIFI_TRANSITION_SCORE - 2));
+        assertTrue(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + TIME_INTERVAL_TO_CALCULATE_NUD_CHECK_SCORE * 4,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 1,
+                WIFI_TRANSITION_SCORE - 11));
+    }
+
+    @Test
+    public void shouldCheckNud_theShorterFromLastNudRequest_theHarderToCheckNud() {
+        assertFalse(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + 1,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 1,
+                WIFI_TRANSITION_SCORE - 2));
+        assertTrue(mConnectedScorerHelper.shouldCheckNud(TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + 1,
+                WIFI_TRANSITION_SCORE,
+                WIFI_TRANSITION_SCORE - 1,
+                WIFI_TRANSITION_SCORE - 11));
+    }
+
+    @Test
+    public void checkNudIfNeeded_enoughTimePassed_returnTrue() {
+        assertTrue(mConnectedScorerHelper.checkNudIfNeeded(mMockIpClientManager, TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + NUD_THROTTLE_MS));
+        verify(mMockIpClientManager).confirmConfiguration();
+    }
+
+    @Test
+    public void checkNudIfNeeded_notEnoughTimePassed_returnFalse() {
+        assertFalse(mConnectedScorerHelper.checkNudIfNeeded(mMockIpClientManager, TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + NUD_THROTTLE_MS - 1));
+        verify(mMockIpClientManager, never()).confirmConfiguration();
+    }
+
+    @Test
+    public void checkNudIfNeeded_nullIpClientManager_returnFalse() {
+        assertFalse(mConnectedScorerHelper.checkNudIfNeeded(null, TEST_TIMESTAMP_MS,
+                TEST_TIMESTAMP_MS + NUD_THROTTLE_MS));
+        verify(mMockIpClientManager, never()).confirmConfiguration();
     }
 }

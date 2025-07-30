@@ -17,7 +17,9 @@
 package com.android.server.wifi;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyDouble;
 import static org.mockito.Mockito.anyInt;
@@ -45,6 +47,8 @@ import org.mockito.Spy;
 @SmallTest
 public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
     private static final int WIFI_LOW_CONNECTED_SCORE_THRESHOLD_TO_TRIGGER_SCAN_FOR_MBB = 55;
+    private static final int TEST_ADJUST_SCORE = 70;
+    private static final long TEST_TIME_STAMP_MS = 12345678L;
 
     class FakeClock extends Clock {
         long mWallClockMillis = 1500000000000L;
@@ -214,5 +218,35 @@ public class VelocityBasedConnectedScoreTest extends WifiBaseTest {
 
         assertFalse(mVelocityBasedConnectedScoreWithMockHelper.generateScoreResult(mWifiInfo, null,
                 mClock.getWallClockMillis(), false).shouldTriggerScan());
+    }
+
+    @Test
+    public void generateScoreResult_shouldCheckNud() {
+        when(mMockConnectedScorerHelper.shouldCheckNud(
+                anyLong(), anyLong(), anyInt(), anyInt(), anyInt())).thenReturn(true);
+        when(mMockConnectedScorerHelper.adjustScore(any(WifiInfo.class), anyDouble(), anyLong(),
+                anyLong(), anyInt(), anyInt())).thenReturn(TEST_ADJUST_SCORE);
+
+        assertTrue(mVelocityBasedConnectedScoreWithMockHelper.generateScoreResult(mWifiInfo, null,
+                TEST_TIME_STAMP_MS, true).shouldCheckNud());
+        assertEquals(TEST_TIME_STAMP_MS,
+                mVelocityBasedConnectedScoreWithMockHelper.mLastNudCheckTimeMs);
+        assertEquals(TEST_ADJUST_SCORE,
+                mVelocityBasedConnectedScoreWithMockHelper.mLastNudCheckScore);
+    }
+
+    @Test
+    public void generateScoreResult_shouldNotCheckNud() {
+        when(mMockConnectedScorerHelper.shouldCheckNud(
+                anyLong(), anyLong(), anyInt(), anyInt(), anyInt())).thenReturn(false);
+        when(mMockConnectedScorerHelper.adjustScore(any(WifiInfo.class), anyDouble(), anyLong(),
+                anyLong(), anyInt(), anyInt())).thenReturn(TEST_ADJUST_SCORE);
+
+        assertFalse(mVelocityBasedConnectedScoreWithMockHelper.generateScoreResult(mWifiInfo, null,
+                TEST_TIME_STAMP_MS, true).shouldCheckNud());
+        assertNotEquals(TEST_TIME_STAMP_MS,
+                mVelocityBasedConnectedScoreWithMockHelper.mLastNudCheckTimeMs);
+        assertNotEquals(TEST_ADJUST_SCORE,
+                mVelocityBasedConnectedScoreWithMockHelper.mLastNudCheckScore);
     }
 }
