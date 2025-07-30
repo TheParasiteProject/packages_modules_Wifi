@@ -4696,4 +4696,20 @@ public class WifiManagerTest {
         verify(mWifiService).isOpenNetworkNotifierEnabled(
                 any(IBooleanListener.Stub.class));
     }
+
+    @RequiresFlagsEnabled(Flags.FLAG_GET_SUPPORTED_INTERFACE_NAMES)
+    @Test
+    public void testGetSupportedInterfaceNames() throws Exception {
+        assumeTrue(Environment.isSdkNewerThanB());
+        Consumer<List<String>> resultsCallback = mock(Consumer.class);
+        SynchronousExecutor executor = mock(SynchronousExecutor.class);
+        // Null executor/callback exception.
+        assertThrows(NullPointerException.class,
+                () -> mWifiManager.getSupportedInterfaceNames(null, resultsCallback));
+        assertThrows(NullPointerException.class,
+                () -> mWifiManager.getSupportedInterfaceNames(executor, null));
+        // Call and verify.
+        mWifiManager.getSupportedInterfaceNames(executor, resultsCallback);
+        verify(mWifiService).getSupportedInterfaceNames(any(IListListener.Stub.class));
+    }
 }

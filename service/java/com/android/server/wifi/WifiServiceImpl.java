@@ -225,6 +225,7 @@ import com.android.server.wifi.coex.CoexManager;
 import com.android.server.wifi.entitlement.PseudonymInfo;
 import com.android.server.wifi.hotspot2.PasspointManager;
 import com.android.server.wifi.hotspot2.PasspointProvider;
+import com.android.server.wifi.nl80211.Nl80211Native;
 import com.android.server.wifi.proto.WifiStatsLog;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.UserActionEvent;
 import com.android.server.wifi.util.ActionListenerWrapper;
@@ -569,6 +570,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
     private final AfcManager mAfcManager;
     private final TwtManager mTwtManager;
     private final OpenNetworkNotifier mOpenNetworkNotifier;
+    private final Nl80211Native mNl80211Native;
 
     /**
      * The wrapper of SoftApCallback is used in WifiService internally.
@@ -834,6 +836,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         mAfcManager = mWifiInjector.getAfcManager();
         mTwtManager = mWifiInjector.getTwtManager();
         mWepNetworkUsageController = mWifiInjector.getWepNetworkUsageController();
+        mNl80211Native = mWifiInjector.getNl80211Native();
         if (Environment.isSdkAtLeastB()) {
             mIsUsdSupported = mContext.getResources().getBoolean(
                     mContext.getResources().getIdentifier("config_deviceSupportsWifiUsd", "bool",
@@ -9800,5 +9803,27 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 Log.e(TAG, e.getMessage(), e);
             }
         }, TAG + "#isOpenNetworkNotifierEnabled");
+    }
+
+    /** See {@link WifiManager#getSupportedInterfaceNames(Executor, Consumer)} */
+    @Override
+    public void getSupportedInterfaceNames(@NonNull IListListener listener) {
+        if (!Environment.isSdkNewerThanB()) {
+            throw new UnsupportedOperationException();
+        }
+        Objects.requireNonNull(listener, "listener cannot be null");
+        int uid = Binder.getCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiInterfacesPermission(uid)) {
+            throw new SecurityException("Uid=" + uid + " is not allowed to manage wifi interfaces");
+        }
+        mWifiThreadRunner.post(
+                () -> {
+                    try {
+                        List<String> interfaceNames = mNl80211Native.getInterfaceNames();
+                        listener.onResult(interfaceNames);
+                    } catch (RemoteException e) {
+                        Log.e(TAG, e.getMessage(), e);
+                    }
+                }, TAG + "#getSupportedInterfaceNames");
     }
 }

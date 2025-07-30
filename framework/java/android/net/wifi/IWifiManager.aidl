@@ -578,4 +578,6 @@ interface IWifiManager {
     void setOpenNetworkNotifierEnabled(boolean enable);
 
     void isOpenNetworkNotifierEnabled(in IBooleanListener listener);
+
+    void getSupportedInterfaceNames(in IListListener listener);
 }
