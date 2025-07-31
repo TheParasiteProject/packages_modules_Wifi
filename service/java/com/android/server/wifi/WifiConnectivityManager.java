@@ -1970,10 +1970,7 @@ public class WifiConnectivityManager {
         // {@link android.net.wifi.WifiManager#WIFI_FEATURE_CONTROL_ROAMING} or the
         // candidate configuration contains a specified BSSID, or the feature to set target BSSID
         // is enabled.
-        if (mConnectivityHelper.isFirmwareRoamingSupported()
-                && !mWifiGlobals.isNetworkSelectionSetTargetBssid()
-                && (targetNetwork.BSSID == null
-                || targetNetwork.BSSID.equals(ClientModeImpl.SUPPLICANT_BSSID_ANY))) {
+        if (shouldUseBssidAny(targetNetwork)) {
             targetBssid = ClientModeImpl.SUPPLICANT_BSSID_ANY;
         }
         localLog("connectToNetwork(" + clientModeManager + "): Connect to "
@@ -3395,8 +3392,14 @@ public class WifiConnectivityManager {
                 mWifiBlocklistMonitor.blockBssidForDurationMs(bssid, configuration,
                         TEMP_BSSID_BLOCK_DURATION,
                         WifiBlocklistMonitor.REASON_FRAMEWORK_DISCONNECT_FAST_RECONNECT, 0);
-                triggerConnectToNetworkUsingCmm(clientModeManager, candidate,
-                        ClientModeImpl.SUPPLICANT_BSSID_ANY);
+                ScanResult scanResult = candidate.getNetworkSelectionStatus()
+                        .getCandidate();
+                String targetBssid = scanResult == null ? ClientModeImpl.SUPPLICANT_BSSID_ANY
+                        : scanResult.BSSID;
+                if (shouldUseBssidAny(candidate)) {
+                    targetBssid = ClientModeImpl.SUPPLICANT_BSSID_ANY;
+                }
+                triggerConnectToNetworkUsingCmm(clientModeManager, candidate, targetBssid);
                 // since using primary manager to connect, stop any existing managers in the
                 // secondary transient role since they are no longer needed.
                 mActiveModeWarden.stopAllClientModeManagersInRole(
@@ -3407,6 +3410,13 @@ public class WifiConnectivityManager {
                     + bssid);
             mLatestCandidates = null;
         }
+    }
+
+    private boolean shouldUseBssidAny(WifiConfiguration targetNetwork) {
+        return mConnectivityHelper.isFirmwareRoamingSupported()
+                && !mWifiGlobals.isNetworkSelectionSetTargetBssid()
+                && (targetNetwork.BSSID == null
+                || targetNetwork.BSSID.equals(ClientModeImpl.SUPPLICANT_BSSID_ANY));
     }
 
     /**

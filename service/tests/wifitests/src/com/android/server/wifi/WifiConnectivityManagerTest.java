@@ -2455,9 +2455,13 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
     /**
      * Verify that when there are we obtain more than one valid candidates from scan results and
      * network connection fails, connection is immediately retried on the remaining candidates.
+     *
+     * When firmware roaming is not supported, the connection initiated should specify the target
+     * BSSID
      */
     @Test
-    public void testRetryConnectionOnFailure() {
+    public void testRetryConnectionOnFailureFirmwareRoamingNotSupported() {
+        when(mWifiConnectivityHelper.isFirmwareRoamingSupported()).thenReturn(false);
         // Setup WifiNetworkSelector to return 2 valid candidates from scan results
         MacAddress macAddress = MacAddress.fromString(CANDIDATE_BSSID_2);
         WifiCandidates.Key key = new WifiCandidates.Key(mock(ScanResultMatchInfo.class),
@@ -2478,7 +2482,86 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         // Verify a connection starting
         verify(mWifiNS).selectNetwork((List<WifiCandidates.Candidate>)
                 argThat(new WifiCandidatesListSizeMatcher(2)));
-        verify(mPrimaryClientModeManager).startConnectToNetwork(anyInt(), anyInt(), any());
+        verify(mPrimaryClientModeManager).startConnectToNetwork(anyInt(), anyInt(),
+                eq(CANDIDATE_BSSID));
+
+        // Need to re-mock wifi network selector to return candidate2 based on candidate
+        ScanResult candidateScanResult = new ScanResult();
+        candidateScanResult.SSID = CANDIDATE_SSID_2;
+        candidateScanResult.BSSID = CANDIDATE_BSSID_2;
+        mCandidateWifiConfig2.getNetworkSelectionStatus().setCandidate(candidateScanResult);
+        when(mWifiNS.selectNetwork(any()))
+                .then(new AnswerWithArguments() {
+                    public WifiConfiguration answer(List<WifiCandidates.Candidate> candidateList) {
+                        if (candidateList != null && candidateList.size() == 1
+                                && candidateList.get(0).getKey().bssid.equals(
+                                        otherCandidate.getKey().bssid)) {
+                            return mCandidateWifiConfig2;
+                        }
+                        return null;
+                    }
+                });
+        // Simulate the connection failing
+        WifiConfiguration config = WifiConfigurationTestUtil.createPskNetwork(CANDIDATE_SSID);
+        mWifiConnectivityManager.handleConnectionAttemptEnded(
+                mPrimaryClientModeManager,
+                WifiMetrics.ConnectionEvent.FAILURE_ASSOCIATION_REJECTION,
+                WifiMetricsProto.ConnectionEvent.FAILURE_REASON_UNKNOWN, CANDIDATE_BSSID,
+                config);
+        // Verify the failed BSSID is added to blocklist
+        verify(mWifiBlocklistMonitor).blockBssidForDurationMs(eq(CANDIDATE_BSSID),
+                eq(config), anyLong(), anyInt(), anyInt());
+        // Verify another connection starting
+        verify(mWifiNS).selectNetwork((List<WifiCandidates.Candidate>)
+                argThat(new WifiCandidatesListSizeMatcher(1)));
+        verify(mPrimaryClientModeManager).startConnectToNetwork(
+                anyInt(), anyInt(), eq(CANDIDATE_BSSID_2));
+
+        // Simulate the second connection also failing
+        mWifiConnectivityManager.handleConnectionAttemptEnded(
+                mPrimaryClientModeManager,
+                WifiMetrics.ConnectionEvent.FAILURE_ASSOCIATION_REJECTION,
+                WifiMetricsProto.ConnectionEvent.FAILURE_REASON_UNKNOWN, CANDIDATE_BSSID_2,
+                config);
+        // Verify there are no more connections
+        verify(mWifiNS).selectNetwork((List<WifiCandidates.Candidate>)
+                argThat(new WifiCandidatesListSizeMatcher(0)));
+        verify(mPrimaryClientModeManager).startConnectToNetwork(
+                anyInt(), anyInt(), eq(CANDIDATE_BSSID_2));
+    }
+
+
+    /**
+     * Verify that when there are we obtain more than one valid candidates from scan results and
+     * network connection fails, connection is immediately retried on the remaining candidates.
+     *
+     * When firmware roaming is supported, the connection initiated should use SUPPLICANT_BSSID_ANY
+     */
+    @Test
+    public void testRetryConnectionOnFailureFirmwareRoamingSupported() {
+        when(mWifiConnectivityHelper.isFirmwareRoamingSupported()).thenReturn(true);
+        // Setup WifiNetworkSelector to return 2 valid candidates from scan results
+        MacAddress macAddress = MacAddress.fromString(CANDIDATE_BSSID_2);
+        WifiCandidates.Key key = new WifiCandidates.Key(mock(ScanResultMatchInfo.class),
+                macAddress, 0, WifiConfiguration.SECURITY_TYPE_OPEN);
+        WifiCandidates.Candidate otherCandidate = mock(WifiCandidates.Candidate.class);
+        when(otherCandidate.getKey()).thenReturn(key);
+        List<WifiCandidates.Candidate> candidateList = new ArrayList<>();
+        candidateList.add(mCandidate1);
+        candidateList.add(otherCandidate);
+        when(mWifiNS.getCandidatesFromScan(any(), any(), any(), anyBoolean(), anyBoolean(),
+                anyBoolean(), any(), anyBoolean(), anyInt())).thenReturn(candidateList);
+
+        // Set WiFi to disconnected state to trigger scan
+        mWifiConnectivityManager.handleConnectionStateChanged(
+                mPrimaryClientModeManager,
+                WifiConnectivityManager.WIFI_STATE_DISCONNECTED);
+        mLooper.dispatchAll();
+        // Verify a connection starting
+        verify(mWifiNS).selectNetwork((List<WifiCandidates.Candidate>)
+                argThat(new WifiCandidatesListSizeMatcher(2)));
+        verify(mPrimaryClientModeManager).startConnectToNetwork(anyInt(), anyInt(),
+                eq(ClientModeImpl.SUPPLICANT_BSSID_ANY));
 
         // Simulate the connection failing
         WifiConfiguration config = WifiConfigurationTestUtil.createPskNetwork(CANDIDATE_SSID);
@@ -2494,7 +2577,7 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         verify(mWifiNS).selectNetwork((List<WifiCandidates.Candidate>)
                 argThat(new WifiCandidatesListSizeMatcher(1)));
         verify(mPrimaryClientModeManager, times(2)).startConnectToNetwork(
-                anyInt(), anyInt(), any());
+                anyInt(), anyInt(), eq(ClientModeImpl.SUPPLICANT_BSSID_ANY));
 
         // Simulate the second connection also failing
         mWifiConnectivityManager.handleConnectionAttemptEnded(
@@ -2506,7 +2589,7 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         verify(mWifiNS).selectNetwork((List<WifiCandidates.Candidate>)
                 argThat(new WifiCandidatesListSizeMatcher(0)));
         verify(mPrimaryClientModeManager, times(2)).startConnectToNetwork(
-                anyInt(), anyInt(), any());
+                anyInt(), anyInt(), eq(ClientModeImpl.SUPPLICANT_BSSID_ANY));
     }
 
     @Test
