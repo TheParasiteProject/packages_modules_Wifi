@@ -13854,4 +13854,45 @@ public class WifiManager {
             throw e.rethrowFromSystemServer();
         }
     }
+
+    /**
+     * Get the names of all Wi-Fi interfaces supported by the device.
+     *
+     * @param executor The executor on which callback will be invoked.
+     * @param resultsCallback An asynchronous callback that will return {@code List<String>}
+     *     indicating the list of device wifi interface names. Null will be returned if the API is
+     *     supported but an unexpected error occurs in the lower layers. Callers may try calling
+     *     this again after some delay.
+     * @throws UnsupportedOperationException if the API is not supported on this SDK version.
+     * @throws SecurityException if the caller does not have permission.
+     * @hide
+     */
+    @SystemApi
+    @RequiresApi(37)
+    @FlaggedApi(Flags.FLAG_GET_SUPPORTED_INTERFACE_NAMES)
+    @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_INTERFACES)
+    public void getSupportedInterfaceNames(
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull Consumer<List<String>> resultsCallback) {
+        if (!Environment.isSdkNewerThanB()) {
+            throw new UnsupportedOperationException();
+        }
+        Objects.requireNonNull(executor, "executor cannot be null");
+        Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+        try {
+            mService.getSupportedInterfaceNames(
+                    new IListListener.Stub() {
+                        @Override
+                        public void onResult(List value) {
+                            Binder.clearCallingIdentity();
+                            executor.execute(
+                                    () -> {
+                                        resultsCallback.accept(value);
+                                    });
+                        }
+                    });
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
 }

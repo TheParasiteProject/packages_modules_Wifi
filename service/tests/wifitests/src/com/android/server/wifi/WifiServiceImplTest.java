@@ -13859,5 +13859,20 @@ public class WifiServiceImplTest extends WifiBaseTest {
                 any(IntentFilter.class),
                 any(), any());
     }
-}
 
+    @Test
+    public void testGetSupportedInterfaceNames() throws Exception {
+        assumeTrue(Environment.isSdkNewerThanB());
+        IListListener listener = mock(IListListener.class);
+        InOrder inOrder = inOrder(listener);
+        assertThrows(
+                SecurityException.class,
+                () -> mWifiServiceImpl.getSupportedInterfaceNames(listener));
+
+        when(mWifiPermissionsUtil.checkManageWifiInterfacesPermission(anyInt())).thenReturn(true);
+        when(mNl80211Native.getInterfaceNames()).thenReturn(List.of("wlan0"));
+        mWifiServiceImpl.getSupportedInterfaceNames(listener);
+        mLooper.dispatchAll();
+        inOrder.verify(listener).onResult(List.of("wlan0"));
+    }
+}

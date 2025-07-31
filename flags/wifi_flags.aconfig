@@ -431,3 +431,11 @@ flag {
     description: "Filters carrier networks from the connection candidate list while the device is in motion"
     bug: "409851656"
 }
+
+flag {
+    name: "get_supported_interface_names"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add new API to get supported interface names"
+    bug: "433370605"
+}
