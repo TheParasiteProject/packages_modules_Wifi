@@ -50,6 +50,8 @@ DISCOVERY_KEY_MAX_DISTANCE_MM = 'MaxDistanceMm'
 # onServiceLost reason code
 EASON_PEER_NOT_VISIBLE = 1
 
+# throughput unit change
+BITS_TO_MBPS = 1000000
 
 class WifiAwareTestConstants:
     """Constants for Wi-Fi Aware test."""

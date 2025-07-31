@@ -894,21 +894,34 @@ def establish_socket_and_send_msg(
 
 
 def run_ping6(dut: android_device.AndroidDevice, peer_ipv6: str):
-  """Run a ping6 over the specified device/link.
+    """Run a ping6 over the specified device/link.
 
-  Args:
-    dut: Device on which to execute ping6.
-    peer_ipv6: Scoped IPv6 address of the peer to ping.
-  """
-  cmd = 'ping6 -c 3 -W 5 %s' % peer_ipv6
-  try:
-    dut.log.info(cmd)
-    results = dut.adb.shell(cmd)
-  except adb.AdbError:
-    time.sleep(1)
-    dut.log.info('CMD RETRY: %s', cmd)
-    results = dut.adb.shell(cmd)
+    Args:
+       dut: Device on which to execute ping6.
+       peer_ipv6: Scoped IPv6 address of the peer to ping.
+    """
+    cmd = 'ping6 -c 3 -W 5 %s' % peer_ipv6
+    try:
+        dut.log.info(cmd)
+        results = dut.adb.shell(cmd)
+    except adb.AdbError:
+        time.sleep(1)
+        dut.log.info('CMD RETRY: %s', cmd)
+        results = dut.adb.shell(cmd)
+    dut.log.info("cmd='%s' -> '%s'", cmd, results)
+    if not results:
+        asserts.fail("ping6 empty results - seems like a failure")
+    return results
 
-  dut.log.info("cmd='%s' -> '%s'", cmd, results)
-  if not results:
-    asserts.fail("ping6 empty results - seems like a failure")
+def iperf_server(ad,  extra_args=""):
+    """
+    Starts an iperf3 server and checks the immediate output for errors.
+
+    NOTE: This is a blocking call and will hang if the server starts
+    successfully. It only proceeds if the command fails instantly.
+    """
+    out = ad.adb.shell("iperf3 -s {}".format(extra_args))
+    clean_out = str(out, 'utf-8').strip().split('\n')
+    if "error" in clean_out:
+        return False, clean_out
+    return True, clean_out
