@@ -231,6 +231,11 @@ public class WifiSettingsConfigStore {
     public static final Key<Boolean> WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON =
             new Key<>("wifi_networks_available_notification_on", true);
 
+    /**
+     * Whether the user enables or not the feature to auto wakeup near a high-quality saved network.
+     */
+    public static final Key<Boolean> WIFI_WAKEUP_ENABLED = new Key<>("wifi_wakeup_enabled", false);
+
     /******** Wifi shared pref keys ***************/
 
     private final Context mContext;
@@ -306,7 +311,9 @@ public class WifiSettingsConfigStore {
             // multi-user WiFi is supported, mUserPrivateKeys serves as a collection for both
             // user-specific keys and keys that support B&R.
             mUserPrivateKeys.addAll(Set.of(
-                    WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON
+                    WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON,
+                    WIFI_WAKEUP_ENABLED,
+                    WIFI_SCAN_ALWAYS_AVAILABLE
             ));
         }
     }
@@ -440,9 +447,15 @@ public class WifiSettingsConfigStore {
         // then Key.defaultValue for each key under migration.
         final Map<Key, String> keysForMigrationFromSettingsGlobal = Map.of(
                 WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON,
-                Settings.Global.WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON
+                Settings.Global.WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON,
+                WIFI_WAKEUP_ENABLED,
+                Settings.Global.WIFI_WAKEUP_ENABLED
         );
         keysForMigrationFromSettingsGlobal.forEach((configStoreKey, settingsGlobalKey) -> {
+            if (mSharedToPrivateMigrationDataHolder.containsKey(configStoreKey.key)) {
+                // Key already found in DE and there's no need for migration from Settings.Global.
+                return;
+            }
             // All Key types should be handled in the switch case below with proper methods to fetch
             // from Settings.Global.
             Object value = switch (configStoreKey.defaultValue) {
@@ -457,7 +470,8 @@ public class WifiSettingsConfigStore {
         // Key.defaultValue when not retrieved from SharedStoreData.
         final List<Key> keysForMigrationFromDefaultValue = List.of(
                 WIFI_WEP_ALLOWED /* no Settings.Global */,
-                D2D_ALLOWED_WHEN_INFRA_STA_DISABLED /* no Settings.Global */
+                D2D_ALLOWED_WHEN_INFRA_STA_DISABLED /* no Settings.Global */,
+                WIFI_SCAN_ALWAYS_AVAILABLE /* already migrated to SharedStoreData */
         );
         for (Key key : keysForMigrationFromDefaultValue) {
             if (!mSharedToPrivateMigrationDataHolder.containsKey(key.key)) {
