@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import os
 import logging
 import time
 
@@ -34,7 +35,7 @@ def enable_wifi_verbose_logging(ad: android_device.AndroidDevice):
 
 def take_bug_reports(ads, test_name=None, begin_time=None, destination=None):
     logging.info('Collecting bugreports...')
-    android_device.take_bug_reports(ads, destination)
+    android_device.take_bug_reports(ads, destination=destination)
 
 def restart_wifi_and_disable_connection_scan(ad: android_device.AndroidDevice):
     ad.wifi.wifiDisableAllSavedNetworks()
@@ -69,3 +70,39 @@ def skip_if_tv_device(
     """Skips current test if the device is a TV."""
     characteristics = (ad.adb.shell('getprop ro.build.characteristics').decode().strip())
     asserts.skip_if('tv' in characteristics, f'{ad}. This test is not for TV devices.')
+
+
+def capture_hsv_snapshot(
+    device: android_device.AndroidDevice,
+    prefix: str,
+    output_path: str | None = None,
+) -> None:
+  """Captures go/hsv device snapshots.
+
+  Note: Assumes the uiautomator is loaded, otherwise only capture screenshot.
+
+  Args:
+    device: Android device to have the HSV snapshot captured.
+    prefix: Name of the HSV snapshot file.
+    output_path: Path to the log directory.
+  """
+  if output_path is None:
+      output_path = device.log_path
+
+  # Take a screenshot equiped with hierarchy.
+  device.take_screenshot(output_path, prefix=f'screenshot,{prefix}')
+
+  if not hasattr(device, 'ui'):
+      return
+
+  hierarchy = device.ui.dump()
+  hsv_file_name = device.generate_filename(
+      file_type=f'hsv,{prefix}', extension_name='xml'
+  )
+
+  # Write hierarchy to xml file.
+  with open(
+      os.path.join(output_path, hsv_file_name), 'w', encoding='utf8'
+  ) as f:
+      print(hierarchy, file=f)
+  logging.info('UI hierarchy saved to: %s', hsv_file_name)
