@@ -4058,6 +4058,8 @@ public class WifiMetrics {
                     event.channelFrequency = infos.get(infoIndex).getFrequency();
                     event.channelBandwidth = infos.get(infoIndex).getBandwidth();
                     event.generation = infos.get(infoIndex).getWifiStandardInternal();
+                    writeSoftApInfoChanged(event.channelFrequency,
+                            event.channelBandwidth, event.generation);
                     numOfEventNeededToUpdate--;
                 }
             }
@@ -10735,6 +10737,57 @@ public class WifiMetrics {
                 getSoftApStoppedUpstreamType(upstreamCaps));
         WifiStatsLog.write(WifiStatsLog.SOFT_AP_STATE_CHANGED,
                 WifiStatsLog.SOFT_AP_STATE_CHANGED__HOTSPOT_ON__STATE_OFF);
+    }
+
+    /**
+     * Map SoftApInfo channel width to proto enum.
+     */
+    @VisibleForTesting
+    int convertSoftApInfoChannelWidthToProto(
+            @WifiAnnotations.ChannelWidth int channelWidth) {
+        return switch (channelWidth) {
+            case SoftApInfo.CHANNEL_WIDTH_20MHZ_NOHT ->
+                    WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_20MHZ_NOHT;
+            case SoftApInfo.CHANNEL_WIDTH_20MHZ ->
+                    WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_20MHZ;
+            case SoftApInfo.CHANNEL_WIDTH_40MHZ ->
+                    WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_40MHZ;
+            case SoftApInfo.CHANNEL_WIDTH_80MHZ ->
+                    WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_80MHZ;
+            case SoftApInfo.CHANNEL_WIDTH_80MHZ_PLUS_MHZ ->
+                    WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_80MHZ_PLUS_MHZ;
+            case SoftApInfo.CHANNEL_WIDTH_160MHZ ->
+                    WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_160MHZ;
+            case SoftApInfo.CHANNEL_WIDTH_320MHZ ->
+                    WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_320MHZ;
+            case SoftApInfo.CHANNEL_WIDTH_2160MHZ ->
+                    WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_2160MHZ;
+            case SoftApInfo.CHANNEL_WIDTH_4320MHZ ->
+                    WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_4320MHZ;
+            case SoftApInfo.CHANNEL_WIDTH_6480MHZ ->
+                    WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_6480MHZ;
+            case SoftApInfo.CHANNEL_WIDTH_8640MHZ ->
+                    WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_8640MHZ;
+            case SoftApInfo.CHANNEL_WIDTH_AUTO ->
+                    WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_AUTO;
+            default -> WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_UNKNOWN;
+        };
+    }
+
+    /**
+     * Call when SoftAp info changed intent is triggered.
+     *
+     * @param frequency new channel frequency_mhz after info changed
+     * @param bandwidth new softAp bandwidth setting
+     * @param standard new softAp supported Wifi standard
+     */
+    public void writeSoftApInfoChanged(int frequency, int bandwidth, int standard) {
+        WifiStatsLog.write(WifiStatsLog.SOFT_AP_INFO_CHANGED,
+                frequency,
+                KnownBandsChannelHelper.getBand(frequency),
+                convertSoftApInfoChannelWidthToProto(bandwidth),
+                getSoftApStoppedStandard(standard)
+        );
     }
 
     /**
