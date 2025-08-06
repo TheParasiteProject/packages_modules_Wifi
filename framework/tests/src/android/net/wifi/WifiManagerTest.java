@@ -4701,13 +4701,27 @@ public class WifiManagerTest {
     @Test
     public void testGetSupportedInterfaceNames() throws Exception {
         assumeTrue(Environment.isSdkNewerThanB());
-        Consumer<List<String>> resultsCallback = mock(Consumer.class);
+        OutcomeReceiver<List<String>, Exception> resultsCallback =
+                new OutcomeReceiver<>() {
+                    @Override
+                    public void onResult(List<String> names) {}
+
+                    @Override
+                    public void onError(Exception ex) {}
+                };
+
         SynchronousExecutor executor = mock(SynchronousExecutor.class);
         // Null executor/callback exception.
-        assertThrows(NullPointerException.class,
-                () -> mWifiManager.getSupportedInterfaceNames(null, resultsCallback));
-        assertThrows(NullPointerException.class,
-                () -> mWifiManager.getSupportedInterfaceNames(executor, null));
+        try {
+            mWifiManager.getSupportedInterfaceNames(null, resultsCallback);
+            fail("expected NullPointerException");
+        } catch (NullPointerException expected) {
+        }
+        try {
+            mWifiManager.getSupportedInterfaceNames(executor, null);
+            fail("expected NullPointerException");
+        } catch (NullPointerException expected) {
+        }
         // Call and verify.
         mWifiManager.getSupportedInterfaceNames(executor, resultsCallback);
         verify(mWifiService).getSupportedInterfaceNames(any(IListListener.Stub.class));
