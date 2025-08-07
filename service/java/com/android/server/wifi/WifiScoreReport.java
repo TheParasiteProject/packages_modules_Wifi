@@ -115,7 +115,6 @@ public class WifiScoreReport {
     private final WifiScoreCard mWifiScoreCard;
     private final Context mContext;
     private long mLastScoreBreachLowTimeMillis = INVALID_TIMESTAMP_MS;
-    private long mLastScoreBreachHighTimeMillis = INVALID_TIMESTAMP_MS;
 
     @VisibleForTesting
     VelocityBasedConnectedScorer mVelocityBasedConnectedScorer;
@@ -194,13 +193,6 @@ public class WifiScoreReport {
                 }
             } else {
                 mLastScoreBreachLowTimeMillis = INVALID_TIMESTAMP_MS;
-            }
-            if (score > ConnectedScorer.WIFI_TRANSITION_SCORE) {
-                if (mLegacyIntScore <= ConnectedScorer.WIFI_TRANSITION_SCORE) {
-                    mLastScoreBreachHighTimeMillis = millis;
-                }
-            } else {
-                mLastScoreBreachHighTimeMillis = INVALID_TIMESTAMP_MS;
             }
             mLegacyIntScore = score;
             reportNetworkScoreToConnectivityServiceIfNecessary();
@@ -439,13 +431,6 @@ public class WifiScoreReport {
                     return;
                 }
             }
-            if (mLastScoreBreachHighTimeMillis != INVALID_TIMESTAMP_MS
-                    && (millis - mLastScoreBreachHighTimeMillis)
-                            < mDeviceConfigFacade.getMinConfirmationDurationSendHighScoreMs()) {
-                Log.d(TAG, "Not reporting high score because elapsed time is shorter than "
-                        + "the minimum confirmation duration");
-                return;
-            }
         }
         // Set the usability prediction for the AOSP scorer.
         mWifiMetrics.setScorerPredictedWifiUsabilityState(mInterfaceName,
@@ -654,7 +639,6 @@ public class WifiScoreReport {
             mVelocityBasedConnectedScorer.reset();
         }
         mLastScoreBreachLowTimeMillis = INVALID_TIMESTAMP_MS;
-        mLastScoreBreachHighTimeMillis = INVALID_TIMESTAMP_MS;
         mLastLowScoreScanTimestampMs = INVALID_TIMESTAMP_MS;
         mLastNudCheckTimeMs = INVALID_TIMESTAMP_MS;
         if (mVerboseLoggingEnabled) Log.d(TAG, "reset");
@@ -1058,7 +1042,6 @@ public class WifiScoreReport {
         mWifiInfoNoReset.setSSID(mWifiInfo.getWifiSsid());
         mWifiInfoNoReset.setRssi(mWifiInfo.getRssi());
         mLastScoreBreachLowTimeMillis = INVALID_TIMESTAMP_MS;
-        mLastScoreBreachHighTimeMillis = INVALID_TIMESTAMP_MS;
     }
 
     /**

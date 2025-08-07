@@ -324,8 +324,6 @@ public class WifiScoreReportTest extends WifiBaseTest {
 
         when(mDeviceConfigFacade.getMinConfirmationDurationSendLowScoreMs()).thenReturn(
                 DeviceConfigFacade.DEFAULT_MIN_CONFIRMATION_DURATION_SEND_LOW_SCORE_MS);
-        when(mDeviceConfigFacade.getMinConfirmationDurationSendHighScoreMs()).thenReturn(
-                DeviceConfigFacade.DEFAULT_MIN_CONFIRMATION_DURATION_SEND_HIGH_SCORE_MS);
         when(mDeviceConfigFacade.getRssiThresholdNotSendLowScoreToCsDbm()).thenReturn(
                 DeviceConfigFacade.DEFAULT_RSSI_THRESHOLD_NOT_SEND_LOW_SCORE_TO_CS_DBM);
         when(mWifiSettingsStore.isWifiScoringEnabled()).thenReturn(true);
@@ -1723,51 +1721,6 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verifySentNetworkScore(52);
 
-    }
-
-    /**
-     * Verify confirmation duration is added for reporting high score with non-zero value
-     */
-    @Test
-    public void confirmationDurationIsAddedForSendingHighScore() throws Exception {
-        assumeFalse(SdkLevel.isAtLeastS());
-        // initially called once
-        verifySentAnyNetworkScore();
-        WifiConnectedNetworkScorerImpl scorerImpl = new WifiConnectedNetworkScorerImpl();
-        // Register Client for verification.
-        mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, scorerImpl, TEST_UID);
-        verify(mExternalScoreUpdateObserverProxy).registerCallback(
-                mExternalScoreUpdateObserverCbCaptor.capture());
-        when(mNetwork.getNetId()).thenReturn(TEST_NETWORK_ID);
-        mWifiScoreReport.startConnectedNetworkScorer(TEST_NETWORK_ID, TEST_USER_SELECTED);
-        mClock.mStepMillis = 0;
-        when(mContext.getResources().getBoolean(
-                R.bool.config_wifiMinConfirmationDurationSendNetworkScoreEnabled)).thenReturn(true);
-        when(mDeviceConfigFacade.getMinConfirmationDurationSendHighScoreMs()).thenReturn(4000);
-
-        mClock.mWallClockMillis = 10;
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 49);
-        mLooper.dispatchAll();
-        // still only called once
-        verifySentAnyNetworkScore();
-        mClock.mWallClockMillis = 3000;
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 51);
-        mLooper.dispatchAll();
-        // still only called once
-        verifySentAnyNetworkScore();
-        mClock.mWallClockMillis = 6999;
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 52);
-        mLooper.dispatchAll();
-        // still only called once
-        verifySentAnyNetworkScore();
-        mClock.mWallClockMillis = 7000;
-        mExternalScoreUpdateObserverCbCaptor.getValue().notifyScoreUpdate(
-                scorerImpl.mSessionId, 53);
-        mLooper.dispatchAll();
-        verifySentNetworkScore(53);
     }
 
     /**
