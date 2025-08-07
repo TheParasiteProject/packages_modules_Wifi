@@ -16,7 +16,7 @@
 
 package com.android.server.wifi;
 
-import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_INVALID;
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_VELOCITY;
 
 import static com.android.server.wifi.Clock.INVALID_TIMESTAMP_MS;
 
@@ -235,8 +235,13 @@ public class WifiScoreReport {
             }
 
             // TODO(b/153075963): This should not be plumbed through WifiMetrics
-            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats, false,
-                    0, -1, SCORER_TYPE_INVALID);
+            com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStatsEntry statsEntry =
+                    mWifiMetrics.buildStatsEntry(mInterfaceName, mWifiInfo, stats, false, 0);
+            WifiUsabilityStatsEntry parcelableStatsEntry =
+                    mWifiMetrics.createNewWifiUsabilityStatsEntryParcelable(statsEntry,
+                            stats, mWifiInfo);
+            mWifiMetrics.sendWifiUsabilityStats(statsEntry, parcelableStatsEntry);
+            mWifiMetrics.addWifiUsabilityStatsEntries(statsEntry);
         }
 
         @Override
@@ -592,7 +597,7 @@ public class WifiScoreReport {
      * using a connected external WiFi scorer.
      *
      */
-    public int calculateAndReportScore() {
+    public int calculateAndReportScore(WifiUsabilityStatsEntry statsEntry) {
         if (mWifiInfo.getRssi() == mWifiInfo.INVALID_RSSI) {
             Log.d(TAG, "Not reporting score because RSSI is invalid");
             return -1;
@@ -600,8 +605,10 @@ public class WifiScoreReport {
 
         long millis = mClock.getWallClockMillis();
         ConnectedScoreResult scoreResult = mVelocityBasedConnectedScorer.generateScoreResult(
-                mWifiInfo, null, millis, isPrimary());
+                mWifiInfo, statsEntry, millis, isPrimary());
         int score = scoreResult.score();
+        statsEntry.setInternalScore(score);
+        statsEntry.setInternalScorerType(SCORER_TYPE_VELOCITY);
         int adjustedScore = scoreResult.adjustedScore();
 
         mAospScorerPredictionStatusForEvaluation =
