@@ -13860,9 +13860,12 @@ public class WifiManager {
      *
      * @param executor The executor on which callback will be invoked.
      * @param resultsCallback An asynchronous callback that will return {@code List<String>}
-     *     indicating the list of device wifi interface names. Null will be returned if the API is
-     *     supported but an unexpected error occurs in the lower layers. Callers may try calling
-     *     this again after some delay.
+     *     indicating the list of device wifi interface names via {@link
+     *     OutcomeReceiver#onResult(Object)}.
+     *     <p>If an unexpected error occurs in the lower layers, {@link
+     *     OutcomeReceiver#onError(Exception)} will be invoked with a {@link IllegalStateException}.
+     *     Callers may try calling this again after some delay. Unrecoverable errors will be thrown
+     *     as exceptions directly.
      * @throws UnsupportedOperationException if the API is not supported on this SDK version.
      * @throws SecurityException if the caller does not have permission.
      * @hide
@@ -13873,7 +13876,7 @@ public class WifiManager {
     @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_INTERFACES)
     public void getSupportedInterfaceNames(
             @NonNull @CallbackExecutor Executor executor,
-            @NonNull Consumer<List<String>> resultsCallback) {
+            @NonNull OutcomeReceiver<List<String>, Exception> resultsCallback) {
         if (!Environment.isSdkNewerThanB()) {
             throw new UnsupportedOperationException();
         }
@@ -13887,7 +13890,13 @@ public class WifiManager {
                             Binder.clearCallingIdentity();
                             executor.execute(
                                     () -> {
-                                        resultsCallback.accept(value);
+                                        if (value != null) {
+                                            resultsCallback.onResult(value);
+                                        } else {
+                                            resultsCallback.onError(
+                                                    new IllegalStateException(
+                                                            "Failed to get interface names"));
+                                        }
                                     });
                         }
                     });
