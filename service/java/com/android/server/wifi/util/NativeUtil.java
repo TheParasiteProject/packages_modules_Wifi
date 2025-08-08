@@ -374,11 +374,15 @@ public class NativeUtil {
      * { 0, 1, 2, -1, 4, 5, 6, 7 } --> "1-02FF0405-1543";
      */
     public static String wpsDevTypeStringFromByteArray(byte[] devType) {
+        if (devType == null || devType.length != 8) {
+            throw new IllegalArgumentException(
+                    "Device type array must be non-null and 8 bytes long");
+        }
         byte[] a = devType;
         int x = ((a[0] & 0xFF) << 8) | (a[1] & 0xFF);
         String y = new String(HexEncoding.encode(Arrays.copyOfRange(devType, 2, 6)));
         int z = ((a[6] & 0xFF) << 8) | (a[7] & 0xFF);
-        return String.format("%d-%s-%d", x, y, z);
+        return String.valueOf(x) + "-" + y + "-" + String.valueOf(z);
     }
 
     /**
