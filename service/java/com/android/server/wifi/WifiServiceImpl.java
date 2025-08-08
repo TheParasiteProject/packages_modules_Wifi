@@ -397,6 +397,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
     private final WifiSettingsConfigStore mSettingsConfigStore;
     private final WifiResourceCache mResourceCache;
     private boolean mIsUsdSupported = false;
+    private int mDeviceMobilityState = WifiManager.DEVICE_MOBILITY_STATE_UNKNOWN;
 
     /**
      * Callback for use with LocalOnlyHotspot to unregister requesting applications upon death.
@@ -7115,6 +7116,11 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         }
         // Post operation to handler thread
         mWifiThreadRunner.post(() -> {
+            if (state == mDeviceMobilityState) {
+                // Ignore repeated mobility state updates
+                return;
+            }
+            mDeviceMobilityState = state;
             mWifiConnectivityManager.setDeviceMobilityState(state);
             mWifiHealthMonitor.setDeviceMobilityState(state);
             mWifiDataStall.setDeviceMobilityState(state);
