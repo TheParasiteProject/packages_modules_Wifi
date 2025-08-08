@@ -414,7 +414,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
                 mWifiScoreReport.getAospScorerPredictionStatusForEvaluation());
         assertEquals(WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_NONE,
                 mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation());
-        assertEquals(ADJUSTED_SCORE, mWifiScoreReport.getScore().getLegacyInt());
+        assertEquals(ADJUSTED_SCORE, mWifiScoreReport.mLegacyIntScore);
     }
 
     /**
