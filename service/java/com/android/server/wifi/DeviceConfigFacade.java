@@ -141,11 +141,6 @@ public class DeviceConfigFacade {
     // depends on the score evaluation period normally controlled by
     // 'com.android.wifi.resources.R' config_wifiPollRssiIntervalMilliseconds.
     static final int DEFAULT_MIN_CONFIRMATION_DURATION_SEND_LOW_SCORE_MS = 5000;
-    // Default minimum confirmation duration for sending network score to connectivity service
-    // when score breaches high. The actual confirmation duration is longer in general and it
-    // depends on the score evaluation period normally controlled by
-    // 'com.android.wifi.resources.R' config_wifiPollRssiIntervalMilliseconds.
-    static final int DEFAULT_MIN_CONFIRMATION_DURATION_SEND_HIGH_SCORE_MS = 0;
     // Default RSSI threshold in dBm above which low score is not sent to connectivity service
     // when external scorer takes action.
     static final int DEFAULT_RSSI_THRESHOLD_NOT_SEND_LOW_SCORE_TO_CS_DBM = -67;
@@ -205,7 +200,6 @@ public class DeviceConfigFacade {
     private int mStationaryScanRssiValidTimeMs;
     private int mHealthMonitorFwAlertValidTimeMs;
     private int mMinConfirmationDurationSendLowScoreMs;
-    private int mMinConfirmationDurationSendHighScoreMs;
     private int mRssiThresholdNotSendLowScoreToCsDbm;
     private int mTrafficStatsThresholdMaxKbyte;
     private int mBandwidthEstimatorLargeTimeConstantSec;
@@ -384,9 +378,6 @@ public class DeviceConfigFacade {
         mMinConfirmationDurationSendLowScoreMs = DeviceConfig.getInt(NAMESPACE,
                 "min_confirmation_duration_send_low_score_ms",
                 DEFAULT_MIN_CONFIRMATION_DURATION_SEND_LOW_SCORE_MS);
-        mMinConfirmationDurationSendHighScoreMs = DeviceConfig.getInt(NAMESPACE,
-                "min_confirmation_duration_send_high_score_ms",
-                DEFAULT_MIN_CONFIRMATION_DURATION_SEND_HIGH_SCORE_MS);
         mRssiThresholdNotSendLowScoreToCsDbm = DeviceConfig.getInt(NAMESPACE,
                 "rssi_threshold_not_send_low_score_to_cs_dbm",
                 DEFAULT_RSSI_THRESHOLD_NOT_SEND_LOW_SCORE_TO_CS_DBM);
@@ -826,14 +817,6 @@ public class DeviceConfigFacade {
      */
     public int getMinConfirmationDurationSendLowScoreMs() {
         return mMinConfirmationDurationSendLowScoreMs;
-    }
-
-    /**
-     * Gets the minimum confirmation duration for sending network score to connectivity service
-     * when score breaches high.
-     */
-    public int getMinConfirmationDurationSendHighScoreMs() {
-        return mMinConfirmationDurationSendHighScoreMs;
     }
 
     /**

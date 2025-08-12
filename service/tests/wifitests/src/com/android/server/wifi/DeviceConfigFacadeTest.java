@@ -222,8 +222,6 @@ public class DeviceConfigFacadeTest extends WifiBaseTest {
                 mDeviceConfigFacade.getHealthMonitorFwAlertValidTimeMs());
         assertEquals(DeviceConfigFacade.DEFAULT_MIN_CONFIRMATION_DURATION_SEND_LOW_SCORE_MS,
                 mDeviceConfigFacade.getMinConfirmationDurationSendLowScoreMs());
-        assertEquals(DeviceConfigFacade.DEFAULT_MIN_CONFIRMATION_DURATION_SEND_HIGH_SCORE_MS,
-                mDeviceConfigFacade.getMinConfirmationDurationSendHighScoreMs());
         assertEquals(DeviceConfigFacade.DEFAULT_RSSI_THRESHOLD_NOT_SEND_LOW_SCORE_TO_CS_DBM,
                 mDeviceConfigFacade.getRssiThresholdNotSendLowScoreToCsDbm());
         assertEquals(DeviceConfigFacade.DEFAULT_TRAFFIC_STATS_THRESHOLD_MAX_KB,
@@ -450,7 +448,6 @@ public class DeviceConfigFacadeTest extends WifiBaseTest {
         assertEquals(3000, mDeviceConfigFacade.getStationaryScanRssiValidTimeMs());
         assertEquals(1000, mDeviceConfigFacade.getHealthMonitorFwAlertValidTimeMs());
         assertEquals(4000, mDeviceConfigFacade.getMinConfirmationDurationSendLowScoreMs());
-        assertEquals(1000, mDeviceConfigFacade.getMinConfirmationDurationSendHighScoreMs());
         assertEquals(-70, mDeviceConfigFacade.getRssiThresholdNotSendLowScoreToCsDbm());
         assertEquals(5000, mDeviceConfigFacade.getTrafficStatsThresholdMaxKbyte());
         assertEquals(30, mDeviceConfigFacade.getBandwidthEstimatorLargeTimeConstantSec());
