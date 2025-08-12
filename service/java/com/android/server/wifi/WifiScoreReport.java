@@ -591,25 +591,23 @@ public class WifiScoreReport {
     /**
      * Calculate the new wifi network score based on updated link layer stats.
      *
-     * Called periodically (POLL_RSSI_INTERVAL_MSECS) about every 3 seconds.
-     * @return scorer from the VelocityBasedConnectedScorer.
      * Note: This function will only notify connectivity services of the updated route if we are NOT
      * using a connected external WiFi scorer.
-     *
+     * @param statsEntry the parcelable {@link WifiUsabilityStatsEntry}. The internal scorer type
+     *                   and score will be set to the statsEntry
      */
-    public int calculateAndReportScore(WifiUsabilityStatsEntry statsEntry) {
+    public void calculateAndReportScore(WifiUsabilityStatsEntry statsEntry) {
         if (mWifiInfo.getRssi() == mWifiInfo.INVALID_RSSI) {
             Log.d(TAG, "Not reporting score because RSSI is invalid");
-            return -1;
+            return;
         }
 
         long millis = mClock.getWallClockMillis();
         ConnectedScoreResult scoreResult = mVelocityBasedConnectedScorer.generateScoreResult(
                 mWifiInfo, statsEntry, millis, isPrimary());
-        int score = scoreResult.score();
-        statsEntry.setInternalScore(score);
-        statsEntry.setInternalScorerType(SCORER_TYPE_VELOCITY);
         int adjustedScore = scoreResult.adjustedScore();
+        statsEntry.setInternalScore(adjustedScore);
+        statsEntry.setInternalScorerType(SCORER_TYPE_VELOCITY);
 
         mAospScorerPredictionStatusForEvaluation =
                 convertToPredictionStatusForEvaluation(scoreResult.isWifiUsable());
@@ -618,7 +616,7 @@ public class WifiScoreReport {
 
         // Bypass AOSP scorer if Wifi connected network scorer is set
         if (mWifiConnectedNetworkScorerHolder != null && !mIsExternalScorerDryRun) {
-            return adjustedScore;
+            return;
         }
 
         if (mAdaptiveConnectivityEnabledSettingObserver.get()
@@ -653,8 +651,7 @@ public class WifiScoreReport {
             mIsUsable = true;
         }
 
-        updateWifiMetrics(millis, score);
-        return adjustedScore;
+        updateWifiMetrics(millis, scoreResult.score());
     }
 
     private boolean enoughTimePassedSinceLastLowConnectedScoreScan() {
