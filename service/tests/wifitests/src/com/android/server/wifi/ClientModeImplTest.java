@@ -10491,6 +10491,17 @@ public class ClientModeImplTest extends WifiBaseTest {
         when(mWifiNative.getConnectionMloLinksInfo(WIFI_IFACE_NAME)).thenReturn(info);
     }
 
+    private void reconfigureMloLinksInfoDynamicUpdate() {
+        mConnectionCapabilities.wifiStandard = ScanResult.WIFI_STANDARD_11BE;
+        WifiNative.ConnectionMloLinksInfo info = new WifiNative.ConnectionMloLinksInfo();
+        info.links = new WifiNative.ConnectionMloLink[2];
+        info.links[0] = new WifiNative.ConnectionMloLink(TEST_MLO_LINK_ID, TEST_MLO_LINK_ADDR,
+                TEST_AP_MLD_MAC_ADDRESS, (byte) 0xFF, (byte) 0xFF, 2437);
+        info.links[1] = new WifiNative.ConnectionMloLink(TEST_MLO_LINK_ID_1, TEST_MLO_LINK_ADDR_1,
+                TEST_AP_MLD_MAC_ADDRESS, (byte) 0xFF, (byte) 0xFF, 5160);
+        when(mWifiNative.getConnectionMloLinksInfo(WIFI_IFACE_NAME)).thenReturn(info);
+    }
+
     @Test
     public void verifyMloLinkChangeTidToLinkMapping() throws Exception {
         // Initialize
@@ -10536,6 +10547,17 @@ public class ClientModeImplTest extends WifiBaseTest {
         assertEquals(2, mWifiInfo.getAffiliatedMloLinks().size());
         assertEquals(1, mWifiInfo.getAssociatedMloLinks().size());
 
+        //Link Addition. Make sure added link is ASSOCIATED.
+        reconfigureMloLinksInfoDynamicUpdate();
+        mCmi.sendMessage(WifiMonitor.MLO_LINKS_INFO_CHANGED,
+                WifiMonitor.MloLinkInfoChangeReason.MULTI_LINK_DYNAMIC_RECONFIG);
+        mLooper.dispatchAll();
+        links = mWifiInfo.getAffiliatedMloLinks();
+        assertEquals(MloLink.MLO_LINK_STATE_ACTIVE, links.get(0).getState());
+        assertEquals(MloLink.MLO_LINK_STATE_ACTIVE, links.get(1).getState());
+
+        assertEquals(2, mWifiInfo.getAffiliatedMloLinks().size());
+        assertEquals(2, mWifiInfo.getAssociatedMloLinks().size());
     }
 
     @Test

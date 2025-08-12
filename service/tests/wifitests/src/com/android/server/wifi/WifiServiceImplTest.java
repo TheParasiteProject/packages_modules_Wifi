@@ -33,6 +33,7 @@ import static android.net.wifi.WifiManager.CHANNEL_DATA_KEY_NUM_AP;
 import static android.net.wifi.WifiManager.COEX_RESTRICTION_SOFTAP;
 import static android.net.wifi.WifiManager.COEX_RESTRICTION_WIFI_AWARE;
 import static android.net.wifi.WifiManager.COEX_RESTRICTION_WIFI_DIRECT;
+import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_HIGH_MVMT;
 import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_STATIONARY;
 import static android.net.wifi.WifiManager.EASY_CONNECT_CRYPTOGRAPHY_CURVE_PRIME256V1;
 import static android.net.wifi.WifiManager.EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE;
@@ -7918,6 +7919,23 @@ public class WifiServiceImplTest extends WifiBaseTest {
         verify(mWifiConnectivityManager).setDeviceMobilityState(DEVICE_MOBILITY_STATE_STATIONARY);
         verify(mWifiHealthMonitor).setDeviceMobilityState(DEVICE_MOBILITY_STATE_STATIONARY);
         verify(mWifiDataStall).setDeviceMobilityState(DEVICE_MOBILITY_STATE_STATIONARY);
+    }
+
+    /**
+     * Verify that repeated mobility state updates with the same value are ignored.
+     */
+    @Test
+    public void setDeviceMobilityStateIgnoresRepeatedUpdates() {
+        mWifiServiceImpl.setDeviceMobilityState(DEVICE_MOBILITY_STATE_STATIONARY);
+        mWifiServiceImpl.setDeviceMobilityState(DEVICE_MOBILITY_STATE_STATIONARY);
+        mWifiServiceImpl.setDeviceMobilityState(DEVICE_MOBILITY_STATE_HIGH_MVMT);
+        mLooper.dispatchAll();
+        // Transition to stationary state should only be processed once
+        verify(mWifiConnectivityManager, times(1))
+                .setDeviceMobilityState(DEVICE_MOBILITY_STATE_STATIONARY);
+        verify(mWifiConnectivityManager, times(1))
+                .setDeviceMobilityState(DEVICE_MOBILITY_STATE_HIGH_MVMT);
+        verifyNoMoreInteractions(mWifiConnectivityManager);
     }
 
     /**
