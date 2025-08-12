@@ -6969,8 +6969,13 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         // .ConnectivityManager.NetworkCallback.onCapabilitiesChanged().
                         updateCapabilities();
                     } else if (reason
-                            == WifiMonitor.MloLinkInfoChangeReason.MULTI_LINK_RECONFIG_AP_REMOVAL) {
-                        // Link is removed. Set removed link state to MLO_LINK_STATE_UNASSOCIATED.
+                            == WifiMonitor.MloLinkInfoChangeReason.MULTI_LINK_RECONFIG_AP_REMOVAL
+                            || reason
+                            == WifiMonitor.MloLinkInfoChangeReason.MULTI_LINK_DYNAMIC_RECONFIG) {
+                        // When a link is removed or deleted the state of the link is set to
+                        // MLO_LINK_STATE_UNASSOCIATED. Conversely when a new link is added the
+                        // state of the link is set to MLO_LINK_STATE_ACTIVE or MLO_LINK_STATE_IDLE
+                        // based on TID mapping for the link.
                         // Also update block list mapping, as there is a change in affiliated
                         // BSSIDs.
                         clearMloLinkStates();
