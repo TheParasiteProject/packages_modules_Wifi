@@ -20,7 +20,10 @@ import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_ML;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.validateMockitoUsage;
 
@@ -31,6 +34,7 @@ import android.net.wifi.WifiUsabilityStatsEntry.RadioStats;
 import android.net.wifi.WifiUsabilityStatsEntry.RateStats;
 import android.net.wifi.WifiUsabilityStatsEntry.ScanResultWithSameFreq;
 import android.os.Parcel;
+import android.telephony.TelephonyManager;
 import android.util.SparseArray;
 
 import androidx.test.filters.SmallTest;
@@ -732,4 +736,255 @@ public class WifiUsabilityStatsEntryTest {
                 () -> usabilityStatsEntry.getTotalRadioOnFreqTimeMillis(
                         MloLink.INVALID_MLO_LINK_ID));
     }
+
+    @Test
+    public void testDefaultBuilder() {
+        WifiUsabilityStatsEntry entry = new WifiUsabilityStatsEntry.Builder().build();
+        assertEquals(0, entry.getTimeStampMillis());
+        assertEquals(WifiInfo.INVALID_RSSI, entry.getRssi());
+        assertEquals(WifiInfo.LINK_SPEED_UNKNOWN, entry.getLinkSpeedMbps());
+        assertEquals(TelephonyManager.NETWORK_TYPE_UNKNOWN, entry.getCellularDataNetworkType());
+        assertFalse(entry.isThroughputSufficient());
+    }
+
+    @Test
+    public void testBuilderWithSingleField() {
+        long timestamp = 123456789L;
+        WifiUsabilityStatsEntry entry = new WifiUsabilityStatsEntry.Builder()
+                .setTimeStampMillis(timestamp)
+                .build();
+
+        assertEquals(timestamp, entry.getTimeStampMillis());
+        assertEquals(WifiInfo.INVALID_RSSI, entry.getRssi());
+        assertEquals(WifiInfo.LINK_SPEED_UNKNOWN, entry.getLinkSpeedMbps());
+    }
+
+    @Test
+    public void testBuilderWithMultipleFields() {
+        long timestamp = 987654321L;
+        int rssi = -50;
+        int linkSpeed = 866;
+        boolean isThroughputSufficient = true;
+        int cellularDataNetworkType = TelephonyManager.NETWORK_TYPE_LTE;
+
+        WifiUsabilityStatsEntry entry = new WifiUsabilityStatsEntry.Builder()
+                .setTimeStampMillis(timestamp)
+                .setRssi(rssi)
+                .setLinkSpeedMbps(linkSpeed)
+                .setIsThroughputSufficient(isThroughputSufficient)
+                .setCellularDataNetworkType(cellularDataNetworkType)
+                .build();
+
+        assertEquals(timestamp, entry.getTimeStampMillis());
+        assertEquals(rssi, entry.getRssi());
+        assertEquals(linkSpeed, entry.getLinkSpeedMbps());
+        assertTrue(entry.isThroughputSufficient());
+        assertEquals(cellularDataNetworkType, entry.getCellularDataNetworkType());
+    }
+
+    @Test
+    public void testAllBuilderMethodsAndBuild() {
+        // Sample data for the builder
+        long testTimeStampMillis = 1000L;
+        int testRssi = -60;
+        int testLinkSpeedMbps = 150;
+        long testTotalTxSuccess = 10000;
+        long testTotalTxRetries = 100;
+        long testTotalTxBad = 5;
+        long testTotalRxSuccess = 20000;
+        long testTotalRadioOnTimeMillis = 5000;
+        long testTotalRadioTxTimeMillis = 1500;
+        long testTotalRadioRxTimeMillis = 2000;
+        long testTotalScanTimeMillis = 100;
+        long testTotalNanScanTimeMillis = 10;
+        long testTotalBackgroundScanTimeMillis = 20;
+        long testTotalRoamScanTimeMillis = 5;
+        long testTotalPnoScanTimeMillis = 5;
+        long testTotalHotspot2ScanTimeMillis = 5;
+        long testTotalCcaBusyFreqTimeMillis = 200;
+        long testTotalRadioOnFreqTimeMillis = 2500;
+        long testTotalBeaconRx = 500;
+        int testProbeStatusSinceLastUpdate = WifiUsabilityStatsEntry.PROBE_STATUS_SUCCESS;
+        int testProbeElapsedTimeSinceLastUpdateMillis = 50;
+        int testProbeMcsRateSinceLastUpdate = 10;
+        int testRxLinkSpeedMbps = 130;
+        int testTimeSliceDutyCycleInPercent = 90;
+        ContentionTimeStats[] testContentionTimeStats = new ContentionTimeStats[4];
+        testContentionTimeStats[0] = new ContentionTimeStats(100, 200, 150, 500);
+        RateStats[] testRateStats = new RateStats[1];
+        testRateStats[0] = new RateStats(
+                WifiUsabilityStatsEntry.WIFI_PREAMBLE_HE,
+                WifiUsabilityStatsEntry.WIFI_SPATIAL_STREAMS_TWO,
+                WifiUsabilityStatsEntry.WIFI_BANDWIDTH_80_MHZ,
+                5,
+                1000,
+                100,
+                200,
+                5,
+                10);
+        RadioStats[] testRadioStats = new RadioStats[1];
+        testRadioStats[0] = new RadioStats(1, 1000, 500, 500, 10, 5, 5, 0, 0, 0);
+        int testChannelUtilizationRatio = 128;
+        boolean testIsThroughputSufficient = true;
+        boolean testIsWifiScoringEnabled = true;
+        boolean testIsCellularDataAvailable = false;
+        int testCellularDataNetworkType = TelephonyManager.NETWORK_TYPE_LTE;
+        int testCellularSignalStrengthDbm = -90;
+        int testCellularSignalStrengthDb = 20;
+        boolean testIsSameRegisteredCell = true;
+        SparseArray<WifiUsabilityStatsEntry.LinkStats> testLinkStats = new SparseArray<>();
+        testLinkStats.put(0, new WifiUsabilityStatsEntry.LinkStats(0,
+                WifiUsabilityStatsEntry.LINK_STATE_NOT_IN_USE, 1, -55, 5180, -60,
+                WifiUsabilityStatsEntry.WIFI_BANDWIDTH_80_MHZ, 5180, 0, 150, 130, 5000, 50, 2,
+                8000, 250, 90, 100, 1200, null, null, null, null, null));
+        int testWifiLinkCount = 1;
+        int testMloMode = WifiManager.MLO_MODE_LOW_LATENCY;
+        long testTxTransmittedBytes = 12345L;
+        long testRxTransmittedBytes = 67890L;
+        int testLabelBadEventCount = 3;
+        int testWifiFrameworkState = WifiManager.WIFI_STATE_ENABLED;
+        int testIsNetworkCapabilitiesDownstreamSufficient = 1;
+        int testIsNetworkCapabilitiesUpstreamSufficient = 1;
+        int testIsThroughputPredictorDownstreamSufficient = 1;
+        int testIsThroughputPredictorUpstreamSufficient = 1;
+        boolean testIsBluetoothConnected = true;
+        int testUwbAdapterState = 1;
+        boolean testIsLowLatencyActivated = true;
+        int testMaxSupportedTxLinkSpeed = 1200;
+        int testMaxSupportedRxLinkSpeed = 1000;
+        int testVoipMode = 1;
+        int testThreadDeviceRole = 1;
+        int testStatusDataStall = 1;
+        int testInternalScore = 85;
+        int testInternalScorerType = WifiUsabilityStatsEntry.SCORER_TYPE_ML;
+
+        // Build the object using the builder
+        WifiUsabilityStatsEntry statsEntry = new WifiUsabilityStatsEntry.Builder()
+                .setTimeStampMillis(testTimeStampMillis)
+                .setRssi(testRssi)
+                .setLinkSpeedMbps(testLinkSpeedMbps)
+                .setTotalTxSuccess(testTotalTxSuccess)
+                .setTotalTxRetries(testTotalTxRetries)
+                .setTotalTxBad(testTotalTxBad)
+                .setTotalRxSuccess(testTotalRxSuccess)
+                .setTotalRadioOnTimeMillis(testTotalRadioOnTimeMillis)
+                .setTotalRadioTxTimeMillis(testTotalRadioTxTimeMillis)
+                .setTotalRadioRxTimeMillis(testTotalRadioRxTimeMillis)
+                .setTotalScanTimeMillis(testTotalScanTimeMillis)
+                .setTotalNanScanTimeMillis(testTotalNanScanTimeMillis)
+                .setTotalBackgroundScanTimeMillis(testTotalBackgroundScanTimeMillis)
+                .setTotalRoamScanTimeMillis(testTotalRoamScanTimeMillis)
+                .setTotalPnoScanTimeMillis(testTotalPnoScanTimeMillis)
+                .setTotalHotspot2ScanTimeMillis(testTotalHotspot2ScanTimeMillis)
+                .setTotalCcaBusyFreqTimeMillis(testTotalCcaBusyFreqTimeMillis)
+                .setTotalRadioOnFreqTimeMillis(testTotalRadioOnFreqTimeMillis)
+                .setTotalBeaconRx(testTotalBeaconRx)
+                .setProbeStatusSinceLastUpdate(testProbeStatusSinceLastUpdate)
+                .setProbeElapsedTimeSinceLastUpdateMillis(testProbeElapsedTimeSinceLastUpdateMillis)
+                .setProbeMcsRateSinceLastUpdate(testProbeMcsRateSinceLastUpdate)
+                .setRxLinkSpeedMbps(testRxLinkSpeedMbps)
+                .setTimeSliceDutyCycleInPercent(testTimeSliceDutyCycleInPercent)
+                .setContentionTimeStats(testContentionTimeStats)
+                .setRateStats(testRateStats)
+                .setWifiLinkLayerRadioStats(testRadioStats)
+                .setChannelUtilizationRatio(testChannelUtilizationRatio)
+                .setIsThroughputSufficient(testIsThroughputSufficient)
+                .setIsWifiScoringEnabled(testIsWifiScoringEnabled)
+                .setIsCellularDataAvailable(testIsCellularDataAvailable)
+                .setCellularDataNetworkType(testCellularDataNetworkType)
+                .setCellularSignalStrengthDbm(testCellularSignalStrengthDbm)
+                .setCellularSignalStrengthDb(testCellularSignalStrengthDb)
+                .setIsSameRegisteredCell(testIsSameRegisteredCell)
+                .setLinkStats(testLinkStats)
+                .setWifiLinkCount(testWifiLinkCount)
+                .setMloMode(testMloMode)
+                .setTxTransmittedBytes(testTxTransmittedBytes)
+                .setRxTransmittedBytes(testRxTransmittedBytes)
+                .setLabelBadEventCount(testLabelBadEventCount)
+                .setWifiFrameworkState(testWifiFrameworkState)
+                .setIsNetworkCapabilitiesDownstreamSufficient(
+                        testIsNetworkCapabilitiesDownstreamSufficient)
+                .setIsNetworkCapabilitiesUpstreamSufficient(
+                        testIsNetworkCapabilitiesUpstreamSufficient)
+                .setIsThroughputPredictorDownstreamSufficient(
+                        testIsThroughputPredictorDownstreamSufficient)
+                .setIsThroughputPredictorUpstreamSufficient(
+                        testIsThroughputPredictorUpstreamSufficient)
+                .setIsBluetoothConnected(testIsBluetoothConnected)
+                .setUwbAdapterState(testUwbAdapterState)
+                .setIsLowLatencyActivated(testIsLowLatencyActivated)
+                .setMaxSupportedTxLinkSpeed(testMaxSupportedTxLinkSpeed)
+                .setMaxSupportedRxLinkSpeed(testMaxSupportedRxLinkSpeed)
+                .setVoipMode(testVoipMode)
+                .setThreadDeviceRole(testThreadDeviceRole)
+                .setStatusDataStall(testStatusDataStall)
+                .setInternalScore(testInternalScore)
+                .setInternalScorerType(testInternalScorerType)
+                .build();
+
+        // Verify that the built object contains the correct values
+        assertEquals(testTimeStampMillis, statsEntry.getTimeStampMillis());
+        assertEquals(testRssi, statsEntry.getRssi());
+        assertEquals(testLinkSpeedMbps, statsEntry.getLinkSpeedMbps());
+        assertEquals(testTotalTxSuccess, statsEntry.getTotalTxSuccess());
+        assertEquals(testTotalTxRetries, statsEntry.getTotalTxRetries());
+        assertEquals(testTotalTxBad, statsEntry.getTotalTxBad());
+        assertEquals(testTotalRxSuccess, statsEntry.getTotalRxSuccess());
+        assertEquals(testTotalRadioOnTimeMillis, statsEntry.getTotalRadioOnTimeMillis());
+        assertEquals(testTotalRadioTxTimeMillis, statsEntry.getTotalRadioTxTimeMillis());
+        assertEquals(testTotalRadioRxTimeMillis, statsEntry.getTotalRadioRxTimeMillis());
+        assertEquals(testTotalScanTimeMillis, statsEntry.getTotalScanTimeMillis());
+        assertEquals(testTotalNanScanTimeMillis, statsEntry.getTotalNanScanTimeMillis());
+        assertEquals(testTotalBackgroundScanTimeMillis,
+                statsEntry.getTotalBackgroundScanTimeMillis());
+        assertEquals(testTotalRoamScanTimeMillis, statsEntry.getTotalRoamScanTimeMillis());
+        assertEquals(testTotalPnoScanTimeMillis, statsEntry.getTotalPnoScanTimeMillis());
+        assertEquals(testTotalHotspot2ScanTimeMillis, statsEntry.getTotalHotspot2ScanTimeMillis());
+        assertEquals(testTotalCcaBusyFreqTimeMillis, statsEntry.getTotalCcaBusyFreqTimeMillis());
+        assertEquals(testTotalRadioOnFreqTimeMillis, statsEntry.getTotalRadioOnFreqTimeMillis());
+        assertEquals(testTotalBeaconRx, statsEntry.getTotalBeaconRx());
+        assertEquals(testProbeStatusSinceLastUpdate, statsEntry.getProbeStatusSinceLastUpdate());
+        assertEquals(testProbeElapsedTimeSinceLastUpdateMillis,
+                statsEntry.getProbeElapsedTimeSinceLastUpdateMillis());
+        assertEquals(testProbeMcsRateSinceLastUpdate, statsEntry.getProbeMcsRateSinceLastUpdate());
+        assertEquals(testRxLinkSpeedMbps, statsEntry.getRxLinkSpeedMbps());
+        assertEquals(testTimeSliceDutyCycleInPercent, statsEntry.getTimeSliceDutyCycleInPercent());
+        assertNotNull(statsEntry.getContentionTimeStats(0));
+        assertFalse(statsEntry.getRateStats().isEmpty());
+        assertFalse(statsEntry.getWifiLinkLayerRadioStats().isEmpty());
+        assertEquals(testChannelUtilizationRatio, statsEntry.getChannelUtilizationRatio());
+        assertEquals(testIsThroughputSufficient, statsEntry.isThroughputSufficient());
+        assertEquals(testIsWifiScoringEnabled, statsEntry.isWifiScoringEnabled());
+        assertEquals(testIsCellularDataAvailable, statsEntry.isCellularDataAvailable());
+        assertEquals(testCellularDataNetworkType, statsEntry.getCellularDataNetworkType());
+        assertEquals(testCellularSignalStrengthDbm, statsEntry.getCellularSignalStrengthDbm());
+        assertEquals(testCellularSignalStrengthDb, statsEntry.getCellularSignalStrengthDb());
+        assertEquals(testIsSameRegisteredCell, statsEntry.isSameRegisteredCell());
+        assertNotNull(statsEntry.getLinkIds());
+        assertEquals(testWifiLinkCount, statsEntry.getWifiLinkCount());
+        assertEquals(testMloMode, statsEntry.getMloMode());
+        assertEquals(testTxTransmittedBytes, statsEntry.getTxTransmittedBytes());
+        assertEquals(testRxTransmittedBytes, statsEntry.getRxTransmittedBytes());
+        assertEquals(testLabelBadEventCount, statsEntry.getLabelBadEventCount());
+        assertEquals(testWifiFrameworkState, statsEntry.getWifiFrameworkState());
+        assertEquals(testIsNetworkCapabilitiesDownstreamSufficient,
+                statsEntry.isNetworkCapabilitiesDownstreamSufficient());
+        assertEquals(testIsNetworkCapabilitiesUpstreamSufficient,
+                statsEntry.isNetworkCapabilitiesUpstreamSufficient());
+        assertEquals(testIsThroughputPredictorDownstreamSufficient,
+                statsEntry.isThroughputPredictorDownstreamSufficient());
+        assertEquals(testIsThroughputPredictorUpstreamSufficient,
+                statsEntry.isThroughputPredictorUpstreamSufficient());
+        assertEquals(testIsBluetoothConnected, statsEntry.isBluetoothConnected());
+        assertEquals(testUwbAdapterState, statsEntry.getUwbAdapterState());
+        assertEquals(testIsLowLatencyActivated, statsEntry.getLowLatencyModeState());
+        assertEquals(testMaxSupportedTxLinkSpeed, statsEntry.getMaxSupportedTxLinkSpeed());
+        assertEquals(testMaxSupportedRxLinkSpeed, statsEntry.getMaxSupportedRxLinkSpeed());
+        assertEquals(testVoipMode, statsEntry.getVoipMode());
+        assertEquals(testThreadDeviceRole, statsEntry.getThreadDeviceRole());
+        assertEquals(testStatusDataStall, statsEntry.getStatusDataStall());
+        assertEquals(testInternalScore, statsEntry.getInternalScore());
+        assertEquals(testInternalScorerType, statsEntry.getInternalScorerType());
+    }
 }
+
