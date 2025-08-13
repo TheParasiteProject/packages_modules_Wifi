@@ -188,8 +188,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final int mThreadDeviceRole;
     /** Data stall status */
     private final int mStatusDataStall;
-    private final int mInternalScore;
-    private final int mInternalScorerType;
+    private int mInternalScore;
+    private int mInternalScorerType;
 
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
@@ -2093,6 +2093,12 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         return mInternalScore;
     }
 
+    /** @hide */
+    public void setInternalScore(int score) {
+        mInternalScore = score;
+    }
+
+
     /**
      * Get the type of the internal scorer that calculates the score returned by
      * {@link #getInternalScore()}
@@ -2100,6 +2106,11 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     @FlaggedApi(Flags.FLAG_FEED_INTERNAL_SCORE_TO_EXTERNAL_SCORER)
     public @ScorerType int getInternalScorerType() {
         return mInternalScorerType;
+    }
+
+    /** @hide */
+    public void setInternalScorerType(@ScorerType int scorerType) {
+        mInternalScorerType = scorerType;
     }
 
     /** @hide */

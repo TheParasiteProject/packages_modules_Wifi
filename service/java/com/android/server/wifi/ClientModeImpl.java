@@ -29,8 +29,6 @@ import static android.net.wifi.WifiManager.WIFI_FEATURE_LINK_LAYER_STATS;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_TDLS;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SAE;
-import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_INVALID;
-import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_VELOCITY;
 
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_LOCAL_ONLY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_PRIMARY;
@@ -7043,12 +7041,21 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 mWifiScoreReport.clearScorerPredictionStatusForEvaluation();
             }
             // Send the update score to network agent.
-            int internalScore = mWifiScoreReport.calculateAndReportScore();
-            int internalScorerType =
-                    internalScore == -1 ? SCORER_TYPE_INVALID : SCORER_TYPE_VELOCITY;
-            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats, oneshot,
-                    statusDataStall, internalScore, internalScorerType);
-
+            WifiUsabilityStatsEntry statsEntry = mWifiMetrics.buildStatsEntry(
+                    mInterfaceName, mWifiInfo, stats, oneshot, statusDataStall);
+            android.net.wifi.WifiUsabilityStatsEntry parcelableStatsEntry =
+                    mWifiMetrics.createNewWifiUsabilityStatsEntryParcelable(statsEntry,
+                            stats, mWifiInfo);
+            // Send the update score to network agent.
+            // Also set the score and scorerType to the parcelableStatsEntry.
+            mWifiScoreReport.calculateAndReportScore(parcelableStatsEntry);
+            // Invoke Wifi usability stats listener.
+            // TODO(b/179518316): Enable this for secondary transient STA also if external scorer
+            // is in charge of MBB.
+            if (isPrimary()) {
+                mWifiMetrics.sendWifiUsabilityStats(statsEntry, parcelableStatsEntry);
+                mWifiMetrics.addWifiUsabilityStatsEntries(statsEntry);
+            }
             mLastLinkLayerStats = stats;
             return stats;
         }

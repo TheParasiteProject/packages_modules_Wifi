@@ -17,6 +17,7 @@
 package android.net.wifi;
 
 import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_ML;
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_VELOCITY;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -813,15 +814,15 @@ public class WifiUsabilityStatsEntryTest {
         testContentionTimeStats[0] = new ContentionTimeStats(100, 200, 150, 500);
         RateStats[] testRateStats = new RateStats[1];
         testRateStats[0] = new RateStats(
-                WifiUsabilityStatsEntry.WIFI_PREAMBLE_HE,
-                WifiUsabilityStatsEntry.WIFI_SPATIAL_STREAMS_TWO,
-                WifiUsabilityStatsEntry.WIFI_BANDWIDTH_80_MHZ,
-                5,
-                1000,
-                100,
-                200,
-                5,
-                10);
+            WifiUsabilityStatsEntry.WIFI_PREAMBLE_HE,
+            WifiUsabilityStatsEntry.WIFI_SPATIAL_STREAMS_TWO,
+            WifiUsabilityStatsEntry.WIFI_BANDWIDTH_80_MHZ,
+            5,
+            1000,
+            100,
+            200,
+            5,
+            10);
         RadioStats[] testRadioStats = new RadioStats[1];
         testRadioStats[0] = new RadioStats(1, 1000, 500, 500, 10, 5, 5, 0, 0, 0);
         int testChannelUtilizationRatio = 128;
@@ -903,13 +904,13 @@ public class WifiUsabilityStatsEntryTest {
                 .setLabelBadEventCount(testLabelBadEventCount)
                 .setWifiFrameworkState(testWifiFrameworkState)
                 .setIsNetworkCapabilitiesDownstreamSufficient(
-                        testIsNetworkCapabilitiesDownstreamSufficient)
+                    testIsNetworkCapabilitiesDownstreamSufficient)
                 .setIsNetworkCapabilitiesUpstreamSufficient(
-                        testIsNetworkCapabilitiesUpstreamSufficient)
+                    testIsNetworkCapabilitiesUpstreamSufficient)
                 .setIsThroughputPredictorDownstreamSufficient(
-                        testIsThroughputPredictorDownstreamSufficient)
+                    testIsThroughputPredictorDownstreamSufficient)
                 .setIsThroughputPredictorUpstreamSufficient(
-                        testIsThroughputPredictorUpstreamSufficient)
+                    testIsThroughputPredictorUpstreamSufficient)
                 .setIsBluetoothConnected(testIsBluetoothConnected)
                 .setUwbAdapterState(testUwbAdapterState)
                 .setIsLowLatencyActivated(testIsLowLatencyActivated)
@@ -986,5 +987,32 @@ public class WifiUsabilityStatsEntryTest {
         assertEquals(testInternalScore, statsEntry.getInternalScore());
         assertEquals(testInternalScorerType, statsEntry.getInternalScorerType());
     }
-}
 
+    @Test
+    public void setInternalScore() {
+        WifiUsabilityStatsEntry usabilityStatsEntry = new WifiUsabilityStatsEntry(
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                32, null, null, null, 100, true, true, true, 23, 24, 25, true, null, 26, 27,
+                28, 29, 30, 31, 32, 33, 34, 35, true, 36, true, 37, 38, 39, 40, 41,
+                TEST_INTERNAL_SCORE, SCORER_TYPE_ML);
+        assertEquals(TEST_INTERNAL_SCORE, usabilityStatsEntry.getInternalScore());
+
+        usabilityStatsEntry.setInternalScore(TEST_INTERNAL_SCORE + 1);
+
+        assertEquals(TEST_INTERNAL_SCORE + 1, usabilityStatsEntry.getInternalScore());
+    }
+
+    @Test
+    public void setInternalScorerType() {
+        WifiUsabilityStatsEntry usabilityStatsEntry = new WifiUsabilityStatsEntry(
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                32, null, null, null, 100, true, true, true, 23, 24, 25, true, null, 26, 27,
+                28, 29, 30, 31, 32, 33, 34, 35, true, 36, true, 37, 38, 39, 40, 41,
+                TEST_INTERNAL_SCORE, SCORER_TYPE_ML);
+        assertEquals(SCORER_TYPE_ML, usabilityStatsEntry.getInternalScorerType());
+
+        usabilityStatsEntry.setInternalScorerType(SCORER_TYPE_VELOCITY);
+
+        assertEquals(SCORER_TYPE_VELOCITY, usabilityStatsEntry.getInternalScorerType());
+    }
+}
