@@ -22,9 +22,7 @@ import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_UNKNOWN;
 import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_VELOCITY;
 import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_ML;
 
-import static com.android.server.wifi.WifiMetrics.convertBandwidthEnumToUsabilityStatsType;
 import static com.android.server.wifi.WifiMetrics.convertPreambleTypeEnumToUsabilityStatsType;
-import static com.android.server.wifi.WifiMetrics.convertSpatialStreamEnumToUsabilityStatsType;
 import static com.android.server.wifi.WifiMetricsTestUtil.assertDeviceMobilityStatePnoScanStatsEqual;
 import static com.android.server.wifi.WifiMetricsTestUtil.assertExperimentProbeCountsEqual;
 import static com.android.server.wifi.WifiMetricsTestUtil.assertHistogramBucketsEqual;
@@ -88,7 +86,6 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.wifi.EAPConstants;
 import android.net.wifi.IOnWifiUsabilityStatsListener;
-import android.net.wifi.MloLink;
 import android.net.wifi.ScanResult;
 import android.net.wifi.SecurityParams;
 import android.net.wifi.SoftApCapability;
@@ -116,7 +113,6 @@ import android.os.test.TestLooper;
 import android.telephony.TelephonyManager;
 import android.util.Base64;
 import android.util.Pair;
-import android.util.SparseArray;
 import android.util.SparseIntArray;
 
 import androidx.test.filters.MediumTest;
@@ -217,6 +213,8 @@ public class WifiMetricsTest extends WifiBaseTest {
     private static final int WIFI_STATS_LOG_TRI_STATE_UNKNOWN = 0;
     private static final int WIFI_STATS_LOG_TRI_STATE_TRUE = 1;
     private static final int WIFI_STATS_LOG_TRI_STATE_FALSE = 2;
+    private static final int TEST_SEQ_NUM_INSIDE_FRAMEWORK = 101;
+    private static final boolean TEST_IS_SAME_BSSID_AND_FREQ = true;
     private MockitoSession mSession;
     @Mock Context mContext;
     MockResources mResources;
@@ -4521,13 +4519,13 @@ public class WifiMetricsTest extends WifiBaseTest {
     }
 
     /**
-     * Verify that updateWifiUsabilityStatsEntries correctly converts the inputs into
+     * Verify that buildStatsEntry correctly converts the inputs into
      * a WifiUsabilityStatsEntry Object and then stores it.
      *
      * @throws Exception
      */
     @Test
-    public void testUpdateWifiUsabilityStatsEntries() throws Exception {
+    public void testBuildStatsEntry() throws Exception {
         WifiInfo info = mock(WifiInfo.class);
         when(info.getRssi()).thenReturn(nextRandInt());
         when(info.getLinkSpeed()).thenReturn(nextRandInt());
@@ -4547,8 +4545,8 @@ public class WifiMetricsTest extends WifiBaseTest {
                 TEST_IFACE_NAME, nextRandInt(), nextRandInt(), nextRandInt(), 12);
         // This is used as the timestamp when the record lands in the ring buffer.
         when(mClock.getElapsedSinceBootMillis()).thenReturn((long) 618);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1, false, 0,
-                INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
+        mWifiMetrics.addWifiUsabilityStatsEntries(
+                mWifiMetrics.buildStatsEntry(TEST_IFACE_NAME, info, stats1, false, 0));
         mWifiMetrics.incrementWifiScoreCount(TEST_IFACE_NAME, 58);
         mWifiMetrics.incrementWifiUsabilityScoreCount(TEST_IFACE_NAME, 3, 56, 15);
         mWifiMetrics.logLinkProbeFailure(TEST_IFACE_NAME, nextRandInt(), nextRandInt(),
@@ -4557,8 +4555,8 @@ public class WifiMetricsTest extends WifiBaseTest {
 
         // This is used as the timestamp when the record lands in the ring buffer.
         when(mClock.getElapsedSinceBootMillis()).thenReturn((long) 1791);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0,
-                INTERNAL_SCORE_2, INTERNAL_SCORER_TYPE_2);
+        mWifiMetrics.addWifiUsabilityStatsEntries(
+                mWifiMetrics.buildStatsEntry(TEST_IFACE_NAME, info, stats2, false, 0));
         assertEquals(stats2.beacon_rx, mWifiMetrics.getTotalBeaconRxCount());
 
         assertEquals(2, mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.size());
@@ -4814,181 +4812,21 @@ public class WifiMetricsTest extends WifiBaseTest {
                 expected, mDecodedProto.mobilityStatePnoStatsList);
     }
 
-    /**
-     * Verify that clients should be notified of activity in case Wifi stats get updated.
-     */
     @Test
-    public void testClientNotification() throws RemoteException {
-        // Register Client for verification.
-        ArgumentCaptor<android.net.wifi.WifiUsabilityStatsEntry> usabilityStats =
-                ArgumentCaptor.forClass(android.net.wifi.WifiUsabilityStatsEntry.class);
+    public void sendWifiUsabilityStats() throws RemoteException {
         mWifiMetrics.addOnWifiUsabilityListener(mOnWifiUsabilityStatsListener);
-        WifiInfo info = mock(WifiInfo.class);
-        when(info.getRssi()).thenReturn(nextRandInt());
-        when(info.getLinkSpeed()).thenReturn(nextRandInt());
+        WifiUsabilityStatsEntry protoStatsEntry = new WifiUsabilityStatsEntry();
+        protoStatsEntry.seqNumInsideFramework = TEST_SEQ_NUM_INSIDE_FRAMEWORK;
+        protoStatsEntry.isSameBssidAndFreq = TEST_IS_SAME_BSSID_AND_FREQ;
+        android.net.wifi.WifiUsabilityStatsEntry mockParcelableStatsEntry =
+                mock(android.net.wifi.WifiUsabilityStatsEntry.class);
 
+        mWifiMetrics.sendWifiUsabilityStats(protoStatsEntry, mockParcelableStatsEntry);
 
-        WifiLinkLayerStats linkLayerStats = nextRandomStats(createNewWifiLinkLayerStats());
-
-        // Add MLO links
-        List<MloLink> links = new ArrayList<>();
-        MloLink link;
-        for (WifiLinkLayerStats.LinkSpecificStats stat : linkLayerStats.links) {
-            link = new MloLink();
-            link.setStaMacAddress(MacAddress.fromString(MLO_LINK_STA_MAC_ADDRESS));
-            link.setApMacAddress(MacAddress.fromString(MLO_LINK_AP_MAC_ADDRESS));
-            link.setRssi(stat.rssi_mgmt);
-            link.setLinkId(stat.link_id);
-            link.setBand(WifiScanner.WIFI_BAND_5_GHZ);
-            link.setChannel(TEST_CHANNEL);
-            link.setRxLinkSpeedMbps(nextRandInt());
-            link.setTxLinkSpeedMbps(nextRandInt());
-            link.setState(nextRandInt() % MloLink.MLO_LINK_STATE_ACTIVE);
-            links.add(link);
-        }
-        when(info.getAffiliatedMloLinks()).thenReturn(links);
-
-        // verify non-primary does not send wifi usability stats
-        ConcreteClientModeManager concreteClientModeManager = mock(ConcreteClientModeManager.class);
-        when(concreteClientModeManager.getInterfaceName()).thenReturn(TEST_IFACE_NAME);
-        when(concreteClientModeManager.getRole()).thenReturn(
-                ActiveModeManager.ROLE_CLIENT_SECONDARY_LONG_LIVED);
-        mModeChangeCallbackArgumentCaptor.getValue()
-                .onActiveModeManagerRoleChanged(concreteClientModeManager);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats, false,
-                0, INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
-        verify(mOnWifiUsabilityStatsListener, never()).onWifiUsabilityStats(anyInt(), anyBoolean(),
-                any());
-
-        // verify primary sends out wifi usability stats
-        concreteClientModeManager = mock(ConcreteClientModeManager.class);
-        when(concreteClientModeManager.getInterfaceName()).thenReturn(TEST_IFACE_NAME);
-        when(concreteClientModeManager.getRole()).thenReturn(ActiveModeManager.ROLE_CLIENT_PRIMARY);
-        mModeChangeCallbackArgumentCaptor.getValue()
-                .onActiveModeManagerRoleChanged(concreteClientModeManager);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats, false,
-                0, INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
-
-        // Client should get the stats.
-        verify(mOnWifiUsabilityStatsListener).onWifiUsabilityStats(anyInt(), anyBoolean(),
-                usabilityStats.capture());
-        assertEquals(usabilityStats.getValue().getTotalRadioOnTimeMillis(), linkLayerStats.on_time);
-        assertEquals(usabilityStats.getValue().getTotalTxBad(), linkLayerStats.lostmpdu_be
-                + linkLayerStats.lostmpdu_bk + linkLayerStats.lostmpdu_vi
-                + linkLayerStats.lostmpdu_vo);
-        assertEquals(usabilityStats.getValue().getTimeStampMillis(), linkLayerStats.timeStampInMs);
-        assertEquals(usabilityStats.getValue().getTotalRoamScanTimeMillis(),
-                linkLayerStats.on_time_roam_scan);
-
-        SparseArray<MloLink> mloLinks = new SparseArray<>();
-        for (MloLink mloLink: info.getAffiliatedMloLinks()) {
-            mloLinks.put(mloLink.getLinkId(), mloLink);
-        }
-
-        // Verify MLO stats
-        for (WifiLinkLayerStats.LinkSpecificStats linkStat : linkLayerStats.links) {
-            assertEquals(usabilityStats.getValue().getLinkState(linkStat.link_id), linkStat.state);
-            assertEquals(usabilityStats.getValue().getRadioId(linkStat.link_id), linkStat.radio_id);
-            assertEquals(usabilityStats.getValue().getRssi(linkStat.link_id), linkStat.rssi_mgmt);
-            assertEquals(usabilityStats.getValue().getTotalTxSuccess(linkStat.link_id),
-                    linkStat.txmpdu_be + linkStat.txmpdu_bk + linkStat.txmpdu_vi
-                            + linkStat.txmpdu_vo);
-            assertEquals(usabilityStats.getValue().getTxLinkSpeedMbps(linkStat.link_id),
-                    mloLinks.get(linkStat.link_id).getTxLinkSpeedMbps());
-            assertEquals(usabilityStats.getValue().getRxLinkSpeedMbps(linkStat.link_id),
-                    mloLinks.get(linkStat.link_id).getRxLinkSpeedMbps());
-
-            assertEquals(usabilityStats.getValue().getTotalTxRetries(linkStat.link_id),
-                    linkStat.retries_be + linkStat.retries_bk + linkStat.retries_vi
-                            + linkStat.retries_vo);
-            assertEquals(usabilityStats.getValue().getTotalCcaBusyFreqTimeMillis(linkStat.link_id),
-                    linkLayerStats.channelStatsMap.get(linkStat.frequencyMhz).ccaBusyTimeMs);
-            assertEquals(usabilityStats.getValue().getTotalRadioOnFreqTimeMillis(linkStat.link_id),
-                    linkLayerStats.channelStatsMap.get(linkStat.frequencyMhz).radioOnTimeMs);
-            assertEquals(usabilityStats.getValue().getTotalBeaconRx(linkStat.link_id),
-                    linkStat.beacon_rx);
-            assertEquals(usabilityStats.getValue().getTimeSliceDutyCycleInPercent(linkStat.link_id),
-                    linkStat.timeSliceDutyCycleInPercent);
-
-            // Verify contention time stats for each AC's
-            android.net.wifi.WifiUsabilityStatsEntry.ContentionTimeStats contentionTimeStatsBe =
-                    usabilityStats.getValue().getContentionTimeStats(linkStat.link_id,
-                            android.net.wifi.WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BE);
-            assertEquals(contentionTimeStatsBe.getContentionTimeMinMicros(),
-                    linkStat.contentionTimeMinBeInUsec);
-            assertEquals(contentionTimeStatsBe.getContentionTimeAvgMicros(),
-                    linkStat.contentionTimeAvgBeInUsec);
-            assertEquals(contentionTimeStatsBe.getContentionTimeMaxMicros(),
-                    linkStat.contentionTimeMaxBeInUsec);
-            assertEquals(contentionTimeStatsBe.getContentionNumSamples(),
-                    linkStat.contentionNumSamplesBe);
-
-            android.net.wifi.WifiUsabilityStatsEntry.ContentionTimeStats contentionTimeStatsBk =
-                    usabilityStats.getValue().getContentionTimeStats(linkStat.link_id,
-                            android.net.wifi.WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BK);
-            assertEquals(contentionTimeStatsBk.getContentionTimeMinMicros(),
-                    linkStat.contentionTimeMinBkInUsec);
-            assertEquals(contentionTimeStatsBk.getContentionTimeAvgMicros(),
-                    linkStat.contentionTimeAvgBkInUsec);
-            assertEquals(contentionTimeStatsBk.getContentionTimeMaxMicros(),
-                    linkStat.contentionTimeMaxBkInUsec);
-            assertEquals(contentionTimeStatsBk.getContentionNumSamples(),
-                    linkStat.contentionNumSamplesBk);
-
-            android.net.wifi.WifiUsabilityStatsEntry.ContentionTimeStats contentionTimeStatsVo =
-                    usabilityStats.getValue().getContentionTimeStats(linkStat.link_id,
-                            android.net.wifi.WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VO);
-            assertEquals(contentionTimeStatsVo.getContentionTimeMinMicros(),
-                    linkStat.contentionTimeMinVoInUsec);
-            assertEquals(contentionTimeStatsVo.getContentionTimeAvgMicros(),
-                    linkStat.contentionTimeAvgVoInUsec);
-            assertEquals(contentionTimeStatsVo.getContentionTimeMaxMicros(),
-                    linkStat.contentionTimeMaxVoInUsec);
-            assertEquals(contentionTimeStatsVo.getContentionNumSamples(),
-                    linkStat.contentionNumSamplesVo);
-
-            android.net.wifi.WifiUsabilityStatsEntry.ContentionTimeStats contentionTimeStatsVi =
-                    usabilityStats.getValue().getContentionTimeStats(linkStat.link_id,
-                            android.net.wifi.WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VI);
-            assertEquals(contentionTimeStatsVi.getContentionTimeMinMicros(),
-                    linkStat.contentionTimeMinViInUsec);
-            assertEquals(contentionTimeStatsVi.getContentionTimeAvgMicros(),
-                    linkStat.contentionTimeAvgViInUsec);
-            assertEquals(contentionTimeStatsVi.getContentionTimeMaxMicros(),
-                    linkStat.contentionTimeMaxViInUsec);
-            assertEquals(contentionTimeStatsVi.getContentionNumSamples(),
-                    linkStat.contentionNumSamplesVi);
-
-            // Verify Rate stats.
-            List<android.net.wifi.WifiUsabilityStatsEntry.RateStats> usabilityRateStats =
-                    usabilityStats.getValue().getRateStats(linkStat.link_id);
-            int i = 0;
-            for (RateStat rateStat : linkStat.peerInfo[0].rateStats) {
-                assertEquals(convertPreambleTypeEnumToUsabilityStatsType(rateStat.preamble),
-                        usabilityRateStats.get(i).getPreamble());
-                assertEquals(rateStat.bitRateInKbps,
-                        usabilityRateStats.get(i).getBitRateInKbps());
-                assertEquals(convertSpatialStreamEnumToUsabilityStatsType(rateStat.nss),
-                        usabilityRateStats.get(i).getNumberOfSpatialStreams());
-                assertEquals(convertBandwidthEnumToUsabilityStatsType(rateStat.bw),
-                        usabilityRateStats.get(i).getBandwidthInMhz());
-                assertEquals(rateStat.rateMcsIdx,
-                        usabilityRateStats.get(i).getRateMcsIdx());
-                assertEquals(rateStat.bitRateInKbps,
-                        usabilityRateStats.get(i).getBitRateInKbps());
-                assertEquals(rateStat.txMpdu,
-                        usabilityRateStats.get(i).getTxMpdu());
-                assertEquals(rateStat.rxMpdu,
-                        usabilityRateStats.get(i).getRxMpdu());
-                assertEquals(rateStat.mpduLost,
-                        usabilityRateStats.get(i).getMpduLost());
-                assertEquals(rateStat.retries,
-                        usabilityRateStats.get(i).getRetries());
-                i++;
-            }
-        }
-        assertEquals(INTERNAL_SCORE_1, usabilityStats.getValue().getInternalScore());
-        assertEquals(INTERNAL_SCORER_TYPE_1, usabilityStats.getValue().getInternalScorerType());
+        verify(mOnWifiUsabilityStatsListener).onWifiUsabilityStats(
+                eq(TEST_SEQ_NUM_INSIDE_FRAMEWORK),
+                eq(TEST_IS_SAME_BSSID_AND_FREQ),
+                eq(mockParcelableStatsEntry));
     }
 
     /**
@@ -5005,8 +4843,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         when(info.getRssi()).thenReturn(nextRandInt());
         when(info.getLinkSpeed()).thenReturn(nextRandInt());
         WifiLinkLayerStats linkLayerStats = nextRandomStats(new WifiLinkLayerStats());
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats, false,
-                0, INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
+        mWifiMetrics.buildStatsEntry(TEST_IFACE_NAME, info, linkLayerStats, false, 0);
 
         verify(mOnWifiUsabilityStatsListener, never()).onWifiUsabilityStats(anyInt(),
                 anyBoolean(), any());
@@ -5035,8 +4872,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         when(info.getRssi()).thenReturn(nextRandInt());
         when(info.getLinkSpeed()).thenReturn(nextRandInt());
         WifiLinkLayerStats linkLayerStats = nextRandomStats(new WifiLinkLayerStats());
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats, false,
-                0, INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
+        mWifiMetrics.buildStatsEntry(TEST_IFACE_NAME, info, linkLayerStats, false, 0);
 
         // Client should not get any message listener add failed.
         verify(mOnWifiUsabilityStatsListener, never()).onWifiUsabilityStats(anyInt(),
@@ -5803,15 +5639,13 @@ public class WifiMetricsTest extends WifiBaseTest {
         int upper = WifiMetrics.LOW_WIFI_SCORE + 7;
         int lower = WifiMetrics.LOW_WIFI_SCORE - 8;
         mWifiMetrics.incrementWifiScoreCount(TEST_IFACE_NAME, upper);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0,
-                INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
+        mWifiMetrics.buildStatsEntry(TEST_IFACE_NAME, info, stats2, false, 0);
         stats2 = nextRandomStats(stats2);
         long timeMs = 0;
         when(mClock.getElapsedSinceBootMillis()).thenReturn(timeMs);
         // Wifi score breaches low
         mWifiMetrics.incrementWifiScoreCount(TEST_IFACE_NAME, lower);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0,
-                INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
+        mWifiMetrics.buildStatsEntry(TEST_IFACE_NAME, info, stats2, false, 0);
         stats2 = nextRandomStats(stats2);
         return stats2;
     }
@@ -5822,15 +5656,13 @@ public class WifiMetricsTest extends WifiBaseTest {
         int upper = WifiMetrics.LOW_WIFI_USABILITY_SCORE + 7;
         int lower = WifiMetrics.LOW_WIFI_USABILITY_SCORE - 8;
         mWifiMetrics.incrementWifiUsabilityScoreCount(TEST_IFACE_NAME, 1, upper, 30);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0,
-                INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
+        mWifiMetrics.buildStatsEntry(TEST_IFACE_NAME, info, stats2, false, 0);
         stats2 = nextRandomStats(stats2);
         long timeMs = 0;
         when(mClock.getElapsedSinceBootMillis()).thenReturn(timeMs);
         // Wifi usability score breaches low
         mWifiMetrics.incrementWifiUsabilityScoreCount(TEST_IFACE_NAME, 2, lower, 30);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0,
-                INTERNAL_SCORE_1, INTERNAL_SCORER_TYPE_1);
+        mWifiMetrics.buildStatsEntry(TEST_IFACE_NAME, info, stats2, false, 0);
         stats2 = nextRandomStats(stats2);
         return stats2;
     }

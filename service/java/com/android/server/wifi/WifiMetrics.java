@@ -17,6 +17,7 @@
 package com.android.server.wifi;
 
 import static android.net.wifi.WifiConfiguration.MeteredOverride;
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_INVALID;
 
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_PRIMARY;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED;
@@ -7434,15 +7435,9 @@ public class WifiMetrics {
      *
      * oneshot is used to indicate that this call came from CMD_ONESHOT_RSSI_POLL.
      */
-    public void updateWifiUsabilityStatsEntries(String ifaceName, WifiInfo info,
-            WifiLinkLayerStats stats, boolean oneshot, int statusDataStall, int internalScore,
-            int internalScorerType) {
+    public WifiUsabilityStatsEntry buildStatsEntry(String ifaceName, WifiInfo info,
+            WifiLinkLayerStats stats, boolean oneshot, int statusDataStall) {
         synchronized (mLock) {
-            // This is only collected for primary STA currently because RSSI polling is disabled for
-            // non-primary STAs.
-            if (info == null) {
-                return;
-            }
             if (stats == null) {
                 // For devices lacking vendor hal, fill in the parts that we can
                 stats = new WifiLinkLayerStats();
@@ -7867,40 +7862,35 @@ public class WifiMetrics {
             wifiUsabilityStatsEntry.captureEventType = oneshot
                     ? WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_ONESHOT_RSSI_POLL
                     : WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_SYNCHRONOUS;
-
-            if (mScoreBreachLowTimeMillis != -1) {
-                long elapsedTime =  mClock.getElapsedSinceBootMillis() - mScoreBreachLowTimeMillis;
-                if (elapsedTime >= MIN_SCORE_BREACH_TO_GOOD_STATS_WAIT_TIME_MS) {
-                    mScoreBreachLowTimeMillis = -1;
-                }
-            }
-
-            // Invoke Wifi usability stats listener.
-            // TODO(b/179518316): Enable this for secondary transient STA also if external scorer
-            // is in charge of MBB.
-            if (isPrimary(ifaceName)) {
-                sendWifiUsabilityStats(mSeqNumInsideFramework, isSameBssidAndFreq,
-                        createNewWifiUsabilityStatsEntryParcelable(wifiUsabilityStatsEntry, stats,
-                                info, internalScore, internalScorerType));
-            }
-
-            // We need the records in the ring buffer to all have the same timebase. The records
-            // created here are timestamped by the WiFi driver and the timestamps have been found to
-            // drift relative to the Android clock. Historically, these records have been forwarded
-            // to external WiFi scorers with the drifting clock. In order to maintain historical
-            // behavior while ensuring that records in the ring buffer have the same timebase, we
-            // will send the record created in this function unmodified to any external WiFi Scorer,
-            // but we will modify the timestamp before storing in the ring buffer. Thus, the
-            // following statement, which also modifies the timestamp, must be executed AFTER the
-            // record is deep copied and sent to the external WiFi Scorer.
-            addToRingBuffer(wifiUsabilityStatsEntry);
-
-            mSeqNumInsideFramework++;
-            mProbeStatusSinceLastUpdate =
-                    android.net.wifi.WifiUsabilityStatsEntry.PROBE_STATUS_NO_PROBE;
-            mProbeElapsedTimeSinceLastUpdateMs = -1;
-            mProbeMcsRateSinceLastUpdate = -1;
+            return wifiUsabilityStatsEntry;
         }
+    }
+
+    /** Add the WifiUsabilityStatsEntry into the ring buffer and update the global variables. */
+    public void addWifiUsabilityStatsEntries(WifiUsabilityStatsEntry wifiUsabilityStatsEntry) {
+        if (mScoreBreachLowTimeMillis != -1) {
+            long elapsedTime =  mClock.getElapsedSinceBootMillis() - mScoreBreachLowTimeMillis;
+            if (elapsedTime >= MIN_SCORE_BREACH_TO_GOOD_STATS_WAIT_TIME_MS) {
+                mScoreBreachLowTimeMillis = -1;
+            }
+        }
+
+        // We need the records in the ring buffer to all have the same timebase. The records
+        // created here are timestamped by the WiFi driver and the timestamps have been found to
+        // drift relative to the Android clock. Historically, these records have been forwarded
+        // to external WiFi scorers with the drifting clock. In order to maintain historical
+        // behavior while ensuring that records in the ring buffer have the same timebase, we
+        // will send the record created in this function unmodified to any external WiFi Scorer,
+        // but we will modify the timestamp before storing in the ring buffer. Thus, the
+        // following statement, which also modifies the timestamp, must be executed AFTER the
+        // record is deep copied and sent to the external WiFi Scorer.
+        addToRingBuffer(wifiUsabilityStatsEntry);
+
+        mSeqNumInsideFramework++;
+        mProbeStatusSinceLastUpdate =
+            android.net.wifi.WifiUsabilityStatsEntry.PROBE_STATUS_NO_PROBE;
+        mProbeElapsedTimeSinceLastUpdateMs = -1;
+        mProbeMcsRateSinceLastUpdate = -1;
     }
 
     /**
@@ -7909,13 +7899,14 @@ public class WifiMetrics {
      * @param isSameBssidAndFreq
      * @param statsEntry
      */
-    private void sendWifiUsabilityStats(int seqNum, boolean isSameBssidAndFreq,
-            android.net.wifi.WifiUsabilityStatsEntry statsEntry) {
+    public void sendWifiUsabilityStats(WifiUsabilityStatsEntry statsEntry,
+            android.net.wifi.WifiUsabilityStatsEntry parcelableStatsEntry) {
         int itemCount = mOnWifiUsabilityListeners.beginBroadcast();
         for (int i = 0; i < itemCount; i++) {
             try {
-                mOnWifiUsabilityListeners.getBroadcastItem(i).onWifiUsabilityStats(seqNum,
-                        isSameBssidAndFreq, statsEntry);
+                mOnWifiUsabilityListeners.getBroadcastItem(i).onWifiUsabilityStats(
+                        statsEntry.seqNumInsideFramework,
+                        statsEntry.isSameBssidAndFreq, parcelableStatsEntry);
             } catch (RemoteException e) {
                 Log.e(TAG, "Unable to invoke Wifi usability stats entry listener ", e);
             }
@@ -8178,9 +8169,8 @@ public class WifiMetrics {
      *
      * These are two different types.
      */
-    private android.net.wifi.WifiUsabilityStatsEntry createNewWifiUsabilityStatsEntryParcelable(
-            WifiUsabilityStatsEntry s, WifiLinkLayerStats stats, WifiInfo info, int internalScore,
-            int internalScorerType) {
+    public android.net.wifi.WifiUsabilityStatsEntry createNewWifiUsabilityStatsEntryParcelable(
+            WifiUsabilityStatsEntry s, WifiLinkLayerStats stats, WifiInfo info) {
         int probeStatus;
         switch (s.probeStatusSinceLastUpdate) {
             case WifiUsabilityStatsEntry.PROBE_STATUS_NO_PROBE:
@@ -8228,8 +8218,8 @@ public class WifiMetrics {
                 s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected,
                 s.uwbAdapterState, s.isLowLatencyActivated, s.maxSupportedTxLinkspeed,
                 s.maxSupportedRxLinkspeed, s.voipMode, s.threadDeviceRole, s.statusDataStall,
-                internalScore,
-                internalScorerType
+                -1, // This field will be set by the internal scorer
+                SCORER_TYPE_INVALID // This field will be set by the internal scorer
         );
     }
 

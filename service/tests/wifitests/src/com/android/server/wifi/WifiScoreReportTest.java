@@ -25,6 +25,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.AdditionalAnswers.answerVoid;
+import static org.mockito.AdditionalMatchers.not;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
@@ -158,6 +159,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     @Mock VelocityBasedConnectedScorer mMockVelocityScorer;
     @Mock ConnectedScorerHelper mMockConnectedScorerHelper;
     @Mock IpClientManager mMockIpClientManager;
+    @Mock WifiUsabilityStatsEntry mMockWifiUsabilityStatsEntry;
     @Captor ArgumentCaptor<WifiManager.ScoreUpdateObserver> mExternalScoreUpdateObserverCbCaptor;
     private TestLooper mLooper;
 
@@ -406,7 +408,9 @@ public class WifiScoreReportTest extends WifiBaseTest {
                 mWifiScoreReport.getAospScorerPredictionStatusForEvaluation());
         assertEquals(WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_NONE,
                 mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation());
-        assertNotEquals(-1, mWifiScoreReport.calculateAndReportScore());
+        mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
+
+        verify(mMockWifiUsabilityStatsEntry).setInternalScore(not(eq(-1)));
         // called again after calculateAndReportScore()
         verifySentAnyNetworkScore(times(2));
         verify(mWifiMetrics).incrementWifiScoreCount(eq(TEST_IFACE_NAME), anyInt());
@@ -414,7 +418,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
                 mWifiScoreReport.getAospScorerPredictionStatusForEvaluation());
         assertEquals(WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_NONE,
                 mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation());
-        assertEquals(ADJUSTED_SCORE, mWifiScoreReport.getScore().getLegacyInt());
+        assertEquals(ADJUSTED_SCORE, mWifiScoreReport.mLegacyIntScore);
     }
 
     /**
@@ -433,7 +437,9 @@ public class WifiScoreReportTest extends WifiBaseTest {
         when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
                 .thenReturn(scoreResult);
 
-        assertEquals(mWifiScoreReportWithMockHelper.calculateAndReportScore(), ADJUSTED_SCORE);
+        mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
+
+        verify(mMockWifiUsabilityStatsEntry).setInternalScore(eq(ADJUSTED_SCORE));
         verify(mMockConnectedScorerHelper).triggerScanIfNeeded(eq(INVALID_TIMESTAMP_MS),
                 eq(mClock.mElapsedSinceBootMillis), eq(true));
     }
@@ -457,7 +463,9 @@ public class WifiScoreReportTest extends WifiBaseTest {
         when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
                 .thenReturn(scoreResult);
 
-        assertEquals(ADJUSTED_SCORE, mWifiScoreReportWithMockHelper.calculateAndReportScore());
+        mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
+
+        verify(mMockWifiUsabilityStatsEntry).setInternalScore(eq(ADJUSTED_SCORE));
         verify(mMockConnectedScorerHelper, never())
                 .triggerScanIfNeeded(anyLong(), anyLong(), anyBoolean());
     }
@@ -481,7 +489,9 @@ public class WifiScoreReportTest extends WifiBaseTest {
         when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
                 .thenReturn(scoreResult);
 
-        assertEquals(ADJUSTED_SCORE, mWifiScoreReportWithMockHelper.calculateAndReportScore());
+        mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
+
+        verify(mMockWifiUsabilityStatsEntry).setInternalScore(eq(ADJUSTED_SCORE));
         verify(mMockConnectedScorerHelper, never())
                 .triggerScanIfNeeded(anyLong(), anyLong(), anyBoolean());
     }
@@ -505,7 +515,9 @@ public class WifiScoreReportTest extends WifiBaseTest {
         when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
                 .thenReturn(scoreResult);
 
-        assertEquals(ADJUSTED_SCORE, mWifiScoreReportWithMockHelper.calculateAndReportScore());
+        mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
+
+        verify(mMockWifiUsabilityStatsEntry).setInternalScore(eq(ADJUSTED_SCORE));
         verify(mMockConnectedScorerHelper, never())
                 .triggerScanIfNeeded(anyLong(), anyLong(), anyBoolean());
     }
@@ -532,7 +544,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         assertNotEquals(mClock.mElapsedSinceBootMillis,
                 mWifiScoreReportWithMockHelper.mLastLowScoreScanTimestampMs);
 
-        mWifiScoreReportWithMockHelper.calculateAndReportScore();
+        mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
 
         assertEquals(mClock.mElapsedSinceBootMillis,
                 mWifiScoreReportWithMockHelper.mLastLowScoreScanTimestampMs);
@@ -560,7 +572,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         assertNotEquals(mClock.mElapsedSinceBootMillis,
                 mWifiScoreReportWithMockHelper.mLastLowScoreScanTimestampMs);
 
-        mWifiScoreReportWithMockHelper.calculateAndReportScore();
+        mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
 
         assertNotEquals(mClock.mElapsedSinceBootMillis,
                 mWifiScoreReportWithMockHelper.mLastLowScoreScanTimestampMs);
@@ -637,7 +649,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         }
 
         mWifiInfo.setRssi(-77);
-        mWifiScoreReport.calculateAndReportScore();
+        mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         // score not sent again while lingering
         verify(mNetworkAgent, times(3)).sendNetworkScore(any());
 
@@ -646,7 +658,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mWifiScoreReport.setShouldReduceNetworkScore(false);
         // report score again
         mWifiInfo.setRssi(-60);
-        mWifiScoreReport.calculateAndReportScore();
+        mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         // Some non-lingering score is sent
         // capture most recent invocation
         verify(mNetworkAgent, times(6)).sendNetworkScore(networkScoreCaptor.capture());
@@ -720,7 +732,8 @@ public class WifiScoreReportTest extends WifiBaseTest {
 
         mWifiInfo.setRssi(WifiInfo.INVALID_RSSI);
 
-        assertEquals(-1, mWifiScoreReport.calculateAndReportScore());
+        mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
+
         // still only called once
         verifySentAnyNetworkScore();
         verify(mWifiMetrics, never()).incrementWifiScoreCount(any(), anyInt());
@@ -737,7 +750,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mWifiInfo.setRssi(-33);
         mWifiScoreReport.enableVerboseLogging(true);
         mWifiScoreReport.setNetworkAgent(null);
-        mWifiScoreReport.calculateAndReportScore();
+        mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         verify(mWifiMetrics).incrementWifiScoreCount(eq(TEST_IFACE_NAME), anyInt());
     }
 
@@ -758,7 +771,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mWifiInfo.setSuccessfulTxPacketsPerSecond(5.1); // proportional to pps
         mWifiInfo.setSuccessfulRxPacketsPerSecond(5.1);
         for (int i = 0; i < 10; i++) {
-            mWifiScoreReport.calculateAndReportScore();
+            mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         }
         int score = mWifiInfo.getScore();
         assertTrue(score > getTransitionScore());
@@ -786,7 +799,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mWifiInfo.setSuccessfulTxPacketsPerSecond(0.1);
         mWifiInfo.setSuccessfulRxPacketsPerSecond(0.1);
         for (int i = 0; i < 10; i++) {
-            mWifiScoreReport.calculateAndReportScore();
+            mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         }
         int score = mWifiInfo.getScore();
         assertTrue(score < getTransitionScore());
@@ -812,7 +825,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mWifiInfo.setSuccessfulTxPacketsPerSecond(0.1);
         mWifiInfo.setSuccessfulRxPacketsPerSecond(0.1);
         for (int i = 0; i < 10; i++) {
-            mWifiScoreReport.calculateAndReportScore();
+            mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         }
         assertTrue("wifi score should be high",
                 mWifiInfo.getScore() >= getTransitionScore());
@@ -821,7 +834,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         // Then simulate low RSSI and traffic, and verify score becomes low and a scan is triggered.
         mWifiInfo.setRssi(-100);
         for (int i = 0; i < 10; i++) {
-            mWifiScoreReport.calculateAndReportScore();
+            mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         }
         assertTrue("wifi score should be low",
                 mWifiInfo.getScore() < getTransitionScore());
@@ -831,13 +844,13 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mClock.mElapsedSinceBootMillis = (long) TEST_LOW_CONNECTED_SCORE_SCAN_PERIOD_SECONDS * 1000;
 
         // trigger low score again and verify no additional scan yet.
-        mWifiScoreReport.calculateAndReportScore();
+        mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         verify(mWifiConnectivityManager).forceConnectivityScan(WIFI_WORK_SOURCE);
 
         // move time past the threshold to trigger scan again and verify the scan happens
         mClock.mElapsedSinceBootMillis =
                 (long) TEST_LOW_CONNECTED_SCORE_SCAN_PERIOD_SECONDS * 1000 + 1;
-        mWifiScoreReport.calculateAndReportScore();
+        mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         verify(mWifiConnectivityManager, times(2)).forceConnectivityScan(WIFI_WORK_SOURCE);
     }
 
@@ -854,7 +867,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mWifiInfo.setFrequency(5220);
         for (int rssi = -60; rssi >= -83; rssi -= 1) {
             mWifiInfo.setRssi(rssi);
-            mWifiScoreReport.calculateAndReportScore();
+            mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         }
         int score = mWifiInfo.getScore();
         assertTrue(score < getTransitionScore());
@@ -862,7 +875,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
 
         // when the external score is cleared, scan should be triggered.
         mWifiScoreReport.clearWifiConnectedNetworkScorer();
-        mWifiScoreReport.calculateAndReportScore();
+        mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         assertTrue(score < getTransitionScore());
         verify(mWifiConnectivityManager).forceConnectivityScan(any());
         verify(mWifiGlobals).setUsingExternalScorer(false);
@@ -879,7 +892,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         for (int rssi = -60; rssi >= -83; rssi -= 1) {
             mWifiInfo.setRssi(rssi);
             oops += " " + mClock.mWallClockMillis + "," + rssi;
-            mWifiScoreReport.calculateAndReportScore();
+            mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
             oops += ":" + mWifiInfo.getScore();
         }
         int score = mWifiInfo.getScore();
@@ -908,7 +921,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
             int rssi = Math.max(r, -80);
             mWifiInfo.setRssi(rssi);
             oops += " " + mClock.mWallClockMillis + "," + rssi;
-            mWifiScoreReport.calculateAndReportScore();
+            mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
             oops += ":" + mWifiInfo.getScore();
             if (mWifiInfo.getScore() < minScore) minScore = mWifiInfo.getScore();
         }
@@ -934,19 +947,19 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mWifiInfo.setFrequency(5220);
         for (int r = -30; r >= -120; r -= 2) {
             mWifiInfo.setRssi(r);
-            mWifiScoreReport.calculateAndReportScore();
+            mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
             assertTrue(mWifiInfo.getScore() > getTransitionScore());
         }
         // If the throughput dips, we should let go
         mWifiInfo.setSuccessfulRxPacketsPerSecond(
                 mScoringParams.getYippeeSkippyPacketsPerSecond() - 0.1);
-        mWifiScoreReport.calculateAndReportScore();
+        mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         assertTrue(mWifiInfo.getScore() < getTransitionScore());
         // And even if throughput improves again, once we have decided to let go, disregard
         // the good rates.
         mWifiInfo.setSuccessfulRxPacketsPerSecond(
                 mScoringParams.getYippeeSkippyPacketsPerSecond() + 0.1);
-        mWifiScoreReport.calculateAndReportScore();
+        mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         assertTrue(mWifiInfo.getScore() < getTransitionScore());
     }
 
@@ -959,7 +972,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         int[] counter = new int[1];
         doAnswer(answerVoid((String line) -> {
             if (counter[0]++ < 3) {
-                mWifiScoreReport.calculateAndReportScore();
+                mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
             }
         })).when(mPrintWriter).println(anyString());
     }
@@ -978,7 +991,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
             mWifiInfo.setRetriedTxPacketsRate(0.2 + i);
             mWifiInfo.setLostTxPacketsPerSecond(0.01 * i);
             mWifiInfo.setSuccessfulRxPacketsPerSecond(0.3 + i);
-            mWifiScoreReport.calculateAndReportScore();
+            mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         }
         setupToGenerateAReportWhenPrintlnIsCalled();
         mWifiScoreReport.dump(null, mPrintWriter, null);
@@ -1034,7 +1047,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
             link2.setRetriedTxPacketsRate(0.2 + i);
             link2.setLostTxPacketsPerSecond(0.01 * i);
             link2.setSuccessfulRxPacketsPerSecond(0.3 + i);
-            mWifiScoreReport.calculateAndReportScore();
+            mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         }
         setupToGenerateAReportWhenPrintlnIsCalled();
         mWifiScoreReport.dump(null, mPrintWriter, null);
@@ -1057,7 +1070,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
             mWifiInfo.setRetriedTxPacketsRate(0.2 + i % 100);
             mWifiInfo.setLostTxPacketsPerSecond(0.0001 * i);
             mWifiInfo.setSuccessfulRxPacketsPerSecond(0.3 + i % 200);
-            mWifiScoreReport.calculateAndReportScore();
+            mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         }
         mWifiScoreReport.dump(null, mPrintWriter, null);
         verify(mPrintWriter, atMost(3603)).println(anyString());
@@ -1078,7 +1091,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         // Reduce RSSI value to fall below the transition score
         for (int rssi = -60; rssi >= -83; rssi -= 1) {
             mWifiInfo.setRssi(rssi);
-            mWifiScoreReport.calculateAndReportScore();
+            mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         }
         assertTrue(mWifiInfo.getScore() < getTransitionScore());
         assertEquals(WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_UNUSABLE,
@@ -1091,7 +1104,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         assertEquals(WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_NONE,
                 mWifiScoreReport.getAospScorerPredictionStatusForEvaluation());
 
-        mWifiScoreReport.calculateAndReportScore();
+        mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         assertTrue(mWifiInfo.getScore() > getTransitionScore());
         assertEquals(WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
                 mWifiScoreReport.getAospScorerPredictionStatusForEvaluation());
@@ -1506,7 +1519,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mWifiInfo.setRssi(-85);
         when(mAdaptiveConnectivityEnabledSettingObserver.get()).thenReturn(false);
 
-        mWifiScoreReport.calculateAndReportScore();
+        mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
 
         ArgumentCaptor<NetworkScore> scoreCaptor = ArgumentCaptor.forClass(NetworkScore.class);
         verify(mNetworkAgent, times(2)).sendNetworkScore(scoreCaptor.capture());
@@ -1529,7 +1542,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
                 .thenReturn(scoreResult);
 
-        mWifiScoreReportWithMockHelper.calculateAndReportScore();
+        mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
 
         verify(mMockConnectedScorerHelper, never())
                 .checkNudIfNeeded(any(IpClientManager.class), anyLong(), anyLong());
@@ -1547,7 +1560,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mWifiInfo.setFrequency(5220);
         mWifiInfo.setRssi(-85);
         when(mWifiSettingsStore.isWifiScoringEnabled()).thenReturn(false);
-        mWifiScoreReport.calculateAndReportScore();
+        mWifiScoreReport.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
 
         ArgumentCaptor<NetworkScore> scoreCaptor = ArgumentCaptor.forClass(NetworkScore.class);
         verify(mNetworkAgent, times(2)).sendNetworkScore(scoreCaptor.capture());
@@ -1574,7 +1587,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
                 .thenReturn(scoreResult);
 
-        mWifiScoreReportWithMockHelper.calculateAndReportScore();
+        mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
 
         verify(mMockConnectedScorerHelper, never())
                 .checkNudIfNeeded(any(IpClientManager.class), anyLong(), anyLong());
