@@ -3026,6 +3026,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             @Override
             public void enterImpl() {
                 mWifiInjector.getWifiP2pConnection().setP2pInDisabledState(true);
+                mDetailedState = NetworkInfo.DetailedState.IDLE;
             }
 
             @Override

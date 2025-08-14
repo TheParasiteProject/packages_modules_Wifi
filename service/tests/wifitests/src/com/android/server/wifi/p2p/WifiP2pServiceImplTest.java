@@ -8067,6 +8067,14 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         verify(mClientHandler, times(2)).sendMessage(mMessageCaptor.capture());
         assertEquals(WifiP2pManager.RESPONSE_CONNECTION_INFO, mMessageCaptor.getValue().what);
         assertFalse(((WifiP2pInfo) mMessageCaptor.getValue().obj).groupFormed);
+
+        // The state of network should be set to IDLE
+        sendSimpleMsg(mClientMessenger, WifiP2pManager.REQUEST_NETWORK_INFO);
+        verify(mClientHandler, times(3)).sendMessage(mMessageCaptor.capture());
+        assertEquals(WifiP2pManager.RESPONSE_NETWORK_INFO, mMessageCaptor.getValue().what);
+        assertEquals(NetworkInfo.DetailedState.IDLE,
+                ((NetworkInfo) mMessageCaptor.getValue().obj).getDetailedState());
+
     }
 
     @Test
