@@ -340,6 +340,12 @@ class SupplicantStaIfaceCallbackAidlImpl extends ISupplicantStaIfaceCallback.Stu
             WifiConfiguration curConfiguration =
                     mStaIfaceHal.getCurrentNetworkLocalConfig(mIfaceName);
             if (curConfiguration != null) {
+                if (reasonCode == SupplicantStaIfaceHal.StaIfaceReasonCode.PREV_AUTH_NOT_VALID) {
+                    Log.d(TAG, "Flushing PMK cache for config id: "
+                            + curConfiguration.networkId
+                            + " because previous authentication is not valid.");
+                    mStaIfaceHal.removePmkCacheEntry(curConfiguration.networkId);
+                }
                 if (mStateBeforeDisconnect == StaIfaceCallbackState.FOURWAY_HANDSHAKE
                         && NativeUtil.isEapol4WayHandshakeFailureDueToWrongPassword(
                                 curConfiguration, locallyGenerated, reasonCode)) {
