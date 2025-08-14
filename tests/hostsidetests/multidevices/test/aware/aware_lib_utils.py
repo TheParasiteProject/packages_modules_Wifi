@@ -20,6 +20,8 @@ import json
 import logging
 import time
 from typing import Any, Callable, Dict, List, Optional
+from queue import Empty
+
 
 from aware import constants
 
@@ -461,6 +463,7 @@ def start_attach(
   ad.log.info('Attach Wi-Fi Aware session succeeded.')
   return attach_event.callback_id, mac_address
 
+
 def create_discovery_pair(
     p_dut: android_device.AndroidDevice,
     s_dut: android_device.AndroidDevice,
@@ -571,6 +574,7 @@ def create_discovery_pair(
     return p_id, s_id, p_disc_id, s_disc_id, peer_id_on_sub, peer_id_on_pub
   return p_id, s_id, p_disc_id, s_disc_id, peer_id_on_sub
 
+
 def request_network(
     ad: android_device.AndroidDevice,
     discovery_session: str,
@@ -601,7 +605,7 @@ def request_network(
       net_work_request_id, network_request_dict, _REQUEST_NETWORK_TIMEOUT_MS
   )
 
-def wait_for_network(
+def wait_for_networks(
     ad: android_device.AndroidDevice,
     request_network_cb_handler: callback_handler_v2.CallbackHandlerV2,
     expected_channel: str | None = None,
@@ -656,32 +660,159 @@ def wait_for_network(
     )
   return network_callback_event
 
-def wait_for_link(
-    ad: android_device.AndroidDevice,
-    request_network_cb_handler: callback_handler_v2.CallbackHandlerV2,
-) -> callback_event.CallbackEvent:
-  """Waits for and verifies the establishment of a Wi-Fi Aware network."""
-  network_callback_event = request_network_cb_handler.waitAndGet(
-      event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
-      timeout=_DEFAULT_TIMEOUT,
-  )
-  callback_name = network_callback_event.data[_CALLBACK_NAME]
-  if callback_name == constants.NetworkCbName.ON_UNAVAILABLE:
-    asserts.fail(
-        f'{ad} failed to request the network, got callback {callback_name}.'
-    )
-  elif callback_name == constants.NetworkCbName.ON_PROPERTIES_CHANGED:
-    iface_name = network_callback_event.data[
-        constants.NetworkCbEventKey.NETWORK_INTERFACE_NAME
-    ]
-    ad.log.info('interface name = %s', iface_name)
-  else:
-    asserts.fail(
-        f'{ad} got unknown request network callback {callback_name}.'
-    )
-  ad.log.info('type = %s', type(network_callback_event))
-  return network_callback_event
 
+def wait_for_network(
+        ad: android_device.AndroidDevice,
+        request_network_cb_handler: callback_handler_v2.CallbackHandlerV2,
+        expected_channel: str | None = None,
+    ) -> callback_event.CallbackEvent:
+    """
+    Waits for Wi-Fi Aware network events, attempting up to 3 times.
+
+    This function collects all available network callbacks within the attempts
+    and then searches for a definitive success or failure event to verify.
+    """
+    collected_events = []
+    # Loop a maximum of 2 times to collect events.
+    for attempt in range(2):
+        try:
+            event = request_network_cb_handler.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+            ad.log.info(f'Attempt {attempt + 1}: Collected event'
+                        f' {event.data.get(_CALLBACK_NAME)}')
+            collected_events.append(event)
+        except Empty:
+            ad.log.info(f'Attempt {attempt + 1}: No event received in time.'
+                        ' Stopping collection.')
+            # If the queue is empty, no need to try again.
+            break
+        except Exception as e:
+            asserts.fail(f'An unexpected error occurred while waiting for'
+                         f' event: {e}')
+
+    # After collecting events, process them to find the one we need.
+    success_event = None
+    for event in collected_events:
+        callback_name = event.data.get(_CALLBACK_NAME)
+
+        if callback_name == constants.NetworkCbName.ON_UNAVAILABLE:
+            # A definitive failure event was found. Fail immediately.
+            asserts.fail(
+                f'{ad} failed to request the network. Received ON_UNAVAILABLE.'
+            )
+        elif callback_name == constants.NetworkCbName.ON_CAPABILITIES_CHANGED:
+            # This is the primary success event. Store it and stop searching.
+            success_event = event
+            break
+
+    # After checking all collected events, verify the success event.
+    if success_event:
+        # `network` is the network whose capabilities have changed.
+        network = success_event.data[constants.NetworkCbEventKey.NETWORK]
+        network_capabilities = success_event.data[
+            constants.NetworkCbEventKey.NETWORK_CAPABILITIES
+        ]
+        asserts.assert_true(
+            network and network_capabilities,
+            f'{ad} received a null Network or NetworkCapabilities!?.',
+            )
+        transport_info_class_name = success_event.data[
+            constants.NetworkCbEventKey.TRANSPORT_INFO_CLASS_NAME
+        ]
+        ad.log.info(f'Got class_name {transport_info_class_name}')
+        asserts.assert_equal(
+            transport_info_class_name,
+            constants.AWARE_NETWORK_INFO_CLASS_NAME,
+            f'{ad} network capabilities changed but it is not a WiFi Aware'
+            ' network.',
+        )
+        if expected_channel:
+            mhz_list = success_event.data[
+                constants.NetworkCbEventKey.CHANNEL_IN_MHZ
+            ]
+            asserts.assert_equal(
+                mhz_list,
+                [expected_channel],
+                f'{ad} Channel freq does not match the request.',
+            )
+        # Return the successfully validated event.
+        return success_event
+    else:
+        # If the loop finishes and no success_event was found, fail.
+        event_names = [e.data.get(_CALLBACK_NAME) for e in collected_events]
+        asserts.fail(
+            f'{ad} did not receive ON_CAPABILITIES_CHANGED after all attempts.'
+            f' Got events: {event_names}'
+        )
+
+def wait_for_link(
+        ad: android_device.AndroidDevice,
+        request_network_cb_handler: callback_handler_v2.CallbackHandlerV2,
+    ) -> callback_event.CallbackEvent:
+    """
+    Waits for and verifies the establishment of a Wi-Fi Aware network,
+    attempting to fetch events up to 3 times.
+    """
+    collected_events = []
+    # Loop a maximum of 3 times to collect any available events.
+    for attempt in range(2):
+        try:
+            event = request_network_cb_handler.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+            ad.log.info(
+                f'Attempt {attempt + 1}: Collected event'
+                f' {event.data.get(_CALLBACK_NAME)}'
+            )
+            collected_events.append(event)
+        except Empty:
+            ad.log.info(
+                f'Attempt {attempt + 1}: No more events in the queue. '
+                'Stopping collection.'
+            )
+            # If the queue is empty, there's no need to try again.
+            break
+        except Exception as e:
+            asserts.fail(
+                f'An unexpected error occurred while waiting for event: {e}'
+            )
+
+    # After collecting events, process them to find the one we need.
+    success_event = None
+    for event in collected_events:
+        # Use .get() for safe access in case the key is missing.
+        callback_name = event.data.get(_CALLBACK_NAME)
+
+        if callback_name == constants.NetworkCbName.ON_UNAVAILABLE:
+            # A definitive failure event was found. Fail the test immediately.
+            asserts.fail(
+                f'{ad} failed to request the network, received ON_UNAVAILABLE.'
+            )
+        elif callback_name == constants.NetworkCbName.ON_PROPERTIES_CHANGED:
+            # This is the success event we are looking for.
+            success_event = event
+            # We found the event, no need to check the rest of the list.
+            break
+
+    # After checking all collected events, verify the outcome.
+    if success_event:
+        # If we found the success event, log its details and return it.
+        iface_name = success_event.data[
+            constants.NetworkCbEventKey.NETWORK_INTERFACE_NAME
+        ]
+        ad.log.info('Successfully found link. Interface name = %s', iface_name)
+        ad.log.info('type = %s', type(success_event))
+        return success_event
+    else:
+        # If the loop finishes and no success_event was found, fail the test.
+        event_names = [e.data.get(_CALLBACK_NAME) for e in collected_events]
+        asserts.fail(
+            f'{ad} did not receive ON_PROPERTIES_CHANGED after all attempts. '
+            f'Got events: {event_names}'
+        )
 
 def _wait_accept_success(
     pub_accept_handler: callback_handler_v2.CallbackHandlerV2
@@ -696,7 +827,6 @@ def _wait_accept_success(
         asserts.fail(
             f'Publisher failed to accept the connection. Error: {error}'
         )
-
 
 def _send_socket_msg(
     sender_ad: android_device.AndroidDevice,
@@ -725,7 +855,6 @@ def _send_socket_msg(
         f'{received_message}.'
     )
     receiver_ad.log.info('Read data from the socket.')
-
 
 def establish_socket_and_send_msg(
     publisher: android_device.AndroidDevice,
