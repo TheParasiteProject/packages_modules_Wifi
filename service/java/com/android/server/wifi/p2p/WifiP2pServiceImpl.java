@@ -3026,6 +3026,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             @Override
             public void enterImpl() {
                 mWifiInjector.getWifiP2pConnection().setP2pInDisabledState(true);
+                mDetailedState = NetworkInfo.DetailedState.IDLE;
             }
 
             @Override
@@ -5152,6 +5153,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         break;
                     case DISABLE_P2P:
                         mWifiP2pMetrics.endConnectionEvent(P2pConnectionEvent.CLF_GROUP_REMOVED);
+                        resetP2pGroupInformationAndNotifyGroupCreationFailure(
+                                WifiP2pManager.GROUP_CREATION_FAILURE_REASON_GROUP_REMOVED);
                         //remaining p2p disabling works will be handled in its parent states
                     default:
                         return NOT_HANDLED;
@@ -7839,6 +7842,15 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             return true;
         }
 
+        private void resetP2pGroupInformationAndNotifyGroupCreationFailure(
+                @WifiP2pManager.GroupCreationFailureReason int reason) {
+            resetWifiP2pInfo();
+            mGroup = null;
+            mDetailedState = NetworkInfo.DetailedState.FAILED;
+            onGroupCreationFailed(reason);
+            sendP2pConnectionChangedBroadcast();
+        }
+
         private void handleGroupCreationFailure(
                 @WifiP2pManager.GroupCreationFailureReason int reason) {
             // A group is formed, but the tethering request is not proceed.
@@ -7847,12 +7859,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 // that reuse the main p2p interface for a created group.
                 mWifiNative.setP2pGroupIdle(mGroup.getInterface(), 0);
                 mWifiNative.p2pGroupRemove(mGroup.getInterface());
-                mGroup = null;
             }
-            resetWifiP2pInfo();
-            mDetailedState = NetworkInfo.DetailedState.FAILED;
-            onGroupCreationFailed(reason);
-            sendP2pConnectionChangedBroadcast();
+            resetP2pGroupInformationAndNotifyGroupCreationFailure(reason);
 
             // Remove only the peer we failed to connect to so that other devices discovered
             // that have not timed out still remain in list for connection

@@ -8018,7 +8018,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
     }
 
     @Test
-    public void testP2pInfoIsClearedWhenP2pIsDisabledDurningNegotiation() throws Exception {
+    public void testP2pInfoIsClearedWhenP2pIsDisabledDuringNegotiation() throws Exception {
         forceP2pEnabled(mClient1);
         WifiP2pGroup group = new WifiP2pGroup();
         group.setNetworkId(WifiP2pGroup.NETWORK_ID_PERSISTENT);
@@ -8027,6 +8027,16 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         group.setIsGroupOwner(true);
         group.setInterface(IFACE_NAME_P2P);
         sendGroupStartedMsg(group);
+
+        // 2 connection changed events:
+        // * Enter Enabled state
+        // * Enter Group Connecting state
+        if (SdkLevel.isAtLeastT()) {
+            verify(mContext, times(2)).sendBroadcastWithMultiplePermissions(
+                    argThat(new WifiP2pServiceImplTest
+                            .P2pConnectionChangedIntentMatcherForNetworkState(CONNECTING)), any());
+            verify(mP2pListener).onGroupCreating();
+        }
 
         // P2P group is formed, the internal group data are filled.
         // The tether request is not done yet, so it stays at GroupNegotiationState.
@@ -8040,11 +8050,31 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         sendP2pStateMachineMessage(WifiP2pMonitor.SUP_DISCONNECTION_EVENT);
         mLooper.dispatchAll();
 
+        verify(mContext).sendBroadcastWithMultiplePermissions(
+                argThat(new WifiP2pServiceImplTest
+                        .P2pConnectionChangedIntentMatcherForNetworkState(FAILED)), any());
+        if (SdkLevel.isAtLeastT()) {
+            verify(mContext, atLeastOnce()).sendBroadcast(
+                    argThat(new WifiP2pServiceImplTest
+                            .P2pConnectionChangedIntentMatcherForNetworkState(FAILED)), any(),
+                    any());
+            verify(mP2pListener).onGroupCreationFailed(
+                    eq(WifiP2pManager.GROUP_CREATION_FAILURE_REASON_GROUP_REMOVED));
+        }
+
         // p2p info should be cleared.
         sendSimpleMsg(mClientMessenger, WifiP2pManager.REQUEST_CONNECTION_INFO);
         verify(mClientHandler, times(2)).sendMessage(mMessageCaptor.capture());
         assertEquals(WifiP2pManager.RESPONSE_CONNECTION_INFO, mMessageCaptor.getValue().what);
         assertFalse(((WifiP2pInfo) mMessageCaptor.getValue().obj).groupFormed);
+
+        // The state of network should be set to IDLE
+        sendSimpleMsg(mClientMessenger, WifiP2pManager.REQUEST_NETWORK_INFO);
+        verify(mClientHandler, times(3)).sendMessage(mMessageCaptor.capture());
+        assertEquals(WifiP2pManager.RESPONSE_NETWORK_INFO, mMessageCaptor.getValue().what);
+        assertEquals(NetworkInfo.DetailedState.IDLE,
+                ((NetworkInfo) mMessageCaptor.getValue().obj).getDetailedState());
+
     }
 
     @Test
