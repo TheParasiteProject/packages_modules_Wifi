@@ -42,6 +42,7 @@ import java.util.Deque;
 /** Class to store a buffer of wifi stats and call classifier. */
 public class MlConnectedScorer extends ConnectedScorer {
     private static final String TAG = "MlConnectedScorer";
+    private boolean mVerboseLoggingEnabled = false;
     @VisibleForTesting
     final Deque<WifiUsabilityStatsEntryWrapper> mBuffer = new ArrayDeque<>();
     private double mPrevScore = Constants.MAX_SCORE;
@@ -57,7 +58,7 @@ public class MlConnectedScorer extends ConnectedScorer {
     private MlConnectedScorerHelper mHelper;
     private String mLastBssid = null;
     private int mLastFrequency = -1;
-    MlConnectedScorer(WifiUsabilityClassifier classifier, MlConnectedScorerHelper helper) {
+    public MlConnectedScorer(WifiUsabilityClassifier classifier, MlConnectedScorerHelper helper) {
         mClassifier = classifier;
         mHelper = helper;
     }
@@ -94,6 +95,14 @@ public class MlConnectedScorer extends ConnectedScorer {
                 .setShouldCheckNud(shouldCheckNud)
                 .setShouldBlockBssid(mBlockCurrentBssid)
                 .build();
+    }
+
+    /**
+     * Enable/Disable verbose logging.
+     */
+    public void enableVerboseLogging(boolean enable) {
+        mVerboseLoggingEnabled = enable;
+        mHelper.enableVerboseLogging(enable);
     }
     /**
      * Return the score after it has been calculated and adjusted.

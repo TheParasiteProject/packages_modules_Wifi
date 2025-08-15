@@ -16,6 +16,8 @@
 
 package com.android.server.wifi;
 
+import static com.android.server.wifi.ml_connected_scorer.Constants.RANDOM_FOREST_MODEL_ID;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
@@ -64,6 +66,10 @@ import com.android.server.wifi.hotspot2.PasspointManager;
 import com.android.server.wifi.hotspot2.PasspointNetworkNominateHelper;
 import com.android.server.wifi.hotspot2.PasspointObjectFactory;
 import com.android.server.wifi.mainline_supplicant.MainlineSupplicant;
+import com.android.server.wifi.ml_connected_scorer.MlConnectedScorer;
+import com.android.server.wifi.ml_connected_scorer.MlConnectedScorerHelper;
+import com.android.server.wifi.ml_connected_scorer.RandomForestModule;
+import com.android.server.wifi.ml_connected_scorer.WifiUsabilityClassifierFactory;
 import com.android.server.wifi.mockwifi.MockWifiServiceUtil;
 import com.android.server.wifi.nl80211.Nl80211Native;
 import com.android.server.wifi.p2p.SupplicantP2pIfaceHal;
@@ -903,6 +909,11 @@ public class WifiInjector {
                 mContext, mWifiConfigManager, mBatteryStats, mWifiHandlerThread.getLooper(),
                 mWifiMonitor, ifaceName, clientModeManager, mBroadcastQueue);
         supplicantStateTracker.enableVerboseLogging(verboseLoggingEnabled);
+        WifiUsabilityClassifierFactory wifiUsabilityClassifierFactory =
+                new WifiUsabilityClassifierFactory(new RandomForestModule());
+        MlConnectedScorer mlConnectedScorer = new MlConnectedScorer(
+                wifiUsabilityClassifierFactory.getModel(mContext, RANDOM_FOREST_MODEL_ID),
+                new MlConnectedScorerHelper());
         return new ClientModeImpl(mContext, mWifiMetrics, mClock,
                 mWifiScoreCard, mWifiStateTracker, mWifiPermissionsUtil, mWifiConfigManager,
                 mPasspointManager, mWifiMonitor, mWifiDiagnostics,
@@ -927,7 +938,7 @@ public class WifiInjector {
                         mDeviceConfigFacade, mContext, mAdaptiveConnectivityEnabledSettingObserver,
                         ifaceName, mExternalScoreUpdateObserverProxy, mSettingsStore, mWifiGlobals,
                         mActiveModeWarden, mWifiConnectivityManager, mWifiConfigManager,
-                        mConnectedScorerHelper),
+                        mConnectedScorerHelper, mlConnectedScorer),
                 mWifiP2pConnection, mWifiGlobals, ifaceName, clientModeManager,
                 mCmiMonitor, mBroadcastQueue, mWifiNetworkSelector, makeTelephonyManager(),
                 this, mSettingsConfigStore, verboseLoggingEnabled, mWifiNotificationManager,

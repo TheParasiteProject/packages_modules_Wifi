@@ -16,6 +16,9 @@
 
 package com.android.server.wifi;
 
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_ML;
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_VELOCITY;
+
 import static com.android.server.wifi.ClientModeImpl.WIFI_WORK_SOURCE;
 import static com.android.server.wifi.Clock.INVALID_TIMESTAMP_MS;
 
@@ -23,6 +26,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.AdditionalAnswers.answerVoid;
 import static org.mockito.AdditionalMatchers.not;
@@ -66,7 +70,9 @@ import android.os.test.TestLooper;
 import androidx.test.filters.SmallTest;
 
 import com.android.modules.utils.build.SdkLevel;
+import com.android.server.wifi.ml_connected_scorer.MlConnectedScorer;
 import com.android.server.wifi.proto.WifiStatsLog;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import org.junit.After;
@@ -160,6 +166,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
     @Mock ConnectedScorerHelper mMockConnectedScorerHelper;
     @Mock IpClientManager mMockIpClientManager;
     @Mock WifiUsabilityStatsEntry mMockWifiUsabilityStatsEntry;
+    @Mock MlConnectedScorer mMockMlConnectedScorer;
     @Captor ArgumentCaptor<WifiManager.ScoreUpdateObserver> mExternalScoreUpdateObserverCbCaptor;
     private TestLooper mLooper;
 
@@ -301,7 +308,8 @@ public class WifiScoreReportTest extends WifiBaseTest {
                 mAdaptiveConnectivityEnabledSettingObserver, TEST_IFACE_NAME,
                 mExternalScoreUpdateObserverProxy, mWifiSettingsStore,
                 mWifiGlobals, mActiveModeWarden, mWifiConnectivityManager, mWifiConfigManager,
-                new ConnectedScorerHelper(mScoringParams, mWifiGlobals, mWifiConnectivityManager));
+                new ConnectedScorerHelper(mScoringParams, mWifiGlobals, mWifiConnectivityManager),
+                mMockMlConnectedScorer);
         mWifiScoreReport.onRoleChanged(mIsPrimary ? ActiveModeManager.ROLE_CLIENT_PRIMARY
                 : ActiveModeManager.ROLE_CLIENT_SECONDARY_LONG_LIVED);
         mWifiScoreReport.setNetworkAgent(mNetworkAgent);
@@ -318,10 +326,13 @@ public class WifiScoreReportTest extends WifiBaseTest {
             mAdaptiveConnectivityEnabledSettingObserver, TEST_IFACE_NAME,
             mExternalScoreUpdateObserverProxy, mWifiSettingsStore,
             mWifiGlobals, mActiveModeWarden, mWifiConnectivityManager, mWifiConfigManager,
-            mMockConnectedScorerHelper);
+            mMockConnectedScorerHelper, mMockMlConnectedScorer);
         mWifiScoreReportWithMockHelper.mVelocityBasedConnectedScorer = mMockVelocityScorer;
         mWifiScoreReportWithMockHelper.setNetworkAgent(mMockNetworkAgent);
         mWifiScoreReportWithMockHelper.setIpClientManager(mMockIpClientManager);
+        mWifiScoreReportWithMockHelper.onRoleChanged(mIsPrimary
+                ? ActiveModeManager.ROLE_CLIENT_PRIMARY
+                : ActiveModeManager.ROLE_CLIENT_SECONDARY_LONG_LIVED);
 
         when(mDeviceConfigFacade.getMinConfirmationDurationSendLowScoreMs()).thenReturn(
                 DeviceConfigFacade.DEFAULT_MIN_CONFIRMATION_DURATION_SEND_LOW_SCORE_MS);
@@ -419,6 +430,101 @@ public class WifiScoreReportTest extends WifiBaseTest {
         assertEquals(WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_NONE,
                 mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation());
         assertEquals(ADJUSTED_SCORE, mWifiScoreReport.mLegacyIntScore);
+    }
+
+    @Test
+    public void calculateAndReportScore_mlInternalScorerAndPrimary() {
+        assumeTrue("Skipping test because feature flag is disabled", Flags.mlScorerInWifiFw());
+        assumeTrue(mIsPrimary);
+        mWifiInfo.setRssi(-77);
+        when(mWifiGlobals.getInternalScorerType()).thenReturn(SCORER_TYPE_ML);
+        ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
+                .setScore(TEST_SCORE)
+                .setAdjustedScore(ADJUSTED_SCORE)
+                .setIsWifiUsable(true)
+                .build();
+        when(mMockMlConnectedScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
+                .thenReturn(scoreResult);
+
+        mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
+        verify(mMockWifiUsabilityStatsEntry).setInternalScore(eq(ADJUSTED_SCORE));
+        verify(mMockWifiUsabilityStatsEntry).setInternalScorerType(eq(SCORER_TYPE_ML));
+    }
+
+    @Test
+    public void calculateAndReportScore_mlInternalScorerAndSecondary() {
+        assumeTrue("Skipping test because feature flag is disabled", Flags.mlScorerInWifiFw());
+        assumeFalse(mIsPrimary);
+        mWifiInfo.setRssi(-77);
+        when(mWifiGlobals.getInternalScorerType()).thenReturn(SCORER_TYPE_ML);
+        ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
+                .setScore(TEST_SCORE)
+                .setAdjustedScore(ADJUSTED_SCORE)
+                .setIsWifiUsable(true)
+                .build();
+        when(mMockMlConnectedScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
+                .thenReturn(scoreResult);
+
+        mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
+
+        verify(mMockWifiUsabilityStatsEntry, never()).setInternalScore(anyInt());
+        verify(mMockWifiUsabilityStatsEntry, never()).setInternalScorerType(anyInt());
+    }
+
+    @Test
+    public void calculateAndReportScore_mlInternalScorerWithFlagDisabled() {
+        assumeFalse("Skipping test because feature flag is enabled", Flags.mlScorerInWifiFw());
+        mWifiInfo.setRssi(-77);
+        when(mWifiGlobals.getInternalScorerType()).thenReturn(SCORER_TYPE_ML);
+        ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
+                .setScore(TEST_SCORE)
+                .setAdjustedScore(ADJUSTED_SCORE)
+                .setIsWifiUsable(true)
+                .build();
+        when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
+                .thenReturn(scoreResult);
+
+        mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
+        verify(mMockWifiUsabilityStatsEntry).setInternalScore(eq(ADJUSTED_SCORE));
+        verify(mMockWifiUsabilityStatsEntry).setInternalScorerType(eq(SCORER_TYPE_VELOCITY));
+    }
+
+    @Test
+    public void calculateAndReportScore_velocityInternalScorerAndPrimary() {
+        assumeTrue(mIsPrimary);
+        mWifiInfo.setRssi(-77);
+        when(mWifiGlobals.getInternalScorerType()).thenReturn(SCORER_TYPE_VELOCITY);
+        ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
+                .setScore(TEST_SCORE)
+                .setAdjustedScore(ADJUSTED_SCORE)
+                .setIsWifiUsable(true)
+                .build();
+        when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
+                .thenReturn(scoreResult);
+
+        mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
+
+        verify(mMockWifiUsabilityStatsEntry).setInternalScore(eq(ADJUSTED_SCORE));
+        verify(mMockWifiUsabilityStatsEntry).setInternalScorerType(eq(SCORER_TYPE_VELOCITY));
+    }
+
+    @Test
+    public void calculateAndReportScore_velocityInternalScorerAndSecondary() {
+        assumeFalse(mIsPrimary);
+        mWifiInfo.setRssi(-77);
+        when(mWifiGlobals.getInternalScorerType()).thenReturn(SCORER_TYPE_VELOCITY);
+        ConnectedScoreResult scoreResult = ConnectedScoreResult.builder()
+                .setScore(TEST_SCORE)
+                .setAdjustedScore(ADJUSTED_SCORE)
+                .setIsWifiUsable(true)
+                .build();
+        when(mMockVelocityScorer.generateScoreResult(any(), any(), anyLong(), anyBoolean()))
+                .thenReturn(scoreResult);
+
+        mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
+
+        verify(mMockWifiUsabilityStatsEntry).setInternalScore(eq(ADJUSTED_SCORE));
+        verify(mMockWifiUsabilityStatsEntry).setInternalScorerType(eq(SCORER_TYPE_VELOCITY));
     }
 
     /**

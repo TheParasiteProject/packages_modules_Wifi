@@ -439,3 +439,10 @@ flag {
     description: "Add new API to get supported interface names"
     bug: "433370605"
 }
+
+flag {
+    name: "ml_scorer_in_wifi_fw"
+    namespace: "wifi"
+    description: "Add ML scorer into Wi-Fi framework"
+    bug: "412641160"
+}
