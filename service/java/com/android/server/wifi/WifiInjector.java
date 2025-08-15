@@ -16,8 +16,6 @@
 
 package com.android.server.wifi;
 
-import static com.android.server.wifi.ml_connected_scorer.Constants.RANDOM_FOREST_MODEL_ID;
-
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
@@ -286,6 +284,7 @@ public class WifiInjector {
     private final boolean mHasActiveModem;
     private final RunnerHandler mWifiHandler;
     private boolean mVerboseLoggingEnabled;
+    private WifiUsabilityClassifierFactory mWifiUsabilityClassifierFactory;
     @Nullable private final WepNetworkUsageController mWepNetworkUsageController;
 
     public WifiInjector(WifiContext context) {
@@ -322,6 +321,8 @@ public class WifiInjector {
         mWifiDeviceStateChangeManager = new WifiDeviceStateChangeManager(context, mWifiThreadRunner,
                 this);
         mWifiGlobals = new WifiGlobals(mContext);
+        WifiUsabilityClassifierFactory mWifiUsabilityClassifierFactory =
+                new WifiUsabilityClassifierFactory(mContext, new RandomForestModule());
         mWifiMetrics = new WifiMetrics(mContext, mFrameworkFacade, mClock, wifiLooper,
                 awareMetrics, rttMetrics, new WifiPowerMetrics(mBatteryStats), mWifiP2pMetrics,
                 mDppMetrics, mWifiMonitor, mWifiDeviceStateChangeManager, mWifiGlobals);
@@ -909,10 +910,7 @@ public class WifiInjector {
                 mContext, mWifiConfigManager, mBatteryStats, mWifiHandlerThread.getLooper(),
                 mWifiMonitor, ifaceName, clientModeManager, mBroadcastQueue);
         supplicantStateTracker.enableVerboseLogging(verboseLoggingEnabled);
-        WifiUsabilityClassifierFactory wifiUsabilityClassifierFactory =
-                new WifiUsabilityClassifierFactory(new RandomForestModule());
-        MlConnectedScorer mlConnectedScorer = new MlConnectedScorer(
-                wifiUsabilityClassifierFactory.getModel(mContext, RANDOM_FOREST_MODEL_ID),
+        MlConnectedScorer mlConnectedScorer = new MlConnectedScorer(mWifiUsabilityClassifierFactory,
                 new MlConnectedScorerHelper());
         return new ClientModeImpl(mContext, mWifiMetrics, mClock,
                 mWifiScoreCard, mWifiStateTracker, mWifiPermissionsUtil, mWifiConfigManager,
