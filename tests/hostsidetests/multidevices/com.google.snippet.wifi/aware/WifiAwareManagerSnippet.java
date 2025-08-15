@@ -404,6 +404,7 @@ public class WifiAwareManagerSnippet implements Snippet {
             SnippetEvent snippetEvent = new SnippetEvent(mCallBackId, "discoveryResult");
             snippetEvent.getData().putString("callbackName", "onPublishStarted");
             snippetEvent.getData().putBoolean("isSessionInitialized", session != null);
+            snippetEvent.getData().putLong("timestampMs", System.currentTimeMillis());
             EventCache.getInstance().postEvent(snippetEvent);
         }
 
@@ -413,6 +414,7 @@ public class WifiAwareManagerSnippet implements Snippet {
             SnippetEvent snippetEvent = new SnippetEvent(mCallBackId, "discoveryResult");
             snippetEvent.getData().putString("callbackName", "onSubscribeStarted");
             snippetEvent.getData().putBoolean("isSessionInitialized", session != null);
+            snippetEvent.getData().putLong("timestampMs", System.currentTimeMillis());
             EventCache.getInstance().postEvent(snippetEvent);
         }
 
@@ -438,6 +440,7 @@ public class WifiAwareManagerSnippet implements Snippet {
             event.getData().putByteArray("serviceSpecificInfo", info.getServiceSpecificInfo());
             event.getData().putString("pairedAlias", info.getPairedAlias());
             event.getData().putInt("peerId", info.getPeerHandle().hashCode());
+            event.getData().putLong("timestampMs", System.currentTimeMillis());
             List<byte[]> matchFilter = info.getMatchFilters();
             putMatchFilterData(matchFilter, event);
             EventCache.getInstance().postEvent(event);
