@@ -28,17 +28,29 @@ import static com.android.server.wifi.ml_connected_scorer.Flags.SCORE_LOW_TX_SUC
 
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiUsabilityStatsEntry;
+import android.util.Log;
 
 /** Class to store a buffer of wifi stats and call classifier. */
 public class MlConnectedScorerHelper {
+    private boolean mVerboseLoggingEnabled = false;
+
     /** Return true if the BSSID and frequence are the same. */
     public boolean isSameBssidAndFreq(String previousBssid, int previousFrequency,
             WifiInfo wifiInfo) {
         if (previousBssid == null || previousFrequency == -1) {
             return true;
         }
-        return previousBssid.equals(wifiInfo.getBSSID())
-                && previousFrequency == wifiInfo.getFrequency();
+        String currentBssid = wifiInfo.getBSSID();
+        int currentFrequency = wifiInfo.getFrequency();
+        if (previousBssid.equals(currentBssid) && (previousFrequency == currentFrequency)) {
+            return true;
+        }
+        if (mVerboseLoggingEnabled) {
+            Log.d(Constants.TAG, "previousBssid=" + previousBssid + " currentBssid=" + currentBssid
+                    + " previousFrequency=" + previousFrequency
+                    + " currentFrequency=" + currentFrequency);
+        }
+        return false;
     }
 
     /** Return true if the time stamp gap between the two stats are too large. */
@@ -78,5 +90,12 @@ public class MlConnectedScorerHelper {
                 && stats.getRxLinkSpeedMbps() > 0;
         boolean isRssiLow = stats.getRssi() < SCORE_BREACHING_RSSI_THRESHOLD;
         return isRssiLow && (isTxLinkSpeedVeryLow || isRxLinkSpeedVeryLow);
+    }
+
+    /**
+     * Enable/Disable verbose logging.
+     */
+    public void enableVerboseLogging(boolean enable) {
+        mVerboseLoggingEnabled = enable;
     }
 }

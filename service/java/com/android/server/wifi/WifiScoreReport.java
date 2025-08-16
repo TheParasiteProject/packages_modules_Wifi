@@ -16,6 +16,8 @@
 
 package com.android.server.wifi;
 
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_INVALID;
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_ML;
 import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_VELOCITY;
 
 import static com.android.server.wifi.Clock.INVALID_TIMESTAMP_MS;
@@ -47,9 +49,11 @@ import androidx.annotation.RequiresApi;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.ActiveModeManager.ClientRole;
+import com.android.server.wifi.ml_connected_scorer.MlConnectedScorer;
 import com.android.server.wifi.proto.WifiStatsLog;
 import com.android.server.wifi.util.RssiUtil;
 import com.android.server.wifi.util.StringUtil;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import java.io.FileDescriptor;
@@ -119,6 +123,7 @@ public class WifiScoreReport {
 
     @VisibleForTesting
     VelocityBasedConnectedScorer mVelocityBasedConnectedScorer;
+    private MlConnectedScorer mMlConnectedScorer;
     private final WifiSettingsStore mWifiSettingsStore;
     private int mSessionIdNoReset = INVALID_SESSION_ID;
     // Indicate whether current network is selected by the user
@@ -170,7 +175,7 @@ public class WifiScoreReport {
             if (SdkLevel.isAtLeastS()) {
                 mLegacyIntScore = score;
                 // Only primary network can have external scorer.
-                updateWifiMetrics(millis, -1);
+                updateWifiMetrics(millis, SCORER_TYPE_INVALID, -1, -1, score);
                 return;
             }
         }
@@ -374,8 +379,14 @@ public class WifiScoreReport {
      */
     private void reportNetworkScoreToConnectivityServiceIfNecessary(int adjustedScore,
             boolean isUsable) {
+        mWifiInfo.setUsable(isUsable);
         if (adjustedScore == mWifiInfo.getScore()) {
             return;
+        } else {
+            if (mVerboseLoggingEnabled) {
+                Log.d(TAG, "report new wifi score " + adjustedScore);
+            }
+            mWifiInfo.setScore(adjustedScore);
         }
         // only send network score if not lingering. If lingering, would have already sent score at
         // start of lingering.
@@ -528,12 +539,14 @@ public class WifiScoreReport {
             ActiveModeWarden activeModeWarden,
             WifiConnectivityManager wifiConnectivityManager,
             WifiConfigManager wifiConfigManager,
-            ConnectedScorerHelper connectedScorerHelper) {
+            ConnectedScorerHelper connectedScorerHelper,
+            MlConnectedScorer mlConnectedScorer) {
         mScoringParams = scoringParams;
         mClock = clock;
         mAdaptiveConnectivityEnabledSettingObserver = adaptiveConnectivityEnabledSettingObserver;
         mVelocityBasedConnectedScorer = new VelocityBasedConnectedScorer(scoringParams, wifiGlobals,
                 connectedScorerHelper);
+        mMlConnectedScorer = mlConnectedScorer;
         mWifiMetrics = wifiMetrics;
         mWifiInfo = wifiInfo;
         mWifiNative = wifiNative;
@@ -575,6 +588,9 @@ public class WifiScoreReport {
         if (mVelocityBasedConnectedScorer != null) {
             mVelocityBasedConnectedScorer.reset();
         }
+        if (mMlConnectedScorer != null) {
+            mMlConnectedScorer.reset();
+        }
         mLastScoreBreachLowTimeMillis = INVALID_TIMESTAMP_MS;
         mLastLowScoreScanTimestampMs = INVALID_TIMESTAMP_MS;
         mLastNudCheckTimeMs = INVALID_TIMESTAMP_MS;
@@ -603,11 +619,21 @@ public class WifiScoreReport {
         }
 
         long millis = mClock.getWallClockMillis();
-        ConnectedScoreResult scoreResult = mVelocityBasedConnectedScorer.generateScoreResult(
-                mWifiInfo, statsEntry, millis, isPrimary());
+        ConnectedScoreResult scoreResult;
+        final int internalScorerType = Flags.mlScorerInWifiFw()
+                ? mWifiGlobals.getInternalScorerType() : SCORER_TYPE_VELOCITY;
+        if (internalScorerType == SCORER_TYPE_VELOCITY) {
+            scoreResult = mVelocityBasedConnectedScorer.generateScoreResult(mWifiInfo, statsEntry,
+                    millis, isPrimary());
+        } else if (internalScorerType == SCORER_TYPE_ML && isPrimary()) {
+            scoreResult = mMlConnectedScorer.generateScoreResult(mWifiInfo, statsEntry, millis,
+                    isPrimary());
+        } else {
+            return;
+        }
         int adjustedScore = scoreResult.adjustedScore();
         statsEntry.setInternalScore(adjustedScore);
-        statsEntry.setInternalScorerType(SCORER_TYPE_VELOCITY);
+        statsEntry.setInternalScorerType(internalScorerType);
 
         mAospScorerPredictionStatusForEvaluation =
                 convertToPredictionStatusForEvaluation(scoreResult.isWifiUsable());
@@ -651,7 +677,7 @@ public class WifiScoreReport {
             mIsUsable = true;
         }
 
-        updateWifiMetrics(millis, scoreResult.score());
+        updateWifiMetrics(millis, internalScorerType, scoreResult.score(), adjustedScore, -1);
     }
 
     private boolean enoughTimePassedSinceLastLowConnectedScoreScan() {
@@ -693,18 +719,14 @@ public class WifiScoreReport {
         return (int) (((long) netId * 10 + (8 - (netId % 9))) % Integer.MAX_VALUE + 1);
     }
 
-    private void updateWifiMetrics(long now, int s2) {
+    private void updateWifiMetrics(long now, int internalScorerType, int internalScore,
+             int internalAdjustedScore, int externalScore) {
         int netId = getCurrentNetId();
 
-        logLinkMetrics(now, netId, s2, mLegacyIntScore);
-
-        if (mLegacyIntScore != mWifiInfo.getScore()) {
-            if (mVerboseLoggingEnabled) {
-                Log.d(TAG, "report new wifi score " + mLegacyIntScore);
-            }
-            mWifiInfo.setScore(mLegacyIntScore);
-        }
-        mWifiMetrics.incrementWifiScoreCount(mInterfaceName, mLegacyIntScore);
+        logLinkMetrics(now, netId, internalScorerType, internalScore, internalAdjustedScore,
+                externalScore);
+        mWifiMetrics.incrementWifiScoreCount(mInterfaceName,
+                internalScorerType == SCORER_TYPE_INVALID ? externalScore : internalAdjustedScore);
     }
 
     /** Called when the IpClientManager is changed. */
@@ -733,7 +755,8 @@ public class WifiScoreReport {
     /**
      * Data logging for dumpsys
      */
-    private void logLinkMetrics(long now, int netId, int s2, int score) {
+    private void logLinkMetrics(long now, int netId, int internalScorerType, int internalScore,
+            int internalAdjustedScore, int externalScore) {
         if (now < FIRST_REASONABLE_WALL_CLOCK) return;
         double filteredRssi = -1;
         double rssiThreshold = -1;
@@ -765,8 +788,15 @@ public class WifiScoreReport {
         stats.add(StringUtil.doubleToString(mWifiInfo.getSuccessfulRxPacketsPerSecond(), 2));
         stats.add(Integer.toString(mNudYes));
         stats.add(Integer.toString(mNudCount));
-        stats.add(Integer.toString(s2));
-        stats.add(Integer.toString(score));
+        String internalScorerName = switch (internalScorerType) {
+            case SCORER_TYPE_VELOCITY -> "Velocity";
+            case SCORER_TYPE_ML -> "ML";
+            default -> "Invalid";
+        };
+        stats.add(internalScorerName);
+        stats.add(Integer.toString(internalScore));
+        stats.add(Integer.toString(internalAdjustedScore));
+        stats.add(Integer.toString(externalScore));
         // MLO stats
         for (MloLink link : mWifiInfo.getAffiliatedMloLinks()) {
             StringJoiner mloStats = new StringJoiner(",", "{", "}");
@@ -838,7 +868,8 @@ public class WifiScoreReport {
         pw.println(
                 "time,session,netid,rssi,filtered_rssi,rssi_threshold,freq,txLinkSpeed,"
                     + "rxLinkSpeed,txTput,rxTput,bcnCnt,tx_good,tx_retry,tx_bad,rx_pps,nudrq,nuds,"
-                    + "s2,score,{linkId,linkRssi,linkFreq,txLinkSpeed,rxLinkSpeed,linkBcnCnt,"
+                    + "internalScorerType, internalScore, internalAdjustedScore, externalScore,"
+                    + "{linkId,linkRssi,linkFreq,txLinkSpeed,rxLinkSpeed,linkBcnCnt,"
                     + "linkTxGood,linkTxRetry,linkTxBad,linkRxGood,linkMloState,linkUsageState}");
         for (String line : history) {
             pw.println(line);
@@ -1053,7 +1084,7 @@ public class WifiScoreReport {
     }
 
     private void revertToDefaultConnectedScorer() {
-        Log.d(TAG, "Using VelocityBasedConnectedScorer");
+        Log.d(TAG, "Using internal scorer");
         mWifiConnectedNetworkScorerHolder = null;
         mDeviceConfigFacade.setDryRunScorerPkgNameChangedListener(null);
         mWifiGlobals.setUsingExternalScorer(false);
