@@ -21,6 +21,7 @@ import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_ML;
 import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_VELOCITY;
 
 import static com.android.server.wifi.Clock.INVALID_TIMESTAMP_MS;
+import static com.android.server.wifi.ml_connected_scorer.Constants.POLLING_INTERVAL_MS;
 
 import android.annotation.Nullable;
 import android.content.Context;
@@ -620,11 +621,15 @@ public class WifiScoreReport {
 
         long millis = mClock.getWallClockMillis();
         ConnectedScoreResult scoreResult;
-        final int internalScorerType = Flags.mlScorerInWifiFw()
+        int internalScorerType = Flags.mlScorerInWifiFw()
                 ? mWifiGlobals.getInternalScorerType() : SCORER_TYPE_VELOCITY;
-        if (internalScorerType == SCORER_TYPE_VELOCITY) {
+        final boolean isIntervalMatch =
+                POLLING_INTERVAL_MS == mWifiGlobals.getPollRssiIntervalMillis();
+        if (internalScorerType == SCORER_TYPE_VELOCITY
+                || (internalScorerType == SCORER_TYPE_ML && !isIntervalMatch)) {
             scoreResult = mVelocityBasedConnectedScorer.generateScoreResult(mWifiInfo, statsEntry,
                     millis, isPrimary());
+            internalScorerType = SCORER_TYPE_VELOCITY; // May fall back to VELOCITY from ML
         } else if (internalScorerType == SCORER_TYPE_ML && isPrimary()) {
             scoreResult = mMlConnectedScorer.generateScoreResult(mWifiInfo, statsEntry, millis,
                     isPrimary());
