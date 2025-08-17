@@ -614,6 +614,7 @@ public class WifiMetricsTest extends WifiBaseTest {
     private static final int SOFT_AP_GENERATION_5G = ScanResult.WIFI_STANDARD_11AC;
     private static final int SOFT_AP_MAX_CLIENT_SETTING = 10;
     private static final int SOFT_AP_MAX_CLIENT_CAPABILITY = 16;
+    private static final boolean SOFT_AP_AUTO_SHUTDOWN_ENABLED_SETTING = true;
     private static final long SOFT_AP_SHUTDOWN_TIMEOUT_SETTING = 10_000;
     private static final long SOFT_AP_SHUTDOWN_TIMEOUT_DEFAULT_SETTING = 600_000;
     private static final boolean SOFT_AP_CLIENT_CONTROL_ENABLE = true;
@@ -1221,6 +1222,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                 .setSsid("Test_Metric_SSID")
                 .setMaxNumberOfClients(SOFT_AP_MAX_CLIENT_SETTING)
                 .setShutdownTimeoutMillis(SOFT_AP_SHUTDOWN_TIMEOUT_SETTING)
+                .setAutoShutdownEnabled(SOFT_AP_AUTO_SHUTDOWN_ENABLED_SETTING)
                 .setClientControlByUserEnabled(SOFT_AP_CLIENT_CONTROL_ENABLE)
                 .build();
         mWifiMetrics.updateSoftApConfiguration(testSoftApConfig,
@@ -1277,6 +1279,9 @@ public class WifiMetricsTest extends WifiBaseTest {
         assertEquals(SOFT_AP_MAX_CLIENT_CAPABILITY,
                 mDecodedProto.softApConnectedClientsEventsTethered[0]
                 .maxNumClientsSettingInSoftapCapability);
+        assertEquals(SOFT_AP_AUTO_SHUTDOWN_ENABLED_SETTING,
+                mDecodedProto.softApConnectedClientsEventsTethered[0]
+                        .autoShutdownIsEnabled);
         assertEquals(SOFT_AP_SHUTDOWN_TIMEOUT_SETTING,
                 mDecodedProto.softApConnectedClientsEventsTethered[0]
                 .shutdownTimeoutSettingInSoftapConfiguration);
@@ -1308,6 +1313,9 @@ public class WifiMetricsTest extends WifiBaseTest {
         assertEquals(SOFT_AP_MAX_CLIENT_CAPABILITY,
                 mDecodedProto.softApConnectedClientsEventsTethered[3]
                 .maxNumClientsSettingInSoftapCapability);
+        assertEquals(SOFT_AP_AUTO_SHUTDOWN_ENABLED_SETTING,
+                mDecodedProto.softApConnectedClientsEventsTethered[3]
+                        .autoShutdownIsEnabled);
         assertEquals(SOFT_AP_SHUTDOWN_TIMEOUT_SETTING,
                 mDecodedProto.softApConnectedClientsEventsTethered[3]
                 .shutdownTimeoutSettingInSoftapConfiguration);

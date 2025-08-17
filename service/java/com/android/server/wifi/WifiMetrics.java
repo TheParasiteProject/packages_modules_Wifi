@@ -4093,6 +4093,7 @@ public class WifiMetrics {
                             config.getMaxNumberOfClients();
                     event.shutdownTimeoutSettingInSoftapConfiguration =
                             config.getShutdownTimeoutMillis();
+                    event.autoShutdownIsEnabled = config.isAutoShutdownEnabled();
                     event.clientControlIsEnabled = config.isClientControlByUserEnabled();
                     numOfEventNeededToUpdate--;
                 }
