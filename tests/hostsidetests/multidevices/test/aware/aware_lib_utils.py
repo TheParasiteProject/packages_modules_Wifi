@@ -18,6 +18,8 @@ import base64
 import datetime
 import json
 import logging
+import os
+import statistics
 import time
 from typing import Any, Callable, Dict, List, Optional
 from queue import Empty
@@ -925,3 +927,185 @@ def iperf_server(ad,  extra_args=""):
     if "error" in clean_out:
         return False, clean_out
     return True, clean_out
+
+def configure_power_setting(dut, mode, name, value):
+    """Use the command-line API to configure the power setting
+
+    Args:
+        dut: Device on which to perform configuration
+        mode: The power mode being set, should be "default", "inactive", or "idle"
+        name: One of the power settings from 'wifiaware set-power'.
+        value: An integer.
+    """
+    dut.adb.shell("cmd wifiaware native_api set-power %s %s %d" % (mode, name, value))
+
+
+def config_power_settings(dut,
+                          dw_24ghz,
+                          dw_5ghz,
+                          disc_beacon_interval=None,
+                          num_ss_in_disc=None,
+                          enable_dw_early_term=None):
+    """Configure device's discovery window (DW) values to the specified values -
+    whether the device is in interactive or non-interactive mode.
+
+    Args:
+        dw_24ghz: DW interval in the 2.4GHz band.
+        dw_5ghz: DW interval in the 5GHz band.
+        disc_beacon_interval: The discovery beacon interval (in ms). If None then
+                          not set.
+        num_ss_in_disc: Number of spatial streams to use for discovery. If None then
+                    not set.
+    enable_dw_early_term: If True then enable early termination of the DW. If
+                          None then not set.
+    """
+    configure_power_setting(dut, "default", "dw_24ghz", dw_24ghz)
+    configure_power_setting(dut, "default", "dw_5ghz", dw_5ghz)
+    configure_power_setting(dut, "inactive", "dw_24ghz", dw_24ghz)
+    configure_power_setting(dut, "inactive", "dw_5ghz", dw_5ghz)
+
+    if disc_beacon_interval is not None:
+        configure_power_setting(dut, "default", "disc_beacon_interval_ms",
+                                disc_beacon_interval)
+        configure_power_setting(dut, "inactive", "disc_beacon_interval_ms",
+                                disc_beacon_interval)
+
+    if num_ss_in_disc is not None:
+        configure_power_setting(dut, "default", "num_ss_in_discovery",
+                                num_ss_in_disc)
+        configure_power_setting(dut, "inactive", "num_ss_in_discovery",
+                                num_ss_in_disc)
+
+    if enable_dw_early_term is not None:
+        configure_power_setting(dut, "default", "enable_dw_early_term",
+                                enable_dw_early_term)
+        configure_power_setting(dut, "inactive", "enable_dw_early_term",
+                                enable_dw_early_term)
+
+def extract_stats(ad, data, results, key_prefix, log_prefix, csv_filepath=None):
+    num_samples = len(data)
+    results[f'{key_prefix}num_samples'] = num_samples
+    if not data:
+        return
+    data_min = min(data)
+    data_max = max(data)
+    data_mean = statistics.mean(data)
+    data_cdf = extract_cdf(data)
+    data_cdf_decile = extract_cdf_decile(data_cdf)
+
+    # --- Populate the results dictionary ---
+    results[f'{key_prefix}min'] = data_min
+    results[f'{key_prefix}max'] = data_max
+    results[f'{key_prefix}mean'] = data_mean
+    results[f'{key_prefix}cdf'] = data_cdf
+    results[f'{key_prefix}cdf_decile'] = data_cdf_decile
+    results[f'{key_prefix}raw_data'] = data
+    # --- Build the log string and handle CSV output ---
+    log_message = ""
+    csv_header = "log_message" # A simple header for our single-column CSV
+
+    if num_samples > 1:
+        data_stdev = statistics.stdev(data)
+        results[f'{key_prefix}stdev'] = data_stdev
+        # Format the string that will be used for both logging and the CSV
+        log_message = (
+            f'{log_prefix}: num_samples={num_samples}, min={data_min:.2f}, '
+            f'max={data_max:.2f}, mean={data_mean:.2f}, stdev={data_stdev:.2f}, '
+            f'cdf_decile={data_cdf_decile}'
+        )
+    else:
+        log_message = (
+            f'{log_prefix}: num_samples={num_samples}, min={data_min:.2f}, '
+            f'max={data_max:.2f}, mean={data_mean:.2f}, '
+            f'cdf_decile={data_cdf_decile}'
+        )
+
+    # Log the message to the console/logcat
+    ad.log.info(log_message)
+    # If a CSV file path was provided, write the same message to the file
+    if csv_filepath:
+        write_to_csv(csv_filepath, csv_header, log_message)
+
+def extract_cdf(data):
+    """Calculates the Cumulative Distribution Function (CDF) of the data.
+
+    Args:
+        data: A list containing data (does not have to be sorted).
+
+    Returns: a list of 2 lists: the X and Y axis of the CDF.
+    """
+    x = []
+    cdf = []
+    if not data:
+        return (x, cdf)
+    all_values = sorted(data)
+    for val in all_values:
+        if not x:
+            x.append(val)
+            cdf.append(1)
+        else:
+            if x[-1] == val:
+                cdf[-1] += 1
+            else:
+                x.append(val)
+                cdf.append(cdf[-1] + 1)
+    scale = 1.0 / len(all_values)
+    for i in range(len(cdf)):
+        cdf[i] = cdf[i] * scale
+    return (x, cdf)
+
+def extract_cdf_decile(cdf):
+    """Extracts the 10%, 20%, ..., 90% points from the CDF and returns their
+    value (a list of 9 values).
+
+    Since CDF may not (will not) have exact x% value picks the value >= x%.
+
+    Args:
+        cdf: a list of 2 lists, the X and Y of the CDF.
+    """
+    decades = []
+    next_decade = 10
+    for x, y in zip(cdf[0], cdf[1]):
+        while 100 * y >= next_decade:
+            decades.append(x)
+            next_decade = next_decade + 10
+        if next_decade == 100:
+            break
+    return decades
+
+# The new function to save the results
+def save_results_to_json(results: dict, filepath: str):
+    """Saves a dictionary to a file in a human-readable JSON format."""
+    try:
+        with open(filepath, 'w') as f:
+            json.dump(results, f, indent=4)
+        logging.info(f"Successfully saved results to {filepath}")
+    except IOError as e:
+        logging.error(f"Failed to write to file {filepath}: {e}")
+    except TypeError as e:
+        logging.error(
+            f"Data contains a type that cannot be serialized to JSON: {e}")
+
+def write_to_csv(filepath: str, header: str, row: str):
+    """
+    Appends a row to a CSV file.
+    Creating it and adding a header if it doesn't exist.
+
+    Args:
+        filepath: The path to the CSV file.
+        header: The header string to write if the file is new.
+        row: The data string to append as a new line.
+    """
+    try:
+        # Check if the file exists to decide whether to write the header
+        file_exists = os.path.exists(filepath)
+
+        # Use 'a' (append mode) to add to the file without overwriting it
+        with open(filepath, 'a') as f:
+            if not file_exists:
+                f.write(header + '\n')
+            f.write(row + '\n')
+
+    except IOError as e:
+        # Use the standard logging module for errors
+        logging.error(f"Could not write to CSV file {filepath}: {e}")
