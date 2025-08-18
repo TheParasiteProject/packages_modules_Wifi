@@ -2062,6 +2062,9 @@ message SoftApConnectedClientsEvent {
   // is used to record the number of the clients on specific instance. (depends
   // on channel_frequency)
   optional int32 num_connected_clients_on_current_frequency = 12;
+
+  // Auto shutdown enabled setting in SoftApConfiguration
+  optional bool auto_shutdown_is_enabled = 13;
 }
 
 // Power stats for Wifi
