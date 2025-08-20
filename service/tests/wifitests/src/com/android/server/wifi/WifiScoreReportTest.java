@@ -16,6 +16,7 @@
 
 package com.android.server.wifi;
 
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_INVALID;
 import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_ML;
 import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_VELOCITY;
 
@@ -451,6 +452,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mWifiScoreReportWithMockHelper.calculateAndReportScore(mMockWifiUsabilityStatsEntry);
         verify(mMockWifiUsabilityStatsEntry).setInternalScore(eq(ADJUSTED_SCORE));
         verify(mMockWifiUsabilityStatsEntry).setInternalScorerType(eq(SCORER_TYPE_ML));
+        assertEquals(SCORER_TYPE_ML, mWifiScoreReport.getLastInternalScorerType());
     }
 
     @Test
@@ -472,6 +474,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
 
         verify(mMockWifiUsabilityStatsEntry).setInternalScore(eq(ADJUSTED_SCORE));
         verify(mMockWifiUsabilityStatsEntry).setInternalScorerType(eq(SCORER_TYPE_VELOCITY));
+        assertEquals(SCORER_TYPE_VELOCITY, mWifiScoreReport.getLastInternalScorerType());
     }
 
     @Test
@@ -492,6 +495,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
 
         verify(mMockWifiUsabilityStatsEntry, never()).setInternalScore(anyInt());
         verify(mMockWifiUsabilityStatsEntry, never()).setInternalScorerType(anyInt());
+        assertEquals(SCORER_TYPE_INVALID, mWifiScoreReport.getLastInternalScorerType());
     }
 
     @Test

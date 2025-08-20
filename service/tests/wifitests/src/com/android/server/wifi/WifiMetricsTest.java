@@ -19,8 +19,9 @@ import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_HIGH_MVMT;
 import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_LOW_MVMT;
 import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_STATIONARY;
 import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_UNKNOWN;
-import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_VELOCITY;
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_INVALID;
 import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_ML;
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_VELOCITY;
 
 import static com.android.server.wifi.WifiMetrics.convertPreambleTypeEnumToUsabilityStatsType;
 import static com.android.server.wifi.WifiMetricsTestUtil.assertDeviceMobilityStatePnoScanStatsEqual;
@@ -7418,7 +7419,8 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.updateWiFiEvaluationAndScorerStats(true, null, null);
         mWifiMetrics.logScorerPredictionResult(false, false, false, POLLING_INTERVAL_DEFAULT,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
-                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE, false);
+                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
+                false, SCORER_TYPE_INVALID);
 
         ExtendedMockito.verify(() -> WifiStatsLog.write_non_chained(
                 SCORER_PREDICTION_RESULT_REPORTED,
@@ -7449,11 +7451,11 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.logScorerPredictionResult(false, false, false, POLLING_INTERVAL_DEFAULT,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
-                true);
+                true, SCORER_TYPE_ML);
 
         ExtendedMockito.verify(() -> WifiStatsLog.write_non_chained(
                 SCORER_PREDICTION_RESULT_REPORTED,
-                Process.WIFI_UID, null,
+                Process.WIFI_UID, WifiMetrics.INTERNAL_ML_SCORER_NAME,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
                 SCORER_PREDICTION_RESULT_REPORTED__UNUSABLE_EVENT__EVENT_NONE,
                 false,
@@ -7494,11 +7496,11 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.logScorerPredictionResult(false, false, false, POLLING_INTERVAL_NOT_DEFAULT,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
-                false);
+                false, SCORER_TYPE_VELOCITY);
 
         ExtendedMockito.verify(() -> WifiStatsLog.write_non_chained(
                 SCORER_PREDICTION_RESULT_REPORTED,
-                Process.WIFI_UID, null,
+                Process.WIFI_UID, WifiMetrics.INTERNAL_VELOCITY_SCORER_NAME,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
                 SCORER_PREDICTION_RESULT_REPORTED__UNUSABLE_EVENT__EVENT_NONE,
                 false,
@@ -7526,11 +7528,11 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.logScorerPredictionResult(false, false, false, POLLING_INTERVAL_DEFAULT,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
-                false);
+                false, SCORER_TYPE_VELOCITY);
 
         ExtendedMockito.verify(() -> WifiStatsLog.write_non_chained(
                 SCORER_PREDICTION_RESULT_REPORTED,
-                Process.WIFI_UID, null,
+                Process.WIFI_UID, WifiMetrics.INTERNAL_VELOCITY_SCORER_NAME,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
                 SCORER_PREDICTION_RESULT_REPORTED__UNUSABLE_EVENT__EVENT_FRAMEWORK_DATA_STALL,
                 false,
@@ -7556,11 +7558,11 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.logScorerPredictionResult(false, false, false, POLLING_INTERVAL_DEFAULT,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
-                false);
+                false, SCORER_TYPE_VELOCITY);
 
         ExtendedMockito.verify(() -> WifiStatsLog.write_non_chained(
                 SCORER_PREDICTION_RESULT_REPORTED,
-                Process.WIFI_UID, null,
+                Process.WIFI_UID, WifiMetrics.INTERNAL_VELOCITY_SCORER_NAME,
                 WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
                 SCORER_PREDICTION_RESULT_REPORTED__UNUSABLE_EVENT__EVENT_NONE,
                 true,
