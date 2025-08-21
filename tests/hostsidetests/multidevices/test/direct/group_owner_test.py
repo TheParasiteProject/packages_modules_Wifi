@@ -53,12 +53,14 @@ class GroupOwnerTest(base_test.BaseTestClass):
         )
         self.group_owner_ad, self.client_ad, *_ = self.ads
         self.group_owner_ad.debug_tag = (
-            f'{self.group_owner_ad.serial}(Group Owner)'
+            f'{self.group_owner_ad.serial}-GroupOwner'
         )
-        self.client_ad.debug_tag = f'{self.client_ad.serial}(Client)'
+        self.client_ad.debug_tag = f'{self.client_ad.serial}-Client'
 
     def _setup_device(self, ad: android_device.AndroidDevice) -> None:
         ad.load_snippet('wifi', constants.WIFI_SNIPPET_PACKAGE_NAME)
+        # set the wifi snippet to foreground
+        ad.wifi.utilityBringToForeground()
         # Load Snippet UiAutomator
         ad.ui = uiautomator.UiDevice(ui=ad.wifi)
         wifi_test_utils.enable_wifi_verbose_logging(ad)

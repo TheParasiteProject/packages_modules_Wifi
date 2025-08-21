@@ -64,12 +64,14 @@ class ServiceDiscoveryTest(base_test.BaseTestClass):
         )
         self.responder_ad, self.requester_ad, *_ = self.ads
         self.responder_ad.debug_tag = (
-            f'{self.responder_ad.serial}(Responder)'
+            f'{self.responder_ad.serial}-Responder'
         )
-        self.requester_ad.debug_tag = f'{self.requester_ad.serial}(Requester)'
+        self.requester_ad.debug_tag = f'{self.requester_ad.serial}-Requester'
 
     def _setup_device(self, ad: android_device.AndroidDevice) -> None:
         ad.load_snippet('wifi', constants.WIFI_SNIPPET_PACKAGE_NAME)
+        # set the wifi snippet to foreground
+        ad.wifi.utilityBringToForeground()
         # Load snippet UiAutomator
         ad.ui = uiautomator.UiDevice(ui=ad.wifi)
         wifi_test_utils.enable_wifi_verbose_logging(ad)
