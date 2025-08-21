@@ -61,6 +61,7 @@ import com.google.android.mobly.snippet.event.SnippetEvent;
 import com.google.android.mobly.snippet.rpc.AsyncRpc;
 import com.google.android.mobly.snippet.rpc.Rpc;
 import com.google.snippet.wifi.aware.WifiAwareJsonDeserializer;
+import com.google.snippet.wifi.aware.WifiAwareSnippetConverter;
 import com.google.snippet.wifi.softap.WifiSapJsonDeserializer;
 
 import org.json.JSONArray;
@@ -105,6 +106,7 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
     private WifiManager.SuggestionConnectionStatusListener mSuggestionConnectionStatusListener;
     private WifiManager.SuggestionUserApprovalStatusListener mSuggestionUserApprovalStatusListener;
     private BroadcastReceiver mNetworkSuggestionPostConnectionReceiver;
+    private volatile boolean mIsScanResultAvailable = false;
 
 
     /**
@@ -912,6 +914,24 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
     }
 
     /**
+     * Enables/disables Wi-Fi scan throttling.
+     */
+    @Rpc(description = "Enable/disable wifi scan throttling.")
+    public void wifiSetScanThrottleState(boolean enabled) {
+        ShellIdentityUtils.invokeWithShellPermissions(
+                () -> mWifiManager.setScanThrottleEnabled(enabled));
+    }
+
+    /**
+     * Gets Wi-Fi scan throttling state.
+     */
+    @Rpc(description = "Get Wi-Fi scan throttle state.")
+    public boolean wifiIsScanThrottleEnabled() {
+        return ShellIdentityUtils.invokeWithShellPermissions(
+            () -> mWifiManager.isScanThrottleEnabled());
+    }
+
+    /**
      * Scan listener passed to WiFiScanner APIs.
      *
      * <p>With different types of events triggered when executing WiFiScanner APIs, corresponding
@@ -1093,5 +1113,46 @@ public class WifiManagerSnippet extends WifiShellPermissionSnippet implements Sn
     @Rpc(description = "Turn off Wi-Fi.")
     public void wifiToggleDisable() throws InterruptedException, WifiManagerSnippetException {
         wifiToggleState(false);
+    }
+
+    /** Start scan, wait for scan to complete, and return results. */
+    @Rpc(
+            description =
+                "Start scan, wait for scan to complete, and return results, which is a list of "
+                + "serialized WifiScanResult objects.")
+    public JSONArray wifiScanAndGetResultsWithShellPermission()
+            throws InterruptedException, JSONException, WifiManagerSnippetException {
+        WifiScanReceiver receiver = new WifiScanReceiver();
+        mContext.registerReceiver(
+                receiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+
+        try {
+            mIsScanResultAvailable = false;
+            if (!executeWithShellPermission(() -> mWifiManager.startScan())) {
+                throw new WifiManagerSnippetException("Failed to initiate Wi-Fi scan.", null);
+            }
+            if (!Utils.waitUntil(() -> mIsScanResultAvailable, 2 * 60)) {
+                throw new WifiManagerSnippetException(
+                    "Failed to get scan results after 2min, timeout!", null);
+            }
+
+            JSONArray results = new JSONArray();
+            for (ScanResult result : mWifiManager.getScanResults()) {
+                results.put(WifiAwareSnippetConverter.serializeScanResult(result));
+            }
+            return results;
+        } finally {
+            mContext.unregisterReceiver(receiver);
+        }
+    }
+
+    private class WifiScanReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context c, Intent intent) {
+            String action = intent.getAction();
+            if (!action.equals(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)) return;
+            if (!intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false)) return;
+            mIsScanResultAvailable = true;
+        }
     }
 }
