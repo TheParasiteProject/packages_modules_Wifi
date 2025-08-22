@@ -24,6 +24,7 @@ from mobly import records
 from mobly import test_runner
 from mobly import utils
 from mobly.controllers import android_device
+from snippet_uiautomator import uiautomator
 import wifi_test_utils
 
 from direct import constants
@@ -51,6 +52,8 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
 
     def _setup_device(self, ad: android_device.AndroidDevice) -> None:
         ad.load_snippet('wifi', constants.WIFI_SNIPPET_PACKAGE_NAME)
+        # Load Snippet UiAutomator
+        ad.ui = uiautomator.UiDevice(ui=ad.wifi)
         wifi_test_utils.enable_wifi_verbose_logging(ad)
         wifi_test_utils.set_screen_on_and_unlock(ad)
         wifi_test_utils.restart_wifi_and_disable_connection_scan(ad)
@@ -93,7 +96,12 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
             device_address=responder.p2p_device.device_address,
             wps_setup=constants.WpsInfo.PBC,
         )
-        p2p_utils.p2p_connect(requester, responder, p2p_config)
+        p2p_utils.p2p_connect(
+            requester,
+            responder,
+            p2p_config,
+            hsv_output_path=self.current_test_info.output_path,
+        )
 
         requester.ad.log.info('Disconnecting the peer device.')
         p2p_utils.remove_group_and_verify_disconnected(
@@ -137,7 +145,12 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
             device_address=responder.p2p_device.device_address,
             wps_setup=constants.WpsInfo.DISPLAY,
         )
-        p2p_utils.p2p_connect(requester, responder, p2p_config)
+        p2p_utils.p2p_connect(
+            requester,
+            responder,
+            p2p_config,
+            hsv_output_path=self.current_test_info.output_path,
+        )
 
         requester.ad.log.info('Disconnecting the peer device.')
         p2p_utils.remove_group_and_verify_disconnected(

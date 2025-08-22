@@ -26,6 +26,7 @@ from mobly import records
 from mobly import test_runner
 from mobly import utils
 from mobly.controllers import android_device
+from snippet_uiautomator import uiautomator
 
 import wifi_test_utils
 
@@ -69,6 +70,8 @@ class ServiceDiscoveryTest(base_test.BaseTestClass):
 
     def _setup_device(self, ad: android_device.AndroidDevice) -> None:
         ad.load_snippet('wifi', constants.WIFI_SNIPPET_PACKAGE_NAME)
+        # Load snippet UiAutomator
+        ad.ui = uiautomator.UiDevice(ui=ad.wifi)
         wifi_test_utils.enable_wifi_verbose_logging(ad)
         wifi_test_utils.set_screen_on_and_unlock(ad)
         wifi_test_utils.restart_wifi_and_disable_connection_scan(ad)

@@ -27,6 +27,7 @@ from mobly import signals
 from mobly import test_runner
 from mobly import utils
 from mobly.controllers import android_device
+from snippet_uiautomator import uiautomator
 
 from direct import constants
 from direct import p2p_utils
@@ -79,6 +80,8 @@ class GroupOwnerWithConfigTest(base_test.BaseTestClass):
 
     def _setup_device(self, ad: android_device.AndroidDevice) -> None:
         ad.load_snippet('wifi', constants.WIFI_SNIPPET_PACKAGE_NAME)
+        # Load snippet UiAutomator
+        ad.ui = uiautomator.UiDevice(ui=ad.wifi)
         wifi_test_utils.enable_wifi_verbose_logging(ad)
         wifi_test_utils.set_screen_on_and_unlock(ad)
         wifi_test_utils.restart_wifi_and_disable_connection_scan(ad)
@@ -178,7 +181,12 @@ class GroupOwnerWithConfigTest(base_test.BaseTestClass):
 
         # Step 4. The client connects the group owner with the same p2p group
         # configuration.
-        p2p_utils.p2p_connect(client, group_owner, p2p_config)
+        p2p_utils.p2p_connect(
+            client,
+            group_owner,
+            p2p_config,
+            hsv_output_path=self.current_test_info.output_path,
+        )
 
         # Step 5. Remove the p2p group on the client.
         p2p_utils.remove_group_and_verify_disconnected(

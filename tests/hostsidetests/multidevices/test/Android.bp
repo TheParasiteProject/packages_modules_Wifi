@@ -98,6 +98,7 @@ python_library_host {
     libs: [
         "wifi_direct_constants",
         "mobly",
+        "wifi_test_utils",
     ],
 }
 
@@ -134,6 +135,7 @@ python_test_host {
         "wifi_test_utils",
         "wifi_direct_test_utils",
         "platform-test-py-annotations",
+        "py-snippet-uiautomator",
     ],
     device_common_data: [":wifi_mobly_snippet"],
     test_options: {
