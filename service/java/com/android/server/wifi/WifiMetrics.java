@@ -18,6 +18,8 @@ package com.android.server.wifi;
 
 import static android.net.wifi.WifiConfiguration.MeteredOverride;
 import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_INVALID;
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_ML;
+import static android.net.wifi.WifiUsabilityStatsEntry.SCORER_TYPE_VELOCITY;
 
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_PRIMARY;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED;
@@ -258,6 +260,8 @@ public class WifiMetrics {
     public static final int COUNTRY_CODE_CONFLICT_WIFI_SCAN = -1;
     public static final int COUNTRY_CODE_CONFLICT_WIFI_SCAN_TELEPHONY = -2;
     public static final int MAX_COUNTRY_CODE_COUNT = 4;
+    public static final String INTERNAL_VELOCITY_SCORER_NAME = "INTERNAL_VELOCITY_SCORER";
+    public static final String INTERNAL_ML_SCORER_NAME = "INTERNAL_ML_SCORER";
     // Histogram for WifiConfigStore IO duration times. Indicates the following 5 buckets (in ms):
     //   < 50
     //   [50, 100)
@@ -9807,7 +9811,8 @@ public class WifiMetrics {
             int pollingIntervalMs,
             int aospScorerPrediction,
             int externalScorerPrediction,
-            boolean isExternalScorerActive
+            boolean isExternalScorerActive,
+            int internalScorerType
     ) {
         boolean isCellularDataAvailable = mWifiDataStall.isCellularDataAvailable();
         boolean isThroughputSufficient = mWifiDataStall.isThroughputSufficient();
@@ -9816,9 +9821,15 @@ public class WifiMetrics {
                 hasActiveSubInfo, isMobileDataEnabled, isCellularDataAvailable,
                 mAdaptiveConnectivityEnabled);
         int scorerUnusableEvent = convertWifiUnusableTypeForScorer(mUnusableEventType);
+        String internalAttributionTag = null;
+        if (internalScorerType == SCORER_TYPE_VELOCITY) {
+            internalAttributionTag = INTERNAL_VELOCITY_SCORER_NAME;
+        } else if (internalScorerType == SCORER_TYPE_ML) {
+            internalAttributionTag = INTERNAL_ML_SCORER_NAME;
+        }
         WifiStatsLog.write_non_chained(SCORER_PREDICTION_RESULT_REPORTED,
                 Process.WIFI_UID,
-                null,
+                internalAttributionTag,
                 aospScorerPrediction,
                 scorerUnusableEvent,
                 isThroughputSufficient, deviceState, pollingIntervalMs,
