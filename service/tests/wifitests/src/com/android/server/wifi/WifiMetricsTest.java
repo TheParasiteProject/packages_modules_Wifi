@@ -7632,6 +7632,100 @@ public class WifiMetricsTest extends WifiBaseTest {
                 WifiStatsLog.WIFI_PERIODIC_SCAN_REPORT__SCAN_TYPE__LOW_LATENCY, 2000));
     }
 
+    @Test
+    public void testconvertSoftApInfoChannelWidthToProto() {
+        int channel_bandwidth;
+        channel_bandwidth = mWifiMetrics.convertSoftApInfoChannelWidthToProto(
+                SoftApInfo.CHANNEL_WIDTH_20MHZ_NOHT);
+        assertEquals(
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_20MHZ_NOHT,
+                channel_bandwidth);
+
+        channel_bandwidth = mWifiMetrics.convertSoftApInfoChannelWidthToProto(
+                SoftApInfo.CHANNEL_WIDTH_20MHZ);
+        assertEquals(
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_20MHZ,
+                channel_bandwidth);
+
+        channel_bandwidth = mWifiMetrics.convertSoftApInfoChannelWidthToProto(
+                SoftApInfo.CHANNEL_WIDTH_40MHZ);
+        assertEquals(
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_40MHZ,
+                channel_bandwidth);
+
+        channel_bandwidth = mWifiMetrics.convertSoftApInfoChannelWidthToProto(
+                SoftApInfo.CHANNEL_WIDTH_80MHZ);
+        assertEquals(
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_80MHZ,
+                channel_bandwidth);
+
+        channel_bandwidth = mWifiMetrics.convertSoftApInfoChannelWidthToProto(
+                SoftApInfo.CHANNEL_WIDTH_80MHZ_PLUS_MHZ);
+        assertEquals(
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_80MHZ_PLUS_MHZ,
+                channel_bandwidth);
+
+        channel_bandwidth = mWifiMetrics.convertSoftApInfoChannelWidthToProto(
+                SoftApInfo.CHANNEL_WIDTH_160MHZ);
+        assertEquals(
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_160MHZ,
+                channel_bandwidth);
+
+        channel_bandwidth = mWifiMetrics.convertSoftApInfoChannelWidthToProto(
+                SoftApInfo.CHANNEL_WIDTH_320MHZ);
+        assertEquals(
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_320MHZ,
+                channel_bandwidth);
+
+        channel_bandwidth = mWifiMetrics.convertSoftApInfoChannelWidthToProto(
+                SoftApInfo.CHANNEL_WIDTH_2160MHZ);
+        assertEquals(
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_2160MHZ,
+                channel_bandwidth);
+
+        channel_bandwidth = mWifiMetrics.convertSoftApInfoChannelWidthToProto(
+                SoftApInfo.CHANNEL_WIDTH_4320MHZ);
+        assertEquals(
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_4320MHZ,
+                channel_bandwidth);
+
+        channel_bandwidth = mWifiMetrics.convertSoftApInfoChannelWidthToProto(
+                SoftApInfo.CHANNEL_WIDTH_6480MHZ);
+        assertEquals(
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_6480MHZ,
+                channel_bandwidth);
+
+        channel_bandwidth = mWifiMetrics.convertSoftApInfoChannelWidthToProto(
+                SoftApInfo.CHANNEL_WIDTH_8640MHZ);
+        assertEquals(
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_8640MHZ,
+                channel_bandwidth);
+
+        channel_bandwidth = mWifiMetrics.convertSoftApInfoChannelWidthToProto(
+                SoftApInfo.CHANNEL_WIDTH_AUTO);
+        assertEquals(
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_AUTO,
+                channel_bandwidth);
+
+        channel_bandwidth = mWifiMetrics.convertSoftApInfoChannelWidthToProto(
+                SoftApInfo.CHANNEL_WIDTH_INVALID);
+        assertEquals(
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_UNKNOWN,
+                channel_bandwidth);
+    }
+
+    @Test
+    public void testWifiSoftApInfoChanged() {
+        mWifiMetrics.writeSoftApInfoChanged(SOFT_AP_CHANNEL_FREQUENCY_5G,
+                SoftApInfo.CHANNEL_WIDTH_80MHZ, ScanResult.WIFI_STANDARD_11AX);
+        ExtendedMockito.verify(
+                () -> WifiStatsLog.write(WifiStatsLog.SOFT_AP_INFO_CHANGED,
+                SOFT_AP_CHANNEL_FREQUENCY_5G,
+                WifiStatsLog.WIFI_HEALTH_STAT_REPORTED__BAND__BAND_5G_LOW,
+                WifiStatsLog.SOFT_AP_INFO_CHANGED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_80MHZ,
+                WifiStatsLog.SOFT_AP_STOPPED__STANDARD__WIFI_STANDARD_11AX));
+    }
+
     /**
      * Test conversion of preamble type to usability stats type.
      */
