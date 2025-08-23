@@ -321,7 +321,7 @@ public class WifiInjector {
         mWifiDeviceStateChangeManager = new WifiDeviceStateChangeManager(context, mWifiThreadRunner,
                 this);
         mWifiGlobals = new WifiGlobals(mContext);
-        WifiUsabilityClassifierFactory mWifiUsabilityClassifierFactory =
+        mWifiUsabilityClassifierFactory =
                 new WifiUsabilityClassifierFactory(mContext, new RandomForestModule());
         mWifiMetrics = new WifiMetrics(mContext, mFrameworkFacade, mClock, wifiLooper,
                 awareMetrics, rttMetrics, new WifiPowerMetrics(mBatteryStats), mWifiP2pMetrics,

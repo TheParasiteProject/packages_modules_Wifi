@@ -3738,7 +3738,15 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 mUserOperatingChannel = 0;
                 mCoexUnsafeChannels.clear();
                 if (mTetheringManager != null) {
-                    mTetheringManager.unregisterTetheringEventCallback(mTetheringEventCallback);
+                    try {
+                        mTetheringManager.unregisterTetheringEventCallback(mTetheringEventCallback);
+                    } catch (IllegalArgumentException | IllegalStateException e) {
+                        // This can happen if the callback somehow removed from tethering module or
+                        // if the tethering service is not available during teardown.
+                        // It is safe to ignore.
+                        Log.w(TAG, "Exception while unregistering tethering callback: e = "
+                                + e);
+                    }
                 }
             }
         }
