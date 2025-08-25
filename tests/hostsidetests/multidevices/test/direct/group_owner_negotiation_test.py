@@ -42,8 +42,8 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
         super().setup_class()
         self.ads = self.register_controller(android_device, min_number=2)
         self.responder_ad, self.requester_ad, *_ = self.ads
-        self.responder_ad.debug_tag = f'{self.responder_ad.serial}(Responder)'
-        self.requester_ad.debug_tag = f'{self.requester_ad.serial}(Requester)'
+        self.responder_ad.debug_tag = f'{self.responder_ad.serial}-Responder'
+        self.requester_ad.debug_tag = f'{self.requester_ad.serial}-Requester'
         utils.concurrent_exec(
             self._setup_device,
             param_list=[[ad] for ad in self.ads],
@@ -52,6 +52,8 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
 
     def _setup_device(self, ad: android_device.AndroidDevice) -> None:
         ad.load_snippet('wifi', constants.WIFI_SNIPPET_PACKAGE_NAME)
+        # set the wifi snippet to foreground
+        ad.wifi.utilityBringToForeground()
         # Load Snippet UiAutomator
         ad.ui = uiautomator.UiDevice(ui=ad.wifi)
         wifi_test_utils.enable_wifi_verbose_logging(ad)

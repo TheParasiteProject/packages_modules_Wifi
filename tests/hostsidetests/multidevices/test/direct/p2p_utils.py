@@ -247,6 +247,9 @@ def discover_group_owner(
     client.ad.log.debug(
         'Discovering Wi-Fi p2p group owner %s.', group_owner_address
     )
+    # Clear events in broadcast receiver before initiating peer discovery.
+    _clear_events(client, constants.WIFI_P2P_PEERS_CHANGED_ACTION)
+
     client.ad.wifi.wifiP2pDiscoverPeers()
 
     # Wait until found the p2p peer device with expected MAC address. It must
@@ -502,9 +505,9 @@ def remove_group_and_verify_disconnected(
 
     # Clear events in broadcast receiver.
     _clear_events(requester, constants.WIFI_P2P_CONNECTION_CHANGED_ACTION)
-    _clear_events(requester, constants.ON_DEVICE_INFO_AVAILABLE)
+    _clear_events(requester, constants.WIFI_P2P_PEERS_CHANGED_ACTION)
     _clear_events(responder, constants.WIFI_P2P_CONNECTION_CHANGED_ACTION)
-    _clear_events(responder, constants.ON_DEVICE_INFO_AVAILABLE)
+    _clear_events(responder, constants.WIFI_P2P_PEERS_CHANGED_ACTION)
 
     # Requester initiates p2p group removal.
     requester.ad.wifi.wifiP2pRemoveGroup()
