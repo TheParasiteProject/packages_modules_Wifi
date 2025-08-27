@@ -5824,6 +5824,108 @@ public class ClientModeImplTest extends WifiBaseTest {
     }
 
     /**
+     * Verify that a one-shot signal poll is triggered when RSSI is stale during network
+     * validation failure.
+     */
+    @Test
+    public void testInternetValidationFailure_StaleRssi_ExpectPoll() throws Exception {
+        setupNetworkValidationFailure(TEST_RSSI);
+        reset(mWifiNative);
+        int freshRssi = -55;
+        WifiSignalPollResults freshPollResults = new WifiSignalPollResults();
+        freshPollResults.addEntry(0, freshRssi, 65, 54, sFreq);
+        when(mWifiNative.signalPoll(any())).thenReturn(freshPollResults);
+        when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
+        when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(new WifiLinkLayerStats());
+
+        int scanRssiValidTimeMs = 5000;
+
+        when(mWifiHealthMonitor.getScanRssiValidTimeMs()).thenReturn(scanRssiValidTimeMs);
+        mWifiInfo.setRssi(TEST_RSSI);
+
+        long lastRssiUpdateTimeMs = mWifiInfo.getLastRssiUpdateMillis();
+        long staleRssiTimeMs = lastRssiUpdateTimeMs + scanRssiValidTimeMs + 1;
+
+        when(mClock.getElapsedSinceBootMillis()).thenReturn(staleRssiTimeMs);
+
+        mWifiNetworkAgentCallbackCaptor.getValue().onValidationStatus(
+                NetworkAgent.VALIDATION_STATUS_NOT_VALID, null /* captivePortalUrl */);
+        mLooper.dispatchAll();
+
+        // Verify poll happened and blocklist uses new RSSI
+        verify(mWifiNative, times(1)).signalPoll(eq(WIFI_IFACE_NAME));
+        verify(mWifiBlocklistMonitor).handleBssidConnectionFailure(eq(TEST_BSSID_STR),
+                any(WifiConfiguration.class),
+                eq(WifiBlocklistMonitor.REASON_NETWORK_VALIDATION_FAILURE), eq(freshRssi));
+    }
+
+    @Test
+    public void testInternetValidationFailure_FreshRssi_ExpectNoPoll() throws Exception {
+        setupNetworkValidationFailure(TEST_RSSI);
+        reset(mWifiNative);
+
+        when(mWifiNative.signalPoll(any())).thenReturn(new WifiSignalPollResults());
+        when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
+        when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(new WifiLinkLayerStats());
+
+        int scanRssiValidTimeMs = 5000;
+
+        when(mWifiHealthMonitor.getScanRssiValidTimeMs()).thenReturn(scanRssiValidTimeMs);
+
+        mWifiInfo.setRssi(TEST_RSSI);
+        long lastRssiUpdateTimeMs = mWifiInfo.getLastRssiUpdateMillis();
+
+        long freshRssiTimeMs = lastRssiUpdateTimeMs + scanRssiValidTimeMs - 1;
+        when(mClock.getElapsedSinceBootMillis()).thenReturn(freshRssiTimeMs);
+
+        mWifiNetworkAgentCallbackCaptor.getValue().onValidationStatus(
+                NetworkAgent.VALIDATION_STATUS_NOT_VALID, null /* captivePortalUrl */);
+        mLooper.dispatchAll();
+
+        // Verify the one-shot poll was NOT triggered
+        verify(mWifiNative, never()).signalPoll(eq(WIFI_IFACE_NAME));
+
+        // Verify blocklist monitor is called with the current (fresh) RSSI
+        verify(mWifiBlocklistMonitor).handleBssidConnectionFailure(eq(TEST_BSSID_STR),
+                any(WifiConfiguration.class),
+                eq(WifiBlocklistMonitor.REASON_NETWORK_VALIDATION_FAILURE), eq(TEST_RSSI));
+    }
+
+    private void setupNetworkValidationFailure(int initialRssi) throws Exception {
+        // Setup RSSI poll to update WifiInfo
+        mCmi.enableRssiPolling(true);
+        WifiLinkLayerStats llStats = new WifiLinkLayerStats();
+        llStats.txmpdu_be = 1000;
+        llStats.rxmpdu_bk = 2000;
+        WifiSignalPollResults signalPollResults = new WifiSignalPollResults();
+        signalPollResults.addEntry(0, initialRssi, 65, 54, sFreq);
+        when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
+        when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(llStats);
+        when(mWifiNative.signalPoll(any())).thenReturn(signalPollResults);
+
+        connect();
+        verify(mWifiInjector).makeWifiNetworkAgent(any(), any(), any(), any(),
+                mWifiNetworkAgentCallbackCaptor.capture());
+
+        WifiConfiguration currentNetwork = new WifiConfiguration();
+        currentNetwork.networkId = FRAMEWORK_NETWORK_ID;
+        currentNetwork.SSID = DEFAULT_TEST_SSID;
+        currentNetwork.noInternetAccessExpected = false;
+        currentNetwork.numNoInternetAccessReports = 1;
+        currentNetwork.getNetworkSelectionStatus().setHasEverValidatedInternetAccess(true);
+
+        // not user selected
+        when(mWifiConfigManager.getConfiguredNetwork(FRAMEWORK_NETWORK_ID))
+                .thenReturn(currentNetwork);
+        when(mWifiConfigManager.getConfiguredNetworkWithoutMasking(FRAMEWORK_NETWORK_ID))
+                .thenReturn(currentNetwork);
+        when(mWifiConfigManager.getLastSelectedNetwork()).thenReturn(FRAMEWORK_NETWORK_ID + 1);
+    }
+
+    /**
      * Verify that we do not set the user connect choice after a successful connection if the
      * connection is not made by the user.
      */
