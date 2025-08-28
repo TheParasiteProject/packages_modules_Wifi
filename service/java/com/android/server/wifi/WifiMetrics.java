@@ -5113,6 +5113,8 @@ public class WifiMetrics {
                             + event.maxNumClientsSettingInSoftapConfiguration);
                     eventLine.append(",max_num_clients_setting_in_softap_capability="
                             + event.maxNumClientsSettingInSoftapCapability);
+                    eventLine.append(",auto_shutdown_is_enabled="
+                            + event.autoShutdownIsEnabled);
                     eventLine.append(",shutdown_timeout_setting_in_softap_configuration="
                             + event.shutdownTimeoutSettingInSoftapConfiguration);
                     eventLine.append(",default_shutdown_timeout_setting="
