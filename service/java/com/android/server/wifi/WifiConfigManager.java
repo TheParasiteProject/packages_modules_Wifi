@@ -24,6 +24,7 @@ import static android.net.wifi.WifiManager.AddNetworkResult.STATUS_INVALID_CONFI
 import static android.net.wifi.WifiManager.AddNetworkResult.STATUS_NO_PERMISSION_MODIFY_CONFIG;
 import static android.net.wifi.WifiManager.AddNetworkResult.STATUS_SUCCESS;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE;
+import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SAE;
 
 import static com.android.server.wifi.WifiConfigurationUtil.validatePassword;
 
@@ -4350,9 +4351,15 @@ public class WifiConfigManager {
             Log.e(TAG, "Cannot find network for " + networkId);
             return false;
         }
+        boolean isSaeTransitionSupported = mWifiInjector.getActiveModeWarden()
+                .getPrimaryClientModeManager().getSupportedFeaturesBitSet()
+                .get(WIFI_FEATURE_WPA3_SAE)
+                && mWifiInjector.getWifiGlobals().isWpa3SaeUpgradeEnabled();
+
         WifiConfiguration copy = new WifiConfiguration(config);
         boolean changed = false;
         if (0 != (indicationBit & WifiMonitor.TDI_USE_WPA3_PERSONAL)
+                && isSaeTransitionSupported
                 && config.isSecurityType(WifiConfiguration.SECURITY_TYPE_SAE)) {
             config.setSecurityParamsEnabled(WifiConfiguration.SECURITY_TYPE_PSK, false);
             changed = true;
@@ -4361,13 +4368,20 @@ public class WifiConfigManager {
             config.enableSaePkOnlyMode(true);
             changed = true;
         }
+        SecurityParams params = config.getNetworkSelectionStatus()
+                .getLastUsedSecurityParams();
+        if (params == null) {
+            Log.e(TAG, "Cannot find network connection security parameters for " + networkId);
+            return false;
+        }
         if (0 != (indicationBit & WifiMonitor.TDI_USE_WPA3_ENTERPRISE)
-                && config.isSecurityType(WifiConfiguration.SECURITY_TYPE_EAP_WPA3_ENTERPRISE)) {
+                && params.getSecurityType()
+                == WifiConfiguration.SECURITY_TYPE_EAP_WPA3_ENTERPRISE) {
             config.setSecurityParamsEnabled(WifiConfiguration.SECURITY_TYPE_EAP, false);
             changed = true;
         }
         if (0 != (indicationBit & WifiMonitor.TDI_USE_ENHANCED_OPEN)
-                && config.isSecurityType(WifiConfiguration.SECURITY_TYPE_OWE)) {
+                && params.getSecurityType() == WifiConfiguration.SECURITY_TYPE_OWE) {
             config.setSecurityParamsEnabled(WifiConfiguration.SECURITY_TYPE_OPEN, false);
             changed = true;
         }
