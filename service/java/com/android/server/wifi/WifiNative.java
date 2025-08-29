@@ -126,7 +126,7 @@ import java.util.TimeZone;
  * Native calls for bring up/shut down of the supplicant daemon and for
  * sending requests to the supplicant daemon
  *
- * {@hide}
+ * @hide
  */
 public class WifiNative {
     private static final String TAG = "WifiNative";

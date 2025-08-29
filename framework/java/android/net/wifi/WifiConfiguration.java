@@ -88,25 +88,25 @@ public class WifiConfiguration implements Parcelable {
      * Current Version of the Backup Serializer.
     */
     private static final int BACKUP_VERSION = 3;
-    /** {@hide} */
+    /** @hide */
     public static final String ssidVarName = "ssid";
-    /** {@hide} */
+    /** @hide */
     public static final String bssidVarName = "bssid";
-    /** {@hide} */
+    /** @hide */
     public static final String pskVarName = "psk";
-    /** {@hide} */
+    /** @hide */
     @Deprecated @UnsupportedAppUsage
     public static final String[] wepKeyVarNames = {"wep_key0", "wep_key1", "wep_key2", "wep_key3"};
-    /** {@hide} */
+    /** @hide */
     @Deprecated
     public static final String wepTxKeyIdxVarName = "wep_tx_keyidx";
-    /** {@hide} */
+    /** @hide */
     public static final String priorityVarName = "priority";
-    /** {@hide} */
+    /** @hide */
     public static final String hiddenSSIDVarName = "scan_ssid";
-    /** {@hide} */
+    /** @hide */
     public static final String pmfVarName = "ieee80211w";
-    /** {@hide} */
+    /** @hide */
     public static final String updateIdentiferVarName = "update_identifier";
     /**
      * The network ID for an invalid network.
@@ -115,12 +115,12 @@ public class WifiConfiguration implements Parcelable {
      */
     @SystemApi
     public static final int INVALID_NETWORK_ID = -1;
-    /** {@hide} */
+    /** @hide */
     public static final int LOCAL_ONLY_NETWORK_ID = -2;
 
-    /** {@hide} */
+    /** @hide */
     private String mPasspointManagementObjectTree;
-    /** {@hide} */
+    /** @hide */
     private static final int MAXIMUM_RANDOM_MAC_GENERATION_RETRY = 3;
 
     /**
@@ -4078,7 +4078,10 @@ public class WifiConfiguration implements Parcelable {
         mIpConfiguration.setHttpProxy(proxy);
     }
 
-    /** Implement the Parcelable interface {@hide} */
+    /**
+     * Implement the Parcelable interface
+     * @hide
+     */
     public int describeContents() {
         return 0;
     }
@@ -4212,7 +4215,10 @@ public class WifiConfiguration implements Parcelable {
         }
     }
 
-    /** Implement the Parcelable interface {@hide} */
+    /**
+     * Implement the Parcelable interface
+     * @hide
+     */
     @Override
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeInt(networkId);
@@ -4314,7 +4320,10 @@ public class WifiConfiguration implements Parcelable {
         dest.writeInt(mCreatorUserId);
     }
 
-    /** Implement the Parcelable interface {@hide} */
+    /**
+     * Implement the Parcelable interface
+     * @hide
+     */
     @SystemApi
     public static final @android.annotation.NonNull Creator<WifiConfiguration> CREATOR =
             new Creator<WifiConfiguration>() {
