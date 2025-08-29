@@ -16,6 +16,8 @@
 
 package com.google.snippet.wifi.aware;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import android.Manifest;
 import android.app.UiAutomation;
 import android.content.BroadcastReceiver;
@@ -53,6 +55,7 @@ import android.os.HandlerThread;
 import android.os.RemoteException;
 import android.text.TextUtils;
 import android.util.Base64;
+import android.util.SparseArray;
 
 import androidx.annotation.NonNull;
 import androidx.test.core.app.ApplicationProvider;
@@ -93,6 +96,9 @@ public class WifiAwareManagerSnippet implements Snippet {
     private final ConcurrentHashMap<Integer, PeerHandle> mPeerHandles = new ConcurrentHashMap<>();
     private final EventCache eventCache = EventCache.getInstance();
     private WifiAwareStateChangedReceiver stateChangedReceiver;
+
+    private final SparseArray<Long> mMssageStartTime = new SparseArray<>();
+
 
     /**
      * Custom exception class for handling specific errors related to the WifiAwareManagerSnippet
@@ -465,6 +471,9 @@ public class WifiAwareManagerSnippet implements Snippet {
             SnippetEvent event = new SnippetEvent(mCallBackId, "messageSendResult");
             event.getData().putString("callbackName", "onMessageSendSucceeded");
             event.getData().putInt("messageId", messageId);
+            Long startTime = mMssageStartTime.get(messageId);
+            event.getData().putLong(
+                    "latencyMs", System.currentTimeMillis() - startTime.longValue());
             EventCache.getInstance().postEvent(event);
         }
 
@@ -481,7 +490,7 @@ public class WifiAwareManagerSnippet implements Snippet {
             mPeerHandles.put(peerHandle.hashCode(), peerHandle);
             SnippetEvent event = new SnippetEvent(mCallBackId, "onMessageReceived");
             event.getData().putByteArray("receivedMessage", message);
-            event.getData().putInt("peerId", peerHandle.hashCode());
+            event.getData().putString("messageAsString", new String(message, UTF_8));
             EventCache.getInstance().postEvent(event);
         }
 
@@ -662,7 +671,9 @@ public class WifiAwareManagerSnippet implements Snippet {
         // 4. send message & wait for send status
         DiscoverySession session = getDiscoverySession(discoverySessionId);
         PeerHandle handle = getPeerHandler(peerId);
+        long startTime = System.currentTimeMillis();
         session.sendMessage(handle, messageId, message.getBytes(StandardCharsets.UTF_8));
+        mMssageStartTime.put(messageId, startTime);
     }
 
     /**

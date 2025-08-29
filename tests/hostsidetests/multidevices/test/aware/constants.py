@@ -135,6 +135,8 @@ class DiscoverySessionCallbackParamsType(enum.StrEnum):
     IS_SESSION_INIT = 'isSessionInitialized'
     MESSAGE_ID = 'messageId'
     RECEIVE_MESSAGE = 'receivedMessage'
+    SESSION_CB_KEY_MESSAGE_AS_STRING = "messageAsString"
+    SESSION_CB_KEY_LATENCY_MS = "latencyMs"
 
 
 @enum.unique
@@ -155,6 +157,8 @@ class NetworkCbEventKey(enum.StrEnum):
     TRANSPORT_INFO_CLASS_NAME = 'transportInfoClassName'
     CHANNEL_IN_MHZ = 'channelInMhz'
     NETWORK_INTERFACE_NAME = 'interfaceName'
+    NETWORK_CB_KEY_CURRENT_TS = "current_timestamp"
+    NETWORK_CB_KEY_CREATE_TS = "creation_timestamp"
 
 
 @enum.unique
