@@ -2,6 +2,15 @@
   "presubmit": [
     {
       "name": "MtsWifiTestCases"
+    },
+    {
+      "name": "GtsGmscoreHostTestCases",
+      "keywords": ["internal"],
+      "options" : [
+        {
+          "include-filter": "com.google.android.gts.wifi.WifiHostTest"
+        }
+      ]
     }
   ],
   "presubmit-large": [
