@@ -5,7 +5,7 @@
     },
     {
       "name": "GtsGmscoreHostTestCases",
-      "keywords": ["internal"],
+      "keywords": ["primary-device"],
       "options" : [
         {
           "include-filter": "com.google.android.gts.wifi.WifiHostTest"
