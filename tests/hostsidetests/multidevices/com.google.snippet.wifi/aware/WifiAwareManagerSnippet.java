@@ -490,6 +490,7 @@ public class WifiAwareManagerSnippet implements Snippet {
             mPeerHandles.put(peerHandle.hashCode(), peerHandle);
             SnippetEvent event = new SnippetEvent(mCallBackId, "onMessageReceived");
             event.getData().putByteArray("receivedMessage", message);
+            event.getData().putInt("peerId", peerHandle.hashCode());
             event.getData().putString("messageAsString", new String(message, UTF_8));
             EventCache.getInstance().postEvent(event);
         }
