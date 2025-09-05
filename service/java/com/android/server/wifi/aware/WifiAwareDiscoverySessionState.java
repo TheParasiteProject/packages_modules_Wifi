@@ -60,6 +60,7 @@ public class WifiAwareDiscoverySessionState {
     private boolean mDbg = false;
 
     private static int sNextPeerIdToBeAllocated = 100; // used to create a unique peer ID
+    public static final int INVALID_INSTANCE_ID = 0;
 
     private final WifiAwareNativeApi mWifiAwareNativeApi;
     private int mSessionId;
@@ -743,9 +744,14 @@ public class WifiAwareDiscoverySessionState {
     public int getPeerIdOrAddIfNew(int requestorInstanceId, byte[] peerMac) {
         for (int i = 0; i < mPeerInfoByRequestorInstanceId.size(); ++i) {
             PeerInfo peerInfo = mPeerInfoByRequestorInstanceId.valueAt(i);
-            if (peerInfo.mInstanceId == requestorInstanceId && Arrays.equals(peerMac,
-                    peerInfo.mMac)) {
-                return mPeerInfoByRequestorInstanceId.keyAt(i);
+            if (Arrays.equals(peerMac, peerInfo.mMac)) {
+                if (peerInfo.mInstanceId == INVALID_INSTANCE_ID) {
+                    // Update the instance ID if it was invalid.
+                    peerInfo.mInstanceId = requestorInstanceId;
+                }
+                if (peerInfo.mInstanceId == requestorInstanceId) {
+                    return peerInfo.mPeerHandle.peerId;
+                }
             }
         }
 
