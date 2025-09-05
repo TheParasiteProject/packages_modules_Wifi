@@ -8339,6 +8339,19 @@ public class ClientModeImplTest extends WifiBaseTest {
     }
 
     @Test
+    public void testRestrictedetworkCapabilityWithOverride() throws Exception {
+        // oemPaid introduced in S, not applicable to R
+        assumeTrue(SdkLevel.isAtLeastS());
+        mCmi.setRestrictedNetworkDebug(true);
+        connect();
+        expectRegisterNetworkAgent((agentConfig) -> { },
+                (cap) -> {
+                    assertFalse(cap.hasCapability(NetworkCapabilities
+                            .NET_CAPABILITY_NOT_RESTRICTED));
+                });
+    }
+
+    @Test
     public void testOemPrivateNetworkCapability() throws Exception {
         // oemPrivate introduced in S, not applicable to R
         assumeTrue(SdkLevel.isAtLeastS());

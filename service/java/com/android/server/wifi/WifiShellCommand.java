@@ -17,6 +17,7 @@
 package com.android.server.wifi;
 
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
+import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_OEM_PAID;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_OEM_PRIVATE;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_TRUSTED;
@@ -223,6 +224,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
     private static final Map<String, Pair<NetworkRequest, ConnectivityManager.NetworkCallback>>
             sActiveRequests = new ConcurrentHashMap<>();
 
+    private static final ConnectivityManager.NetworkCallback sRestrictedNetworkCallback =
+            new ConnectivityManager.NetworkCallback();
     private final ActiveModeWarden mActiveModeWarden;
     private final WifiGlobals mWifiGlobals;
     private final WifiLockManager mWifiLockManager;
@@ -1343,6 +1346,34 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 case "allow-root-to-get-local-only-cmm": {
                     boolean enabled = getNextArgRequiredTrueOrFalse("enabled", "disabled");
                     mActiveModeWarden.allowRootToGetLocalOnlyCmm(enabled);
+                    return 0;
+                }
+                case "set-restricted-network-debug": {
+                    boolean enabled = getNextArgRequiredTrueOrFalse("enabled", "disabled");
+                    mWifiThreadRunner.post(() -> {
+                        ClientModeManager primaryCmm =
+                                mActiveModeWarden.getPrimaryClientModeManager();
+                        primaryCmm.setRestrictedNetworkDebug(enabled);
+                        primaryCmm.updateCapabilities();
+                    }, "shell#set-restricted-request-debug");
+                    return 0;
+                }
+                case "add-restricted-request": {
+                    NetworkRequest.Builder builder = new NetworkRequest.Builder();
+                    builder.addTransportType(TRANSPORT_WIFI);
+                    builder.removeCapability(NET_CAPABILITY_NOT_RESTRICTED);
+                    NetworkRequest networkRequest = builder.build();
+                    mWifiThreadRunner.post(() -> mConnectivityManager.requestNetwork(
+                            networkRequest, sRestrictedNetworkCallback),
+                            "shell#add-restricted-request");
+                    Log.e("ClientModeImplTest", "added restricted network request");
+                    return 0;
+                }
+                case "remove-restricted-request": {
+                    mWifiThreadRunner.post(() -> mConnectivityManager.unregisterNetworkCallback(
+                            sRestrictedNetworkCallback),
+                            "shell#remove-restricted-request");
+                    Log.e("ClientModeImplTest", "removed restricted network request");
                     return 0;
                 }
                 case "add-request": {
@@ -3663,6 +3694,14 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("  allow-root-to-get-local-only-cmm enabled|disabled");
         pw.println("    sets whether the shell running as root could use the local-only secondary "
                 + "STA");
+        pw.println("  set-restricted-network-debug enabled|disabled");
+        pw.println("    If set to true, the current primary CMM's wifi connection will have "
+                + "     it's NET_CAPABILITY_NOT_RESTRICTED capability removed");
+        pw.println("  add-restricted-request");
+        pw.println("    Create a network request for a restricted network.");
+        pw.println("  remove-restricted-request");
+        pw.println("    remove the network request for a restricted network created with "
+                + "     add-restricted-request.");
         pw.println("  add-request [-g] [-i] [-n] [-s] <ssid> open|owe|wpa2|wpa3 [<passphrase>]"
                 + " [-b <bssid>] [-d <band=2|5|6|60>]");
         pw.println("    Add a network request with provided params");
