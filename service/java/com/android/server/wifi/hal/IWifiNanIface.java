@@ -185,11 +185,14 @@ public interface IWifiNanIface {
      * @param appInfo            Arbitrary binary blob transmitted to the peer.
      * @param capabilities       The capabilities of the firmware.
      * @param securityConfig     Security config to encrypt the data-path
+     * @param pubSubId           The pubSubId of the discovery session.
+     * @param frameProtectionEnabled Whether frame protection is enabled.
      */
     boolean initiateDataPath(short transactionId, int peerId, int channelRequestType,
             int channel, MacAddress peer, String interfaceName,
             boolean isOutOfBand, byte[] appInfo, Capabilities capabilities,
-            WifiAwareDataPathSecurityConfig securityConfig, byte pubSubId);
+            WifiAwareDataPathSecurityConfig securityConfig, byte pubSubId,
+        boolean frameProtectionEnabled);
 
     /**
      * Responds to a data request from a peer. Security is provided by either PMK or Passphrase (not
@@ -207,11 +210,14 @@ public interface IWifiNanIface {
      *                       session).
      * @param capabilities   The capabilities of the firmware.
      * @param securityConfig Security config to encrypt the data-path
+     * @param pubSubId       The pubSubId of the discovery session.
+     * @param frameProtectionEnabled Whether frame protection is enabled.
      */
     boolean respondToDataPathRequest(short transactionId, boolean accept, int ndpId,
             String interfaceName, byte[] appInfo,
             boolean isOutOfBand, Capabilities capabilities,
-            WifiAwareDataPathSecurityConfig securityConfig, byte pubSubId);
+            WifiAwareDataPathSecurityConfig securityConfig, byte pubSubId,
+            boolean frameProtectionEnabled);
 
     /**
      * Terminate an existing data-path (does not delete the interface).

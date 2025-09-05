@@ -454,11 +454,12 @@ public class WifiNanIface implements WifiHal.WifiInterface {
     public boolean initiateDataPath(short transactionId, int peerId, int channelRequestType,
             int channel, MacAddress peer, String interfaceName,
             boolean isOutOfBand, byte[] appInfo, Capabilities capabilities,
-            WifiAwareDataPathSecurityConfig securityConfig, byte pubSubId) {
+            WifiAwareDataPathSecurityConfig securityConfig, byte pubSubId,
+        boolean frameProtectionEnabled) {
         return validateAndCall("initiateDataPath", false,
                 () -> mWifiNanIface.initiateDataPath(transactionId, peerId, channelRequestType,
                         channel, peer, interfaceName, isOutOfBand, appInfo, capabilities,
-                        securityConfig, pubSubId));
+                        securityConfig, pubSubId, frameProtectionEnabled));
     }
 
     /**
@@ -468,11 +469,12 @@ public class WifiNanIface implements WifiHal.WifiInterface {
     public boolean respondToDataPathRequest(short transactionId, boolean accept, int ndpId,
             String interfaceName, byte[] appInfo,
             boolean isOutOfBand, Capabilities capabilities,
-            WifiAwareDataPathSecurityConfig securityConfig, byte pubSubId) {
+            WifiAwareDataPathSecurityConfig securityConfig, byte pubSubId,
+            boolean frameProtectionEnabled) {
         return validateAndCall("respondToDataPathRequest", false,
                 () -> mWifiNanIface.respondToDataPathRequest(transactionId, accept, ndpId,
                         interfaceName, appInfo, isOutOfBand, capabilities, securityConfig,
-                        pubSubId));
+                        pubSubId, frameProtectionEnabled));
     }
 
     /**

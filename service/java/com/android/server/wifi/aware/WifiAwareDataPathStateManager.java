@@ -472,7 +472,7 @@ public class WifiAwareDataPathStateManager {
             if (sVdbg) {
                 Log.v(TAG, "onDataPathRequest: network request cache = " + mNetworkRequestsCache);
             }
-            mMgr.respondToDataPathRequest(false, ndpId, "", null, false, null);
+            mMgr.respondToDataPathRequest(false, ndpId, "", null, false, null, null);
             return false;
         }
 
@@ -482,7 +482,7 @@ public class WifiAwareDataPathStateManager {
         if (nnri.interfaceName == null) {
             Log.w(TAG,
                     "onDataPathRequest: request " + networkSpecifier + " no interface available");
-            mMgr.respondToDataPathRequest(false, ndpId, "", null, false, null);
+            mMgr.respondToDataPathRequest(false, ndpId, "", null, false, null, null);
             mNetworkRequestsCache.remove(networkSpecifier);
             mNetworkFactory.letAppKnowThatRequestsAreUnavailable(nnri);
             return false;
@@ -499,7 +499,7 @@ public class WifiAwareDataPathStateManager {
                 NetworkInformationData.buildTlv(nnri.networkSpecifier.port,
                         nnri.networkSpecifier.transportProtocol),
                 nnri.networkSpecifier.isOutOfBand(),
-                nnri.networkSpecifier);
+                nnri.networkSpecifier, mac);
 
         return true;
     }
