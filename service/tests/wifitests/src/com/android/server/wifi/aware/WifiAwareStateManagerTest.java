@@ -21,6 +21,7 @@ import static android.hardware.wifi.V1_0.NanRangingIndication.EGRESS_MET_MASK;
 import static android.net.wifi.WifiAvailableChannel.OP_MODE_WIFI_AWARE;
 import static android.net.wifi.aware.Characteristics.WIFI_AWARE_CIPHER_SUITE_NCS_PK_PASN_128;
 
+import static com.android.server.wifi.aware.WifiAwareDiscoverySessionState.INVALID_INSTANCE_ID;
 import static com.android.server.wifi.WifiSettingsConfigStore.D2D_ALLOWED_WHEN_INFRA_STA_DISABLED;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_AWARE_CAPABILITIES;
 
@@ -6029,11 +6030,12 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
                 /* instantModeBand= */ 0,
                 /* isSuspendable= */ false,
                 /* pairingConfig= */ null);
-
+        int peerId0 = session.getPeerIdOrAddIfNew(INVALID_INSTANCE_ID, mac1);
         int peerId1 = session.getPeerIdOrAddIfNew(instanceId, mac1);
         int peerId2 = session.getPeerIdOrAddIfNew(instanceId, mac2);
         int peerId1Again = session.getPeerIdOrAddIfNew(instanceId, mac1);
 
+        assertEquals("Valid instanceId should override the invalid instanceId", peerId0, peerId1);
         assertEquals("Same MAC should return same peer ID", peerId1, peerId1Again);
         assertNotEquals("Different MACs should return different peer IDs", peerId1, peerId2);
 

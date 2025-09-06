@@ -642,7 +642,6 @@ package android.net.wifi {
     field public static final int RECENT_FAILURE_OCE_RSSI_BASED_ASSOCIATION_REJECTION = 1010; // 0x3f2
     field public static final int RECENT_FAILURE_POOR_CHANNEL_CONDITIONS = 1003; // 0x3eb
     field public static final int RECENT_FAILURE_REFUSED_TEMPORARILY = 1002; // 0x3ea
-    field public boolean allowAutojoin;
     field public int carrierId;
     field public boolean carrierMerged;
     field public String creatorName;
@@ -661,7 +660,6 @@ package android.net.wifi {
     field public int numScorerOverride;
     field public int numScorerOverrideAndSwitchedNetwork;
     field public boolean requirePmf;
-    field public boolean shared;
     field public int subscriptionId;
     field public boolean useExternalScores;
   }

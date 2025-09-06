@@ -1,0 +1,10 @@
+TestBeds:
+- Name: WifiConnectionTestbed
+  Controllers:
+    AndroidDevice:
+      - serial: <serial>
+    OpenWrtDevice:
+    - hostname: 127.0.0.1
+      ssh_port: 2222
+      username: root
+      skip_init_reboot: True

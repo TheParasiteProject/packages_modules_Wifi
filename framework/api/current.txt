@@ -224,6 +224,7 @@ package android.net.wifi {
     field public static final int SECURITY_TYPE_WAPI_PSK = 7; // 0x7
     field public static final int SECURITY_TYPE_WEP = 1; // 0x1
     field public String SSID;
+    field @FlaggedApi("com.android.wifi.flags.multi_user_wifi_enhancement") public boolean allowAutojoin;
     field @NonNull public java.util.BitSet allowedAuthAlgorithms;
     field @NonNull public java.util.BitSet allowedGroupCiphers;
     field @NonNull public java.util.BitSet allowedGroupManagementCiphers;
@@ -239,6 +240,7 @@ package android.net.wifi {
     field @Deprecated public int priority;
     field public String providerFriendlyName;
     field public long[] roamingConsortiumIds;
+    field @FlaggedApi("com.android.wifi.flags.multi_user_wifi_enhancement") public boolean shared;
     field public int status;
     field @Deprecated public String[] wepKeys;
     field @Deprecated public int wepTxKeyIndex;

@@ -1371,10 +1371,9 @@ public class WifiConfiguration implements Parcelable {
     /**
      * True if this network configuration is visible to and usable by other users on the
      * same device, false otherwise.
-     *
-     * @hide
      */
-    @SystemApi
+    @SuppressLint("MutableBareField")
+    @FlaggedApi(Flags.FLAG_MULTI_USER_WIFI_ENHANCEMENT)
     public boolean shared;
 
     /**
@@ -1491,9 +1490,9 @@ public class WifiConfiguration implements Parcelable {
     /**
      * Auto-join is allowed by user for this network.
      * Default true.
-     * @hide
      */
-    @SystemApi
+    @SuppressLint("MutableBareField")
+    @FlaggedApi(Flags.FLAG_MULTI_USER_WIFI_ENHANCEMENT)
     public boolean allowAutojoin = true;
 
     /**
