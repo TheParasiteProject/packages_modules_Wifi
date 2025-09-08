@@ -712,7 +712,7 @@ def check_discovered_upnp_services(
         timeout: The wait timeout.
     """
     channel_id = channel_id or device.channel_ids[0]
-    callback_handler = device.upnp_response_listeners[channel_id]
+    callback_handler = device.upnp_response_listeners.get(channel_id)
     if len(expected_services) == 0:
         _check_no_discovered_service(
             ad=device.ad,
@@ -775,7 +775,7 @@ def check_discovered_dns_sd_response(
         timeout: The wait timeout.
     """
     channel_id = channel_id or device.channel_ids[0]
-    callback_handler = device.dns_sd_response_listeners[channel_id]
+    callback_handler = device.dns_sd_response_listeners.get(channel_id)
     if not expected_responses:
         _check_no_discovered_service(
             device.ad,
@@ -843,7 +843,7 @@ def check_discovered_dns_sd_txt_record(
     """
     channel_id = channel_id or device.channel_ids[0]
     idx = device.channel_ids.index(channel_id)
-    callback_handler = device.dns_sd_response_listeners[idx]
+    callback_handler = device.dns_sd_response_listeners.get(idx)
     if not expected_records:
         _check_no_discovered_service(
             device.ad,
@@ -894,6 +894,9 @@ def _check_no_discovered_service(
     timeout: datetime.timedelta = _DEFAULT_TIMEOUT,
 ):
     """Checks that no service is received from the specified source device."""
+    if not callback_handler:
+        return
+
     def _is_expected_event(event):
         src_device = constants.WifiP2pDevice.from_dict(
             event.data['sourceDevice']
