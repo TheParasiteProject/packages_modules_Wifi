@@ -84,7 +84,7 @@ import com.android.modules.utils.StringParceledListSlice;
 /**
  * Interface that allows controlling and querying Wi-Fi connectivity.
  *
- * {@hide}
+ * @hide
  */
 interface IWifiManager {
     boolean isFeatureSupported(int feature);
