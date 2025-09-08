@@ -85,7 +85,6 @@ import android.os.RemoteException;
 import android.os.WorkSource;
 import android.os.connectivity.WifiActivityEnergyInfo;
 import android.security.advancedprotection.AdvancedProtectionFeature;
-import android.security.advancedprotection.AdvancedProtectionManager;
 import android.telephony.SubscriptionInfo;
 import android.text.TextUtils;
 import android.util.ArraySet;
@@ -13632,19 +13631,13 @@ public class WifiManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(android.security.Flags.FLAG_AAPM_API)
     @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     @NonNull
-    @SuppressLint("NewApi")
     public List<AdvancedProtectionFeature> getAvailableAdvancedProtectionFeatures() {
         if (!Environment.isSdkAtLeastB()) {
             throw new UnsupportedOperationException();
         }
         List<AdvancedProtectionFeature> features = new ArrayList<>();
-        if (Flags.wepDisabledInApm() && android.security.Flags.aapmApi()) {
-            features.add(new AdvancedProtectionFeature(
-                    AdvancedProtectionManager.FEATURE_ID_DISALLOW_WEP));
-        }
         return features;
     }
 
