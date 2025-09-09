@@ -7601,6 +7601,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                                                 config.networkId,
                                                 DISABLED_NO_INTERNET_TEMPORARY);
                                     }
+                                    pollForFreshRssiIfStale();
                                     mWifiBlocklistMonitor.handleBssidConnectionFailure(
                                             mLastBssid, config,
                                             WifiBlocklistMonitor.REASON_NETWORK_VALIDATION_FAILURE,
@@ -7760,6 +7761,24 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             if (SdkLevel.isAtLeastV() && mWifiInjector.getWifiVoipDetector() != null) {
                 mWifiInjector.getWifiVoipDetector().notifyWifiConnected(false,
                         isPrimary(), mInterfaceName);
+            }
+        }
+    }
+
+    /**
+     * Checks if the current RSSI is stale and, if so, performs a one-shot poll to get a fresh
+     * value before it is used for decisions like blocklisting.
+     */
+    private void pollForFreshRssiIfStale() {
+        if (mClock.getElapsedSinceBootMillis() - mWifiInfo.getLastRssiUpdateMillis()
+                > mWifiHealthMonitor.getScanRssiValidTimeMs()) {
+            Log.d(getTag(), "RSSI is stale, performing a one-shot poll before blocklisting.");
+            WifiSignalPollResults pollResults = mWifiNative.signalPoll(mInterfaceName);
+            if (pollResults != null) {
+                int newRssi = RssiUtil.calculateAdjustedRssi(pollResults.getRssi());
+                if (newRssi > mWifiInfo.INVALID_RSSI) {
+                    mWifiInfo.setRssi(newRssi);
+                }
             }
         }
     }
