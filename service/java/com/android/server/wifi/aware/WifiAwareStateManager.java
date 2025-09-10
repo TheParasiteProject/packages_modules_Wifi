@@ -1896,7 +1896,7 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
 
     /**
      * Response from firmware to
-     * {@link #respondToDataPathRequest(boolean, int, String, byte[], boolean, WifiAwareNetworkSpecifier)}
+     * {@link #respondToDataPathRequest(boolean, int, String, byte[], boolean, WifiAwareNetworkSpecifier, byte[])}
      */
     public void onRespondToDataPathSetupRequestResponse(short transactionId, boolean success,
             int reasonOnFailure) {
@@ -4368,7 +4368,7 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
                 return false;
             }
             pubSubId = (byte) session.getPubSubId();
-            frameProtectionEnabled = session.isPeerPaired(peerId);
+            frameProtectionEnabled = session.isPeerPaired(peer);
         }
         boolean success = mWifiAwareNativeApi.initiateDataPath(transactionId, peerId,
                 channelRequestType, channel, peer, interfaceName, isOutOfBand,
@@ -4412,10 +4412,7 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
                 return false;
             }
             pubSubId = (byte) session.getPubSubId();
-            PeerHandle peerHandle = session.getPeerHandleFromPeerMac(peerDiscoveryMac);
-            if (peerHandle != null) {
-                frameProtectionEnabled = session.isPeerPaired(peerHandle.peerId);
-            }
+            frameProtectionEnabled = session.isPeerPaired(peerDiscoveryMac);
         }
         boolean success = mWifiAwareNativeApi.respondToDataPathRequest(transactionId, accept, ndpId,
                 interfaceName, appInfo, isOutOfBand, mCapabilities, securityConfig, pubSubId,
@@ -5408,7 +5405,7 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
         sendAwareResourcesChangedBroadcast();
     }
 
-    private void onPairingRequestReceivedLocal(int discoverySessionId, int peerId,
+    private void onPairingRequestReceivedLocal(int discoverySessionId, int requestorInstanceId,
             byte[] peerDiscMacAddr, int pairingId, int requestType, byte[] nonce, byte[] tag) {
         Pair<WifiAwareClientState, WifiAwareDiscoverySessionState> data =
                 getClientSessionForPubSubId(discoverySessionId);
@@ -5418,7 +5415,7 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
             return;
         }
         if (requestType == NAN_PAIRING_REQUEST_TYPE_SETUP) {
-            data.second.onPairingRequestReceived(peerId, peerDiscMacAddr, pairingId);
+            data.second.onPairingRequestReceived(peerDiscMacAddr, pairingId);
             return;
         }
         // Response with the cache NPKSA
@@ -5428,15 +5425,22 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
         if (alias != null) {
             securityInfo = mPairingConfigManager.getSecurityInfoPairedDevice(alias);
         }
+        PeerHandle peerHandle = data.second.getPeerHandleFromPeerMac(peerDiscMacAddr);
+        int peerId = 0;
+        if (peerHandle == null) {
+            peerId = data.second.getPeerIdOrAddIfNew(requestorInstanceId, peerDiscMacAddr);
+        } else {
+            peerId = peerHandle.peerId;
+        }
         if (securityInfo != null) {
             responseNanPairingVerificationRequest(data.first.getClientId(),
                     data.second.getSessionId(),
-                    data.second.getPeerIdOrAddIfNew(peerId, peerDiscMacAddr), pairingId, alias,
+                    peerId, pairingId, alias,
                     true, securityInfo.mNpk, securityInfo.mAkm, securityInfo.mCipherSuite);
         } else {
             // If local cache is not found, reject the verification request.
             responseNanPairingVerificationRequest(data.first.getClientId(), discoverySessionId,
-                    data.second.getPeerIdOrAddIfNew(peerId, peerDiscMacAddr), pairingId, alias,
+                    peerId, pairingId, alias,
                     false, null, 0, WIFI_AWARE_CIPHER_SUITE_NCS_PK_PASN_128);
         }
     }
