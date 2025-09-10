@@ -540,6 +540,11 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
                 }
                 return 0;
             }
+            case "update_capabilities": {
+                mCapabilities = null;
+                tryToGetAwareCapability();
+                return 0;
+            }
             case "get_aware_resources": {
                 if (!SdkLevel.isAtLeastS()) {
                     return -1;
@@ -674,6 +679,8 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
         pw.println(" clear_override_instant_communication_mode: clear the override of the instant "
                 + "communication mode");
         pw.println(" set_cluster_id <value>: set the cluster id to request to join a cluster");
+        pw.println(" get_aware_resources: get the available aware resources");
+        pw.println(" update_capabilities: update the capabilities from device");
     }
 
     /**
