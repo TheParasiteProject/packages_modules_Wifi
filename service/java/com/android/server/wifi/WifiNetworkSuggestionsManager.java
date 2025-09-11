@@ -1226,10 +1226,6 @@ public class WifiNetworkSuggestionsManager {
             // Carrier merged network must be a enterprise network.
             return false;
         }
-        if (!WifiConfiguration.isMetered(wns.wifiConfiguration, null)) {
-            // Carrier merged network must be metered.
-            return false;
-        }
         if (wns.wifiConfiguration.subscriptionId == SubscriptionManager.INVALID_SUBSCRIPTION_ID
                 && wns.wifiConfiguration.getSubscriptionGroup() == null) {
             // Carrier merged network must have a valid subscription Id.

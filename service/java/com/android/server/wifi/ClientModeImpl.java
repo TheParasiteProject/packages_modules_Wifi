@@ -5309,7 +5309,12 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         }
 
         if (!WifiConfiguration.isMetered(currentWifiConfiguration, mWifiInfo)) {
-            builder.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+            if (currentWifiConfiguration.carrierMerged) {
+                builder.removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+                builder.addCapability(NetworkCapabilities.NET_CAPABILITY_TEMPORARILY_NOT_METERED);
+            } else {
+                builder.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+            }
         } else {
             builder.removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
         }

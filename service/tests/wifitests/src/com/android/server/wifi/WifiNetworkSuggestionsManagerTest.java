@@ -4595,14 +4595,6 @@ public class WifiNetworkSuggestionsManagerTest extends WifiBaseTest {
                 mWifiNetworkSuggestionsManager.add(Arrays.asList(networkSuggestion), TEST_UID_1,
                         TEST_PACKAGE_1, TEST_FEATURE));
 
-        // Adding carrier merged network is not metered will fail.
-        eapSimConfig.meteredOverride = WifiConfiguration.METERED_OVERRIDE_NONE;
-        networkSuggestion = createWifiNetworkSuggestion(
-                eapSimConfig, null, false, false, true, true, DEFAULT_PRIORITY_GROUP);
-        assertEquals(WifiManager.STATUS_NETWORK_SUGGESTIONS_ERROR_ADD_INVALID,
-                mWifiNetworkSuggestionsManager.add(Arrays.asList(networkSuggestion), TEST_UID_1,
-                        TEST_PACKAGE_1, TEST_FEATURE));
-
         // Adding carrier merged network without a valid SubID will fail.
         eapSimConfig.meteredOverride = WifiConfiguration.METERED_OVERRIDE_METERED;
         eapSimConfig.subscriptionId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
