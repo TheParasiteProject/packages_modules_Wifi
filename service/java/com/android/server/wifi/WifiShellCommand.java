@@ -37,7 +37,9 @@ import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
 import static android.net.wifi.aware.Characteristics.WIFI_AWARE_CIPHER_SUITE_NCS_PK_PASN_128;
 import static android.net.wifi.aware.Characteristics.WIFI_AWARE_CIPHER_SUITE_NCS_SK_128;
 import static android.net.wifi.aware.PublishConfig.PUBLISH_TYPE_SOLICITED;
+import static android.net.wifi.aware.PublishConfig.PUBLISH_TYPE_UNSOLICITED;
 import static android.net.wifi.aware.SubscribeConfig.SUBSCRIBE_TYPE_ACTIVE;
+import static android.net.wifi.aware.SubscribeConfig.SUBSCRIBE_TYPE_PASSIVE;
 
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP_BRIDGE;
@@ -2510,6 +2512,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                         return -1;
                     }
                     String awareServiceName = getNextArgRequired();
+                    boolean solicited = getNextArgRequiredTrueOrFalse("yes", "no");
                     boolean securityEnabled = getNextArgRequiredTrueOrFalse("yes", "no");
                     boolean pairingEnabled = getNextArgRequiredTrueOrFalse("yes", "no");
                     String bootMethods = getNextArgRequired();
@@ -2529,7 +2532,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                                             .build();
                             PublishConfig.Builder builder = new PublishConfig.Builder()
                                     .setServiceName(awareServiceName)
-                                    .setPublishType(PUBLISH_TYPE_SOLICITED);
+                                    .setPublishType(solicited
+                                            ? PUBLISH_TYPE_SOLICITED : PUBLISH_TYPE_UNSOLICITED);
                             if (securityEnabled) {
                                 builder.setDataPathSecurityConfig(securityConfig);
                             }
@@ -2589,8 +2593,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                         return -1;
                     }
                     String awareServiceName = getNextArgRequired();
+                    boolean active = getNextArgRequiredTrueOrFalse("yes", "no");
                     boolean enabled = getNextArgRequiredTrueOrFalse("yes", "no");
                     String bootMethods = getNextArgRequired();
+                    String pairingPw = getNextArgRequired();
                     boolean success = mWifiThreadRunner.call(() -> {
                         try {
                             AwarePairingConfig pairingConfig = new AwarePairingConfig.Builder()
@@ -2601,8 +2607,9 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                                     .build();
                             SubscribeConfig.Builder builder = new SubscribeConfig.Builder()
                                     .setServiceName(awareServiceName)
-                                    .setSubscribeType(SUBSCRIBE_TYPE_ACTIVE);
-                            if (SdkLevel.isAtLeastU()) {
+                                    .setSubscribeType(active
+                                            ? SUBSCRIBE_TYPE_ACTIVE : SUBSCRIBE_TYPE_PASSIVE);
+                            if (SdkLevel.isAtLeastU() && enabled) {
                                 builder.setPairingConfig(pairingConfig);
                             }
                             sWifiAwareSession.subscribe(builder.build(),
@@ -2639,6 +2646,13 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                                                 int method) {
                                             Log.d(TAG, peerHandle.peerId
                                                     + " onBootstrappingSucceeded: " + method);
+                                            if (!SdkLevel.isAtLeastU()) {
+                                                return;
+                                            }
+                                            mWifiThreadRunner.post(() -> sDiscoverySession
+                                                .initiatePairingRequest(sPeerHandle, "test",
+                                                WIFI_AWARE_CIPHER_SUITE_NCS_PK_PASN_128,
+                                                pairingPw));
                                         }
                                     }, mWifiThreadRunner.getHandler());
                         } catch (Exception e) {
@@ -3897,20 +3911,24 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    Set wifi scan throttling for 3P apps enabled or disabled.");
         pw.println("  aware-attach");
         pw.println("    enable Wi-Fi Aware");
-        pw.println("  aware-publish <service name> <security enabled=yes|no>"
+        pw.println("  aware-publish <service name> <solicited publish=yes|no> "
+                + "<security enabled=yes|no>"
                 + "<pairing enabled=yes|no> <bootstrapping methods> <pairing password>");
         pw.println("    Start Aware publish ");
         pw.println("    <service name> - Name of the service, should be the same as subscribe");
+        pw.println("    <solicited publish> - use solicited publish or unsolicited publish");
         pw.println("    <security enabled> - enable security or not");
         pw.println("    <pairing enabled> - enable security or not");
         pw.println("    <bootstrapping methods> - bootstrapping method for pairing");
         pw.println("    <pairing password> - password used for pairing");
-        pw.println("  aware-subscribe <service name> <pairing enabled=yes|no> "
-                + "<bootstrapping methods>");
+        pw.println("  aware-subscribe <service name> <active subscriber=yes|no> "
+                + "<pairing enabled=yes|no> <bootstrapping methods> <pairing password>");
         pw.println("    Start Aware subscribe ");
         pw.println("    <service name> - Name of the service, should be the same as subscribe");
+        pw.println("    <active subscriber> - use active subscriber or passive subscriber");
         pw.println("    <pairing enabled> - enable security or not");
         pw.println("    <bootstrapping methods> - bootstrapping method for pairing");
+        pw.println("    <pairing password> - password used for pairing");
         pw.println("  aware-stop-publish-subscribe");
         pw.println("    stop current publish/subscribe session");
         pw.println("  aware-initiate-pairing-request <pairing password>");
