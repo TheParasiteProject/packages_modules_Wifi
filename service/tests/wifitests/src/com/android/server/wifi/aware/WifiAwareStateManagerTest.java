@@ -4612,7 +4612,7 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         final String alias = "alias";
 
         AwarePairingConfig pairingConfig = new AwarePairingConfig(true, true, true,
-                AwarePairingConfig.PAIRING_BOOTSTRAPPING_QR_SCAN,
+                AwarePairingConfig.PAIRING_BOOTSTRAPPING_QR_DISPLAY,
                 WIFI_AWARE_CIPHER_SUITE_NCS_PK_PASN_128);
         ConfigRequest configRequest = new ConfigRequest.Builder().build();
         PublishConfig publishConfig = new PublishConfig.Builder()
@@ -4677,7 +4677,7 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         mDut.onRespondToBootstrappingIndicationResponseSuccess(transactionId.getValue());
         mMockLooper.dispatchAll();
         verify(mockSessionCallback).onBootstrappingVerificationConfirmed(peerIdCaptor.capture(),
-                eq(true), eq(AwarePairingConfig.PAIRING_BOOTSTRAPPING_QR_SCAN));
+                eq(true), eq(AwarePairingConfig.PAIRING_BOOTSTRAPPING_QR_DISPLAY));
 
         // (4) receive pairing request
         mDut.onPairingRequestNotification(publishId, peerId, peerMac1, pairId,
