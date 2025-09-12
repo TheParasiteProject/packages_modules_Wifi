@@ -169,13 +169,43 @@ public class WifiAwareDiscoverySessionState {
     }
 
     /**
-     * Check if proposed method can be fulfilled by the configure.
+     * Get the matched method from the publisher
      */
-    public boolean acceptsBootstrappingMethod(int method) {
+    public int getMatchedBootstrappingMethod(int method) {
         if (mPairingConfig == null) {
-            return false;
+            return 0;
         }
-        return (mPairingConfig.getBootstrappingMethods() & method) != 0;
+        int matchingMethod = getMatchingBootstrappingMethod(method);
+        if ((mPairingConfig.getBootstrappingMethods() & matchingMethod) != 0) {
+            return matchingMethod;
+        }
+        if ((mPairingConfig.getBootstrappingMethods() & method) != 0) {
+            // keep the legacy behavior
+            return method;
+        }
+        return 0;
+    }
+
+    private static int getMatchingBootstrappingMethod(int method) {
+        return switch (method) {
+            case AwarePairingConfig.PAIRING_BOOTSTRAPPING_QR_SCAN ->
+                    AwarePairingConfig.PAIRING_BOOTSTRAPPING_QR_DISPLAY;
+            case AwarePairingConfig.PAIRING_BOOTSTRAPPING_NFC_READER ->
+                    AwarePairingConfig.PAIRING_BOOTSTRAPPING_NFC_TAG;
+            case AwarePairingConfig.PAIRING_BOOTSTRAPPING_NFC_TAG ->
+                    AwarePairingConfig.PAIRING_BOOTSTRAPPING_NFC_READER;
+            case AwarePairingConfig.PAIRING_BOOTSTRAPPING_QR_DISPLAY ->
+                    AwarePairingConfig.PAIRING_BOOTSTRAPPING_QR_SCAN;
+            case AwarePairingConfig.PAIRING_BOOTSTRAPPING_PIN_CODE_KEYPAD ->
+                    AwarePairingConfig.PAIRING_BOOTSTRAPPING_PIN_CODE_DISPLAY;
+            case AwarePairingConfig.PAIRING_BOOTSTRAPPING_PASSPHRASE_KEYPAD ->
+                    AwarePairingConfig.PAIRING_BOOTSTRAPPING_PASSPHRASE_DISPLAY;
+            case AwarePairingConfig.PAIRING_BOOTSTRAPPING_PIN_CODE_DISPLAY ->
+                    AwarePairingConfig.PAIRING_BOOTSTRAPPING_PIN_CODE_KEYPAD;
+            case AwarePairingConfig.PAIRING_BOOTSTRAPPING_PASSPHRASE_DISPLAY ->
+                    AwarePairingConfig.PAIRING_BOOTSTRAPPING_PASSPHRASE_KEYPAD;
+            default -> method;
+        };
     }
 
     /**
@@ -742,6 +772,18 @@ public class WifiAwareDiscoverySessionState {
             mCallback.onBootstrappingVerificationConfirmed(peerId, accept, method);
         } catch (RemoteException e) {
             Log.w(TAG, "onBootStrappingConfirmReceived: RemoteException (FYI): " + e);
+        }
+    }
+
+    /**
+     * Event that response to bootstrapping request success
+     */
+    public void onBootstrappingResponseConfirmed(int peerId, int method) {
+        try {
+            mCallback.onBootstrappingVerificationConfirmed(peerId, true,
+                    getMatchedBootstrappingMethod(method));
+        } catch (RemoteException e) {
+            Log.w(TAG, "onBootstrappingResponseConfirmed: RemoteException (FYI): " + e);
         }
     }
 

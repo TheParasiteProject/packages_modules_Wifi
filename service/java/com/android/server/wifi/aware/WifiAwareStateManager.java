@@ -5070,7 +5070,7 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
             return;
         }
         if (data.getBoolean(MESSAGE_BUNDLE_KEY_BOOTSTRAPPING_ACCEPT)) {
-            session.onBootStrappingConfirmReceived(info.mPeerId, true, info.mMethod);
+            session.onBootstrappingResponseConfirmed(info.mPeerId, info.mMethod);
         }
     }
 
@@ -5498,7 +5498,7 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
                     + discoverySessionId);
             return;
         }
-        if (data.second.acceptsBootstrappingMethod(method)) {
+        if (data.second.getMatchedBootstrappingMethod(method) != 0) {
             respondToBootstrappingRequest(data.first.getClientId(), data.second.getSessionId(),
                     data.second.getPeerIdOrAddIfNew(peerId, peerDiscMacAddr), bootstrappingId,
                     true, method);
