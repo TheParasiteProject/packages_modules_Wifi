@@ -1,3 +1,3 @@
-mobly
-mobly-wifi
-snippet-uiautomator
+mobly==1.13
+mobly-wifi==1.3.0
+snippet-uiautomator==1.1.2
