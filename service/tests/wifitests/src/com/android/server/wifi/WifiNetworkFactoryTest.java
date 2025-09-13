@@ -49,6 +49,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.validateMockitoUsage;
 import static org.mockito.Mockito.verify;
@@ -408,7 +409,7 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
     @Test
     public void testHandleAcceptNetworkRequestFromWithUnsupportedSpecifier() throws Exception {
         // Attach an unsupported specifier.
-        mNetworkCapabilities.setNetworkSpecifier(mock(NetworkSpecifier.class));
+        mNetworkCapabilities.setNetworkSpecifier(spy(NetworkSpecifier.class));
         mNetworkRequest = new NetworkRequest.Builder()
                 .setCapabilities(mNetworkCapabilities)
                 .build();
@@ -753,10 +754,18 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
     @Test
     public void testHandleNetworkRequestWithUnsupportedSpecifier() throws Exception {
         // Attach an unsupported specifier.
-        mNetworkCapabilities.setNetworkSpecifier(mock(NetworkSpecifier.class));
+        mNetworkCapabilities.setNetworkSpecifier(spy(NetworkSpecifier.class));
         mNetworkRequest = new NetworkRequest.Builder()
                 .setCapabilities(mNetworkCapabilities)
                 .build();
+
+        if (mNetworkCapabilities.getNetworkSpecifier() == null) {
+            throw new IllegalArgumentException();
+        }
+
+        if (mNetworkRequest.getNetworkSpecifier() == null) {
+            throw new IllegalArgumentException();
+        }
 
         // Ignore the request, but don't release it.
         mWifiNetworkFactory.needNetworkFor(mNetworkRequest);
