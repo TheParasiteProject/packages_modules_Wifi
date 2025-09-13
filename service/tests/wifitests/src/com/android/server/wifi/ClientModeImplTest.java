@@ -9012,11 +9012,15 @@ public class ClientModeImplTest extends WifiBaseTest {
         when(mDataTelephonyManager.getSubscriberId()).thenReturn(testSubscriberId);
         mConnectedNetwork.carrierMerged = true;
         mConnectedNetwork.subscriptionId = DATA_SUBID;
+        mConnectedNetwork.meteredOverride = METERED_OVERRIDE_NOT_METERED;
         connect();
         expectRegisterNetworkAgent((agentConfig) -> {
             assertEquals(testSubscriberId, agentConfig.subscriberId);
         }, (cap) -> {
                 assertFalse(cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VCN_MANAGED));
+                assertFalse(cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED));
+                assertTrue(cap.hasCapability(NetworkCapabilities
+                        .NET_CAPABILITY_TEMPORARILY_NOT_METERED));
                 assertEquals(Collections.singleton(DATA_SUBID), cap.getSubscriptionIds());
             });
         // Verify VCN policy listener is registered

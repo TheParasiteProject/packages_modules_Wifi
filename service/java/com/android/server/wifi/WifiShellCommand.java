@@ -2519,26 +2519,26 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     String pairingPw = getNextArgRequired();
                     boolean success = mWifiThreadRunner.call(() -> {
                         try {
-                            AwarePairingConfig pairingConfig = new AwarePairingConfig.Builder()
-                                    .setPairingCacheEnabled(true)
-                                    .setPairingSetupEnabled(true)
-                                    .setPairingVerificationEnabled(true)
-                                    .setBootstrappingMethods(Integer.parseInt(bootMethods))
-                                    .build();
-                            WifiAwareDataPathSecurityConfig securityConfig =
-                                    new WifiAwareDataPathSecurityConfig
-                                            .Builder(WIFI_AWARE_CIPHER_SUITE_NCS_SK_128)
-                                            .setPskPassphrase(pairingPw)
-                                            .build();
                             PublishConfig.Builder builder = new PublishConfig.Builder()
                                     .setServiceName(awareServiceName)
                                     .setPublishType(solicited
                                             ? PUBLISH_TYPE_SOLICITED : PUBLISH_TYPE_UNSOLICITED);
                             if (securityEnabled) {
+                                WifiAwareDataPathSecurityConfig securityConfig =
+                                        new WifiAwareDataPathSecurityConfig
+                                                .Builder(WIFI_AWARE_CIPHER_SUITE_NCS_SK_128)
+                                                .setPskPassphrase(pairingPw)
+                                                .build();
                                 builder.setDataPathSecurityConfig(securityConfig);
                             }
 
                             if (pairingEnabled && SdkLevel.isAtLeastU()) {
+                                AwarePairingConfig pairingConfig = new AwarePairingConfig.Builder()
+                                        .setPairingCacheEnabled(true)
+                                        .setPairingSetupEnabled(true)
+                                        .setPairingVerificationEnabled(true)
+                                        .setBootstrappingMethods(Integer.parseInt(bootMethods))
+                                        .build();
                                 builder.setPairingConfig(pairingConfig);
                             }
                             sWifiAwareSession.publish(builder.build(),
@@ -2594,22 +2594,22 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     }
                     String awareServiceName = getNextArgRequired();
                     boolean active = getNextArgRequiredTrueOrFalse("yes", "no");
-                    boolean enabled = getNextArgRequiredTrueOrFalse("yes", "no");
+                    boolean pairingEnabled = getNextArgRequiredTrueOrFalse("yes", "no");
                     String bootMethods = getNextArgRequired();
                     String pairingPw = getNextArgRequired();
                     boolean success = mWifiThreadRunner.call(() -> {
                         try {
-                            AwarePairingConfig pairingConfig = new AwarePairingConfig.Builder()
-                                    .setPairingCacheEnabled(true)
-                                    .setPairingSetupEnabled(true)
-                                    .setPairingVerificationEnabled(true)
-                                    .setBootstrappingMethods(Integer.parseInt(bootMethods))
-                                    .build();
                             SubscribeConfig.Builder builder = new SubscribeConfig.Builder()
                                     .setServiceName(awareServiceName)
                                     .setSubscribeType(active
                                             ? SUBSCRIBE_TYPE_ACTIVE : SUBSCRIBE_TYPE_PASSIVE);
-                            if (SdkLevel.isAtLeastU() && enabled) {
+                            if (SdkLevel.isAtLeastU() && pairingEnabled) {
+                                AwarePairingConfig pairingConfig = new AwarePairingConfig.Builder()
+                                        .setPairingCacheEnabled(true)
+                                        .setPairingSetupEnabled(true)
+                                        .setPairingVerificationEnabled(true)
+                                        .setBootstrappingMethods(Integer.parseInt(bootMethods))
+                                        .build();
                                 builder.setPairingConfig(pairingConfig);
                             }
                             sWifiAwareSession.subscribe(builder.build(),
@@ -2623,7 +2623,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                                         public void onServiceDiscovered(ServiceDiscoveryInfo info) {
                                             sPeerHandle = info.getPeerHandle();
                                             Log.d(TAG, "onServiceDiscovered " + sPeerHandle.peerId);
-                                            if (SdkLevel.isAtLeastU()
+                                            if (pairingEnabled && SdkLevel.isAtLeastU()
                                                     && info.getPairedAlias() == null) {
                                                 sDiscoverySession.initiateBootstrappingRequest(
                                                         sPeerHandle,
